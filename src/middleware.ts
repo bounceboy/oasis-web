@@ -24,7 +24,7 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const pathname = request.nextUrl.pathname
 
-  // Redirect ke login jika belum login dan akses halaman protected
+  // Redirect ke login jika belum login
   if (!user && pathname !== '/login' && !pathname.startsWith('/api/auth')) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
@@ -32,6 +32,33 @@ export async function middleware(request: NextRequest) {
   // Redirect ke dashboard jika sudah login dan akses /login
   if (user && pathname === '/login') {
     return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  // Proteksi route /admin — cek role di database
+  if (user && pathname.startsWith('/admin')) {
+    const { data: profile } = await supabase
+      .from('oasis_profiles')
+      .select('role, status')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || profile.role !== 'admin') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+  }
+
+  // Cek status akun suspended
+  if (user && !pathname.startsWith('/api') && pathname !== '/login') {
+    const { data: profile } = await supabase
+      .from('oasis_profiles')
+      .select('status')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.status === 'suspended') {
+      await supabase.auth.signOut()
+      return NextResponse.redirect(new URL('/login?error=suspended', request.url))
+    }
   }
 
   return supabaseResponse
