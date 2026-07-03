@@ -1,8 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { COOKIE_NAME } from '@/lib/session'
 
 export async function POST() {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
-  return NextResponse.redirect(new URL('/login', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'))
+  const res = NextResponse.redirect(
+    new URL('/login', process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000')
+  )
+  res.cookies.set(COOKIE_NAME, '', { maxAge: 0, path: '/' })
+  return res
 }

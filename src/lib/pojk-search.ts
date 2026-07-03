@@ -1,10 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+import { db } from '@/lib/db'
 
 export async function searchRelevantPojk(query: string, limit = 10): Promise<string> {
-  const supabase = await createClient()
-
-  // Full-text search via kolom fts yang sudah ada (generated, config 'simple')
-  const { data, error } = await supabase
+  const { data, error } = await db()
     .from('pojk_chunks')
     .select('pasal, content, pojk_id, source')
     .textSearch('fts', query.split(' ').slice(0, 5).join(' | '), {
@@ -14,8 +11,7 @@ export async function searchRelevantPojk(query: string, limit = 10): Promise<str
     .limit(limit)
 
   if (error || !data?.length) {
-    // Fallback: ambil chunks umum jika search gagal
-    const { data: fallback } = await supabase
+    const { data: fallback } = await db()
       .from('pojk_chunks')
       .select('pasal, content, pojk_id')
       .limit(5)

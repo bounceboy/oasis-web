@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-
 type Direktorat = { id: string; kode: string; nama: string }
 type Departemen = { id: string; direktorat_id: string; kode: string; nama: string }
 
@@ -28,13 +26,11 @@ export default function RegisterPage() {
     departemen_id: '',
   })
 
-  // Ambil daftar direktorat & departemen (public, tanpa auth)
   useEffect(() => {
-    const supabase = createClient()
     Promise.all([
-      supabase.from('oasis_direktorat').select('id, kode, nama').eq('aktif', true).order('urutan'),
-      supabase.from('oasis_departemen').select('id, direktorat_id, kode, nama').eq('aktif', true).order('urutan'),
-    ]).then(([{ data: dirs }, { data: deps }]) => {
+      fetch('/api/org/direktorat').then((r) => r.json()),
+      fetch('/api/org/departemen').then((r) => r.json()),
+    ]).then(([dirs, deps]) => {
       setDirektoratList(dirs ?? [])
       setDepartemenList(deps ?? [])
     })

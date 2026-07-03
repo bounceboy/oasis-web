@@ -1,41 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { db } from '@/lib/db'
+import { createSession, COOKIE_NAME, COOKIE_OPTIONS, type SessionUser } from '@/lib/session'
 
 export async function POST(req: NextRequest) {
   const { username, password } = await req.json()
-
   if (!username || !password) {
     return NextResponse.json({ error: 'Username dan password wajib diisi' }, { status: 400 })
   }
 
-  const supabase = await createClient()
-  const internalEmail = `${username.toLowerCase().trim()}@oasis.internal`
+  // Verifikasi password dengan bcrypt di Postgres
+  const { data, error } = await db()
+    .from('oasis_users')
+    .select('id, username, nama_lengkap, role, status, direktorat_id, departemen_id, password_hash')
+    .eq('username', username.toLowerCase().trim())
+    .single()
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: internalEmail,
-    password,
-  })
-
-  if (error) {
+  if (error || !data) {
     return NextResponse.json({ error: 'Username atau password salah' }, { status: 401 })
   }
 
-  // Cek status akun
-  const { data: profile } = await supabase
-    .from('oasis_profiles')
-    .select('status, nama_lengkap, role')
-    .eq('id', data.user.id)
-    .single()
+  // Verifikasi password via Postgres crypt
+  const { data: pwCheck } = await db()
+    .rpc('verify_password', { input_password: password, hash: data.password_hash })
 
-  if (profile?.status === 'suspended') {
-    await supabase.auth.signOut()
+  if (!pwCheck) {
+    return NextResponse.json({ error: 'Username atau password salah' }, { status: 401 })
+  }
+
+  if (data.status === 'suspended') {
     return NextResponse.json({ error: 'Akun Anda telah dinonaktifkan. Hubungi administrator.' }, { status: 403 })
   }
 
-  if (profile?.status === 'pending') {
-    await supabase.auth.signOut()
-    return NextResponse.json({ error: 'Akun Anda sedang menunggu aktivasi dari administrator.' }, { status: 403 })
+  // Update last_login
+  await db().from('oasis_users').update({ last_login: new Date().toISOString() }).eq('id', data.id)
+
+  const user: SessionUser = {
+    id: data.id,
+    username: data.username,
+    nama_lengkap: data.nama_lengkap,
+    role: data.role,
+    direktorat_id: data.direktorat_id,
+    departemen_id: data.departemen_id,
+    status: data.status,
   }
 
-  return NextResponse.json({ ok: true, role: profile?.role })
+  const token = await createSession(user)
+  const res = NextResponse.json({ ok: true, role: user.role })
+  res.cookies.set(COOKIE_NAME, token, COOKIE_OPTIONS)
+  return res
 }

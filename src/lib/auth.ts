@@ -1,31 +1,17 @@
-import { createClient } from '@/lib/supabase/server'
-import type { OasisProfile } from '@/types'
+import { getSession, type SessionUser } from '@/lib/session'
 
-export async function getProfile(): Promise<OasisProfile | null> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data } = await supabase
-    .from('oasis_profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  if (!data) return null
-  return { ...data, email: user.email }
+export async function getUser(): Promise<SessionUser | null> {
+  return getSession()
 }
 
-export async function requireAdmin() {
-  const profile = await getProfile()
-  if (!profile || profile.role !== 'admin') {
-    return null
-  }
-  return profile
+export async function requireUser(): Promise<SessionUser> {
+  const user = await getSession()
+  if (!user) throw new Error('Unauthorized')
+  return user
 }
 
-export async function requireRole(...roles: string[]) {
-  const profile = await getProfile()
-  if (!profile || !roles.includes(profile.role)) return null
-  return profile
+export async function requireAdmin(): Promise<SessionUser | null> {
+  const user = await getSession()
+  if (!user || user.role !== 'admin') return null
+  return user
 }

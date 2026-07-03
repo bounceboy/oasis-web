@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/auth'
+import { db } from '@/lib/db'
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const formData = await req.formData()
@@ -14,11 +14,11 @@ export async function POST(req: NextRequest) {
 
   if (!file) return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 400 })
 
-  // Buat session baru di Supabase
-  const { data: session, error } = await supabase
+  const { data: session, error } = await db()
     .from('pemeriksaan_sessions')
     .insert({
       user_id: user.id,
+      direktorat_id: user.direktorat_id,
       nama_entitas: namaEntitas,
       jenis_usaha: jenisUsaha,
       jenis_pemeriksaan: jenisPemeriksaan,

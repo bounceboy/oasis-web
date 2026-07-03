@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/auth'
+import { db } from '@/lib/db'
 import type { MaskingVault, MaskingEntity } from '@/types'
 
-// Simpan vault masking ke Supabase (terenkripsi via RLS + service role)
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { sessionId, vault, entities } = await req.json() as {
@@ -14,7 +13,7 @@ export async function POST(req: NextRequest) {
     entities: MaskingEntity[]
   }
 
-  const { error } = await supabase
+  const { error } = await db()
     .from('masking_vaults')
     .upsert({
       session_id: sessionId,
@@ -23,7 +22,6 @@ export async function POST(req: NextRequest) {
       entities_summary: entities.map((e) => ({
         token: e.token,
         category: e.category,
-        // Simpan original terenkripsi — RLS pastikan hanya user ini yang bisa akses
         original: e.original,
       })),
     })
@@ -33,14 +31,13 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
   const sessionId = searchParams.get('sessionId')
 
-  const { data, error } = await supabase
+  const { data, error } = await db()
     .from('masking_vaults')
     .select('vault_data, entities_summary')
     .eq('session_id', sessionId)

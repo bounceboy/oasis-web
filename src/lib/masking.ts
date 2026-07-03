@@ -19,7 +19,7 @@ export async function maskDocument(
   text: string,
   ollamaUrl = 'http://localhost:11434'
 ): Promise<{ maskedText: string; vault: MaskingVault; entities: MaskingEntity[] }> {
-  const chunks = []
+  const chunks: string[] = []
   for (let i = 0; i < text.length; i += CHUNK_SIZE) {
     chunks.push(text.slice(i, i + CHUNK_SIZE))
   }

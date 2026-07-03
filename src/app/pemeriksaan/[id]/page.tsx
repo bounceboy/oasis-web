@@ -1,14 +1,14 @@
 import { redirect, notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/auth'
+import { db } from '@/lib/db'
 import Link from 'next/link'
 
 export default async function SessionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) redirect('/login')
 
-  const { data: session } = await supabase
+  const { data: session } = await db()
     .from('pemeriksaan_sessions')
     .select('*')
     .eq('id', id)

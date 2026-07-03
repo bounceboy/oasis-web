@@ -1,20 +1,23 @@
 import { redirect } from 'next/navigation'
 import { requireAdmin } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { db } from '@/lib/db'
 import Link from 'next/link'
 
 export default async function AdminPage() {
   const profile = await requireAdmin()
   if (!profile) redirect('/dashboard')
 
-  const supabase = await createClient()
-
-  const [{ count: totalUsers }, { count: totalSessions }, { data: recentUsers }] =
+  const [{ count: totalUsers }, { count: totalSessions }] =
     await Promise.all([
-      supabase.from('oasis_profiles').select('*', { count: 'exact', head: true }),
-      supabase.from('pemeriksaan_sessions').select('*', { count: 'exact', head: true }),
-      supabase.from('oasis_profiles').select('id, nama_lengkap, role, status, created_at').order('created_at', { ascending: false }).limit(5),
+      db().from('oasis_users').select('*', { count: 'exact', head: true }),
+      db().from('pemeriksaan_sessions').select('*', { count: 'exact', head: true }),
     ])
+
+  const { data: recentUsers } = await db()
+    .from('oasis_users')
+    .select('id, username, nama_lengkap, role, status, created_at')
+    .order('created_at', { ascending: false })
+    .limit(5)
 
   const stats = [
     { label: 'Total User', value: totalUsers ?? 0, href: '/admin/users' },
@@ -35,7 +38,6 @@ export default async function AdminPage() {
       <div className="max-w-5xl mx-auto px-6 py-8">
         <h1 className="text-xl font-semibold mb-6">Panel Administrasi OASIS</h1>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 gap-4 mb-8">
           {stats.map((s) => (
             <Link key={s.label} href={s.href}
@@ -46,26 +48,21 @@ export default async function AdminPage() {
           ))}
         </div>
 
-        {/* Quick actions */}
         <div className="flex gap-3 mb-8">
           <Link href="/admin/users"
             className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
             Kelola User
           </Link>
-          <Link href="/admin/users/invite"
-            className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            + Undang User Baru
-          </Link>
         </div>
 
-        {/* User terbaru */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <h2 className="font-medium mb-4 text-slate-300">User Terbaru</h2>
           <div className="space-y-3">
             {recentUsers?.map((u) => (
               <div key={u.id} className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">{u.nama_lengkap || '(belum diisi)'}</p>
+                  <p className="text-sm font-medium">{u.nama_lengkap || u.username}</p>
+                  <p className="text-slate-500 text-xs">{u.username}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <RoleBadge role={u.role} />

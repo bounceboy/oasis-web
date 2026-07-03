@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/auth'
+import { db } from '@/lib/db'
 import { analyzeCompliance, analyzeRisk } from '@/lib/claude'
 import { demaskText, detectLeaks } from '@/lib/masking'
 import { searchRelevantPojk } from '@/lib/pojk-search'
 import type { MaskingVault } from '@/types'
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
@@ -23,20 +23,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Parameter tidak lengkap' }, { status: 400 })
   }
 
-  // Update status ke processing
-  await supabase
+  await db()
     .from('pemeriksaan_sessions')
     .update({ status: 'processing' })
     .eq('id', sessionId)
     .eq('user_id', user.id)
 
   try {
-    // RAG: cari pasal POJK relevan
     const pojkContext = await searchRelevantPojk(
       `${jenisUsaha} ${maskedText.slice(0, 500)}`
     )
 
-    // Analisis compliance
     const complianceRaw = await analyzeCompliance({
       maskedText,
       pojkContext,
@@ -44,7 +41,6 @@ export async function POST(req: NextRequest) {
       jenisUsaha,
     })
 
-    // Analisis risk-based
     const riskRaw = await analyzeRisk({
       maskedText,
       pojkContext,
@@ -53,18 +49,15 @@ export async function POST(req: NextRequest) {
       complianceResult: complianceRaw,
     })
 
-    // Demasking
     const complianceFinal = demaskText(complianceRaw, vault)
     const riskFinal = demaskText(riskRaw, vault)
 
-    // Cek kebocoran
     const leaks = [
       ...detectLeaks(complianceFinal, vault),
       ...detectLeaks(riskFinal, vault),
     ]
 
-    // Simpan hasil ke Supabase
-    await supabase
+    await db()
       .from('pemeriksaan_sessions')
       .update({
         status: 'selesai',
@@ -82,7 +75,7 @@ export async function POST(req: NextRequest) {
       leaks,
     })
   } catch (err) {
-    await supabase
+    await db()
       .from('pemeriksaan_sessions')
       .update({ status: 'error' })
       .eq('id', sessionId)

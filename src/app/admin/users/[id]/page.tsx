@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 
 type Direktorat = { id: string; kode: string; nama: string }
 type Departemen = { id: string; direktorat_id: string; kode: string; nama: string }
@@ -27,15 +26,14 @@ export default function EditUserPage() {
   })
 
   useEffect(() => {
-    const supabase = createClient()
     Promise.all([
-      supabase.from('oasis_direktorat').select('id, kode, nama').eq('aktif', true).order('urutan'),
-      supabase.from('oasis_departemen').select('id, direktorat_id, kode, nama').eq('aktif', true).order('urutan'),
+      fetch('/api/org/direktorat').then((r) => r.json()),
+      fetch('/api/org/departemen').then((r) => r.json()),
       fetch(`/api/admin/users/${id}`).then((r) => r.json()),
-    ]).then(([{ data: dirs }, { data: deps }, userData]) => {
+    ]).then(([dirs, deps, userData]) => {
       setDirektoratList(dirs ?? [])
       setDepartemenList(deps ?? [])
-      setUsername(userData.username ?? userData.email?.replace('@oasis.internal', '') ?? '')
+      setUsername(userData.username ?? '')
       setForm({
         nama_lengkap: userData.nama_lengkap ?? '',
         role: userData.role ?? 'pemeriksa',
