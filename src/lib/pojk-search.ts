@@ -3,13 +3,13 @@ import { createClient } from '@/lib/supabase/server'
 export async function searchRelevantPojk(query: string, limit = 10): Promise<string> {
   const supabase = await createClient()
 
-  // Full-text search di pojk_chunks
+  // Full-text search via kolom fts yang sudah ada (generated, config 'simple')
   const { data, error } = await supabase
     .from('pojk_chunks')
-    .select('pasal, content, pojk_id')
-    .textSearch('content', query.split(' ').slice(0, 5).join(' | '), {
+    .select('pasal, content, pojk_id, source')
+    .textSearch('fts', query.split(' ').slice(0, 5).join(' | '), {
       type: 'plain',
-      config: 'indonesian',
+      config: 'simple',
     })
     .limit(limit)
 
@@ -25,10 +25,10 @@ export async function searchRelevantPojk(query: string, limit = 10): Promise<str
   return formatChunks(data)
 }
 
-function formatChunks(chunks: { pasal: string; content: string; pojk_id: string }[]): string {
+function formatChunks(chunks: { pasal: string; content: string; pojk_id: string; source?: string }[]): string {
   if (!chunks.length) return 'Tidak ada referensi POJK yang relevan ditemukan.'
 
   return chunks
-    .map((c) => `[${c.pojk_id} - ${c.pasal}]\n${c.content}`)
+    .map((c) => `[${c.source || c.pojk_id} - ${c.pasal}]\n${c.content}`)
     .join('\n\n---\n\n')
 }
