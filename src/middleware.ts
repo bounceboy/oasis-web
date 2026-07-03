@@ -25,12 +25,14 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // Redirect ke login jika belum login
-  if (!user && pathname !== '/login' && !pathname.startsWith('/api/auth')) {
+  const publicPaths = ['/login', '/register']
+  const isPublic = publicPaths.includes(pathname) || pathname.startsWith('/api/auth')
+  if (!user && !isPublic) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
   // Redirect ke dashboard jika sudah login dan akses /login
-  if (user && pathname === '/login') {
+  if (user && (pathname === '/login' || pathname === '/register')) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 

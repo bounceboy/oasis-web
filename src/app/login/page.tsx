@@ -1,28 +1,34 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
-  const supabase = createClient()
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError(error.message)
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    })
+
+    const data = await res.json()
+    if (!res.ok) {
+      setError(data.error)
       setLoading(false)
     } else {
       router.push('/dashboard')
+      router.refresh()
     }
   }
 
@@ -42,14 +48,15 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
           <div>
-            <label className="block text-sm text-slate-300 mb-1.5">Email</label>
+            <label className="block text-sm text-slate-300 mb-1.5">Username</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
+              autoComplete="username"
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-              placeholder="nama@ojk.go.id"
+              placeholder="username Anda"
             />
           </div>
           <div>
@@ -59,6 +66,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
               placeholder="••••••••"
             />
@@ -79,7 +87,14 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-slate-600 text-xs mt-6">
+        <p className="text-center text-slate-500 text-sm mt-4">
+          Belum punya akun?{' '}
+          <Link href="/register" className="text-blue-400 hover:text-blue-300">
+            Buat akun
+          </Link>
+        </p>
+
+        <p className="text-center text-slate-700 text-xs mt-6">
           OJK Internal System — Akses terbatas
         </p>
       </div>
