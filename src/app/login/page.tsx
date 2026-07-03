@@ -27,7 +27,7 @@ export default function LoginPage() {
       setError(data.error)
       setLoading(false)
     } else {
-      router.push('/dashboard')
+      router.push('/app')
       router.refresh()
     }
   }

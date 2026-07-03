@@ -8,10 +8,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Username dan password wajib diisi' }, { status: 400 })
   }
 
-  // Verifikasi password dengan bcrypt di Postgres
   const { data, error } = await db()
     .from('oasis_users')
-    .select('id, username, nama_lengkap, role, status, direktorat_id, departemen_id, password_hash')
+    .select('id, username, nama_lengkap, role, status, direktorat_id, departemen_id, password_hash, oasis_direktorat(kode)')
     .eq('username', username.toLowerCase().trim())
     .single()
 
@@ -19,7 +18,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Username atau password salah' }, { status: 401 })
   }
 
-  // Verifikasi password via Postgres crypt
   const { data: pwCheck } = await db()
     .rpc('verify_password', { input_password: password, hash: data.password_hash })
 
@@ -31,15 +29,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Akun Anda telah dinonaktifkan. Hubungi administrator.' }, { status: 403 })
   }
 
-  // Update last_login
   await db().from('oasis_users').update({ last_login: new Date().toISOString() }).eq('id', data.id)
+
+  // Use direktorat KODE (e.g. "DPSS") as direktorat_id in session — the OASIS app needs the code
+  const direktoratKode = data.oasis_direktorat?.kode ?? null
 
   const user: SessionUser = {
     id: data.id,
     username: data.username,
     nama_lengkap: data.nama_lengkap,
     role: data.role,
-    direktorat_id: data.direktorat_id,
+    direktorat_id: direktoratKode,
     departemen_id: data.departemen_id,
     status: data.status,
   }

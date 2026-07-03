@@ -39,9 +39,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
+  // Redirect / dan /dashboard ke /app (main OASIS app)
+  if (pathname === '/' || pathname === '/dashboard') {
+    return NextResponse.redirect(new URL('/app', request.url))
+  }
+
   // Proteksi /admin — hanya role admin
   if (pathname.startsWith('/admin') && user.role !== 'admin') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return NextResponse.redirect(new URL('/app', request.url))
   }
 
   return NextResponse.next()
