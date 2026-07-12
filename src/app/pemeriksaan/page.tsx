@@ -2,9 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import type { MaskingVault, MaskingEntity } from '@/types'
-
-type Step = 1 | 2 | 3 | 4 | 5
+type Step = 1 | 2 | 3
 type Status = 'idle' | 'loading' | 'done' | 'error'
 
 export default function PemeriksaanPage() {
@@ -15,22 +13,15 @@ export default function PemeriksaanPage() {
   const [status, setStatus] = useState<Status>('idle')
   const [log, setLog] = useState<string[]>([])
 
-  // Form
   const [namaEntitas, setNamaEntitas] = useState('')
   const [jenisUsaha, setJenisUsaha] = useState('')
   const [jenisPemeriksaan, setJenisPemeriksaan] = useState('compliance')
   const [file, setFile] = useState<File | null>(null)
   const [docText, setDocText] = useState('')
+  const [sessionId, setSessionId] = useState('')
 
-  // Masking
-  const [vault, setVault] = useState<MaskingVault>({})
-  const [entities, setEntities] = useState<MaskingEntity[]>([])
-  const [maskedText, setMaskedText] = useState('')
-
-  // Hasil
   const [compliance, setCompliance] = useState('')
   const [risk, setRisk] = useState('')
-  const [sessionId, setSessionId] = useState('')
   const [activeTab, setActiveTab] = useState<'compliance' | 'risk'>('compliance')
 
   function addLog(msg: string) {
@@ -75,9 +66,8 @@ export default function PemeriksaanPage() {
     try {
       const text = await extractText(file)
       setDocText(text)
-      addLog(`Dokumen berhasil dibaca: ${text.length.toLocaleString()} karakter`)
+      addLog(`Dokumen dibaca: ${text.length.toLocaleString()} karakter`)
 
-      // Buat session di backend
       const fd = new FormData()
       fd.append('file', file)
       fd.append('namaEntitas', namaEntitas)
@@ -98,79 +88,36 @@ export default function PemeriksaanPage() {
     }
   }
 
-  async function handleStep2() {
+  async function handleAnalyze() {
     setStatus('loading')
-    addLog('Memulai masking via Ollama (lokal)...')
-    addLog('Peringatan: proses ini berjalan di browser, Ollama harus aktif di localhost:11434')
-
-    try {
-      const { maskDocument } = await import('@/lib/masking')
-      const result = await maskDocument(docText)
-
-      setVault(result.vault)
-      setEntities(result.entities)
-      setMaskedText(result.maskedText)
-
-      addLog(`Masking selesai: ${result.entities.length} entitas terdeteksi`)
-      result.entities.slice(0, 5).forEach((e) => {
-        addLog(`  ${e.category}: "${e.original}" → ${e.token}`)
-      })
-      if (result.entities.length > 5) addLog(`  ... dan ${result.entities.length - 5} entitas lainnya`)
-
-      // Simpan vault ke Supabase
-      await fetch('/api/vault', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, vault: result.vault, entities: result.entities }),
-      })
-      addLog('Vault tersimpan di Supabase')
-
-      setStep(3)
-      setStatus('idle')
-    } catch (err) {
-      addLog(`Error masking: ${err instanceof Error ? err.message : String(err)}`)
-      setStatus('error')
-    }
-  }
-
-  async function handleStep3() {
-    setStatus('loading')
-    addLog('Mengirim dokumen termasking ke Claude via OpenRouter...')
-    addLog('Mencari referensi POJK relevan (RAG)...')
+    addLog('Mencari referensi POJK relevan...')
+    addLog('Mengirim dokumen ke AI untuk dianalisis...')
 
     try {
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, maskedText, vault, namaEntitas, jenisUsaha }),
+        body: JSON.stringify({ sessionId, docText, namaEntitas, jenisUsaha }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
 
       setCompliance(data.compliance)
       setRisk(data.risk)
+      addLog('Analisis selesai')
 
-      if (data.leaks?.length > 0) {
-        addLog(`⚠️ Peringatan: ${data.leaks.length} entitas asli terdeteksi di respons (kebocoran)`)
-      } else {
-        addLog('Validasi kebocoran: OK — tidak ada entitas asli di respons')
-      }
-      addLog('Analisis Claude selesai')
-      addLog('Demasking hasil analisis selesai')
-
-      setStep(4)
-      setStatus('idle')
+      setStep(3)
+      setStatus('done')
     } catch (err) {
-      addLog(`Error analisis: ${err instanceof Error ? err.message : String(err)}`)
+      addLog(`Error: ${err instanceof Error ? err.message : String(err)}`)
       setStatus('error')
     }
   }
 
   const steps = [
     { n: 1, label: 'Upload Dokumen' },
-    { n: 2, label: 'Masking Entitas' },
-    { n: 3, label: 'Analisis AI' },
-    { n: 4, label: 'Hasil' },
+    { n: 2, label: 'Konfirmasi' },
+    { n: 3, label: 'Hasil' },
   ]
 
   return (
@@ -301,86 +248,61 @@ export default function PemeriksaanPage() {
           </div>
         )}
 
-        {/* Step 2: Masking */}
+        {/* Step 2 — Konfirmasi */}
         {step === 2 && (
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-            <h2 className="font-semibold text-lg">Masking Entitas Sensitif</h2>
-            <p className="text-slate-400 text-sm">
-              Entitas sensitif (nama orang, perusahaan, produk, NIK) akan disembunyikan sebelum dikirim ke AI.
-              Proses ini berjalan lokal di browser via Ollama — data tidak keluar dari perangkat Anda.
-            </p>
-            <div className="bg-slate-800 rounded-lg p-4 text-sm">
-              <p className="text-slate-300">Dokumen: <span className="text-white font-medium">{file?.name}</span></p>
-              <p className="text-slate-300 mt-1">Ukuran teks: <span className="text-white font-medium">{docText.length.toLocaleString()} karakter</span></p>
-              <p className="text-slate-300 mt-1">Estimasi chunk: <span className="text-white font-medium">{Math.ceil(docText.length / 8000)} chunk</span></p>
+            <h2 className="font-semibold text-lg">Konfirmasi & Mulai Analisis</h2>
+
+            <div className="bg-slate-800 rounded-lg p-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Entitas</span>
+                <span className="font-medium">{namaEntitas}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Jenis Usaha</span>
+                <span>{jenisUsaha}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Jenis Pemeriksaan</span>
+                <span className="capitalize">{jenisPemeriksaan}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Dokumen</span>
+                <span>{file?.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Ukuran Teks</span>
+                <span>{docText.length.toLocaleString()} karakter</span>
+              </div>
             </div>
-            <div className="bg-amber-900/20 border border-amber-800/50 rounded-lg px-4 py-3">
-              <p className="text-amber-400 text-sm font-medium">⚠️ Pastikan Ollama aktif</p>
-              <p className="text-amber-500/70 text-xs mt-1">Jalankan: <code className="font-mono">ollama serve</code> di terminal</p>
+
+            <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg px-4 py-3 text-sm text-blue-300">
+              Dokumen akan dikirim ke AI bersama referensi POJK yang relevan untuk dianalisis.
             </div>
+
             <button
-              onClick={handleStep2}
+              onClick={handleAnalyze}
               disabled={status === 'loading'}
               className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg py-2.5 text-sm font-medium transition-colors"
             >
-              {status === 'loading' ? 'Masking berjalan...' : 'Mulai Masking →'}
+              {status === 'loading' ? 'Menganalisis...' : 'Mulai Analisis →'}
             </button>
           </div>
         )}
 
-        {/* Step 3: Analisis */}
+        {/* Step 3 — Hasil */}
         {step === 3 && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-            <h2 className="font-semibold text-lg">Analisis AI</h2>
-
-            <div className="space-y-3">
-              <div className="bg-slate-800 rounded-lg p-4">
-                <p className="text-sm text-slate-300 font-medium mb-2">Entitas Termasking ({entities.length})</p>
-                <div className="flex flex-wrap gap-2">
-                  {entities.slice(0, 20).map((e) => (
-                    <span key={e.token} className="text-xs bg-slate-700 rounded px-2 py-1 text-slate-300">
-                      {e.token} <span className="text-slate-500">({e.category})</span>
-                    </span>
-                  ))}
-                  {entities.length > 20 && (
-                    <span className="text-xs text-slate-500">+{entities.length - 20} lainnya</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-slate-800 rounded-lg p-4">
-                <p className="text-sm text-slate-300 font-medium mb-2">Preview Teks Termasking</p>
-                <p className="text-xs font-mono text-slate-400 line-clamp-4">{maskedText.slice(0, 400)}...</p>
-              </div>
-            </div>
-
-            <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg px-4 py-3">
-              <p className="text-blue-400 text-sm">Analisis akan menggunakan RAG dari {' '}
-                <span className="font-medium">27 POJK</span> dan <span className="font-medium">3,005 chunk pasal</span> sebagai grounding.
-              </p>
-            </div>
-
-            <button
-              onClick={handleStep3}
-              disabled={status === 'loading'}
-              className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg py-2.5 text-sm font-medium transition-colors"
-            >
-              {status === 'loading' ? 'Menganalisis...' : 'Analisis dengan Claude →'}
-            </button>
-          </div>
-        )}
-
-        {/* Step 4: Hasil */}
-        {step === 4 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-lg">Hasil Pemeriksaan</h2>
-              <button
-                onClick={() => router.push(`/pemeriksaan/${sessionId}`)}
-                className="text-sm text-blue-400 hover:text-blue-300"
-              >
-                Buka halaman penuh →
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => router.push(`/pemeriksaan/${sessionId}`)}
+                  className="text-sm text-blue-400 hover:text-blue-300"
+                >
+                  Buka halaman penuh →
+                </button>
+              </div>
             </div>
 
             <div className="flex gap-2">
