@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Navbar from '@/components/oasis/Navbar'
 type JenisUsaha = 'Jiwa' | 'Umum'
 
 type Status = 'idle' | 'loading' | 'done' | 'error'
@@ -130,102 +131,74 @@ export default function Psak117Page() {
     const rasio = hasil.rasio as Record<string, number | null>
     const dk = hasil.data_keuangan as Record<string, unknown>
 
-    const ratingColor = skor.rating === 'Baik' ? 'text-green-400' :
-      skor.rating === 'Cukup' ? 'text-yellow-400' :
-      skor.rating === 'Kurang' ? 'text-orange-400' : 'text-red-400'
+    const ratingColor = skor.rating === 'Baik' ? '#45e661' :
+      skor.rating === 'Cukup' ? '#f5c842' :
+      skor.rating === 'Kurang' ? '#f5a142' : '#ff6f61'
+
+    const thStyle: React.CSSProperties = { textAlign: 'left', padding: '14px 24px', fontSize: 10.5, color: '#8a949c', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }
+    const tdStyle: React.CSSProperties = { padding: '13px 24px', fontSize: 13 }
 
     return (
-      <div className="space-y-6">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         {/* Skor ringkas */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-slate-800 rounded-xl p-4 text-center">
-            <div className="text-3xl font-bold text-white">{skor.nilai}<span className="text-slate-500 text-lg">/{skor.total}</span></div>
-            <div className="text-xs text-slate-400 mt-1">Metrik Lulus</div>
-          </div>
-          <div className="bg-slate-800 rounded-xl p-4 text-center">
-            <div className={`text-3xl font-bold ${ratingColor}`}>{skor.rating}</div>
-            <div className="text-xs text-slate-400 mt-1">Rating Keseluruhan</div>
-          </div>
-          <div className="bg-slate-800 rounded-xl p-4 text-center">
-            <div className="text-3xl font-bold text-white">{dk.periode as string || '-'}</div>
-            <div className="text-xs text-slate-400 mt-1">Periode</div>
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 24 }}>
+          {[
+            { label: 'Metrik lulus', val: `${skor.nilai}/${skor.total}`, color: '#eef2ef' },
+            { label: 'Rating keseluruhan', val: skor.rating, color: ratingColor },
+            { label: 'Periode', val: dk.periode as string || '-', color: '#eef2ef' },
+          ].map((item, i) => (
+            <div key={i} style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 14 }}>
+              <div style={{ fontSize: 11, color: '#8a949c' }}>{item.label}</div>
+              <div style={{ fontSize: 40, fontWeight: 300, marginTop: 8, color: item.color }}>{item.val}</div>
+            </div>
+          ))}
         </div>
 
         {/* Scorecard table */}
-        <div className="bg-slate-800 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-700">
-                <th className="text-left px-4 py-3 text-slate-400 font-medium">Metrik</th>
-                <th className="text-right px-4 py-3 text-slate-400 font-medium">Nilai</th>
-                <th className="text-left px-4 py-3 text-slate-400 font-medium">Threshold</th>
-                <th className="text-center px-4 py-3 text-slate-400 font-medium">Status</th>
-                <th className="text-left px-4 py-3 text-slate-400 font-medium">Keterangan</th>
-              </tr>
-            </thead>
+        <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <thead><tr>
+              <th style={thStyle}>Metrik</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Nilai</th>
+              <th style={thStyle}>Threshold</th>
+              <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
+            </tr></thead>
             <tbody>
               {scorecard.map((s, i) => (
-                <tr key={i} className="border-b border-slate-700/50 hover:bg-slate-700/30">
-                  <td className="px-4 py-3 text-white">{s.metric}</td>
-                  <td className="px-4 py-3 text-right font-mono text-slate-300">
+                <tr key={i} style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                  <td style={{ ...tdStyle, fontWeight: 500 }}>{s.metric}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 300 }}>
                     {s.nilai != null ? (s.nilai < 10 ? (s.nilai * 100).toFixed(2) + '%' : s.nilai.toFixed(2) + 'x') : 'N/A'}
                   </td>
-                  <td className="px-4 py-3 text-slate-400 text-xs">{s.threshold}</td>
-                  <td className="px-4 py-3 text-center">
-                    {s.pass === null ? (
-                      <span className="text-slate-500 text-xs">–</span>
-                    ) : s.pass ? (
-                      <span className="bg-green-900/50 text-green-400 text-xs px-2 py-0.5 rounded-full">✓ Lulus</span>
-                    ) : (
-                      <span className="bg-red-900/50 text-red-400 text-xs px-2 py-0.5 rounded-full">✗ Tidak Lulus</span>
-                    )}
+                  <td style={{ ...tdStyle, color: '#8a949c' }}>{s.threshold}</td>
+                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                    {s.pass === null ? <span style={{ color: '#5a646c' }}>–</span>
+                      : s.pass ? <span style={{ background: 'rgba(69,230,97,0.15)', color: '#45e661', padding: '4px 12px', borderRadius: 999, fontSize: 10.5, fontWeight: 500 }}>✓ Lulus</span>
+                      : <span style={{ background: 'rgba(255,111,97,0.15)', color: '#ff6f61', padding: '4px 12px', borderRadius: 999, fontSize: 10.5, fontWeight: 500 }}>✗ Tidak Lulus</span>
+                    }
                   </td>
-                  <td className="px-4 py-3 text-slate-400 text-xs">{s.keterangan}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        {/* Data keuangan ringkas */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-slate-800 rounded-xl p-4">
-            <p className="text-slate-400 text-xs font-medium mb-3 uppercase tracking-wide">Posisi Keuangan ({dk.unit as string})</p>
-            <div className="space-y-2">
-              {[
-                ['Total Aset', dk.total_aset],
-                ['Total Liabilitas', dk.total_liabilitas],
-                ['Ekuitas', dk.total_ekuitas],
-                ['Liab. Kontrak Asuransi', dk.liabilitas_kontrak_asuransi],
-                ['CSM Penutup', dk.csm_penutup],
-              ].map(([label, val]) => (
-                <div key={label as string} className="flex justify-between text-sm">
-                  <span className="text-slate-400">{label as string}</span>
-                  <span className="text-white font-mono">{val != null ? Number(val).toLocaleString('id-ID') : '–'}</span>
+        {/* Data keuangan */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          {[
+            { title: `Posisi keuangan (${dk.unit})`, rows: [['Total Aset', dk.total_aset], ['Total Liabilitas', dk.total_liabilitas], ['Ekuitas', dk.total_ekuitas], ['Liab. Kontrak Asuransi', dk.liabilitas_kontrak_asuransi], ['CSM Penutup', dk.csm_penutup]] },
+            { title: `Laba rugi (${dk.unit})`, rows: [['Pendapatan Asuransi', dk.pendapatan_asuransi], ['Beban Jasa Asuransi', dk.beban_jasa_asuransi], ['Klaim & Manfaat', dk.klaim_dan_manfaat], ['Hasil Investasi', dk.hasil_investasi], ['Profit Tahun Berjalan', dk.profit_tahun_berjalan]] },
+          ].map(section => (
+            <div key={section.title} style={{ background: 'rgba(8,12,18,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, padding: 24 }}>
+              <div className="section-label" style={{ marginBottom: 14 }}>{section.title}</div>
+              {section.rows.map(([label, val]) => (
+                <div key={label as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '7px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ color: '#8a949c' }}>{label as string}</span>
+                  <span style={{ color: Number(val) < 0 ? '#ff6f61' : '#eef2ef' }}>{val != null ? Number(val).toLocaleString('id-ID') : '–'}</span>
                 </div>
               ))}
             </div>
-          </div>
-          <div className="bg-slate-800 rounded-xl p-4">
-            <p className="text-slate-400 text-xs font-medium mb-3 uppercase tracking-wide">Laba Rugi ({dk.unit as string})</p>
-            <div className="space-y-2">
-              {[
-                ['Pendapatan Asuransi', dk.pendapatan_asuransi],
-                ['Beban Jasa Asuransi', dk.beban_jasa_asuransi],
-                ['Klaim & Manfaat', dk.klaim_dan_manfaat],
-                ['Hasil Investasi', dk.hasil_investasi],
-                ['Profit Tahun Berjalan', dk.profit_tahun_berjalan],
-              ].map(([label, val]) => (
-                <div key={label as string} className="flex justify-between text-sm">
-                  <span className="text-slate-400">{label as string}</span>
-                  <span className={`font-mono ${Number(val) < 0 ? 'text-red-400' : 'text-white'}`}>
-                    {val != null ? Number(val).toLocaleString('id-ID') : '–'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     )
@@ -233,7 +206,7 @@ export default function Psak117Page() {
 
   function renderMarkdown(text: string) {
     return (
-      <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans leading-relaxed">
+      <pre style={{ fontSize: 13.5, color: '#b7c0c6', whiteSpace: 'pre-wrap', lineHeight: 1.9, margin: 0, fontFamily: 'inherit' }}>
         {text}
       </pre>
     )
@@ -242,76 +215,45 @@ export default function Psak117Page() {
   // ─── Main render ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <nav className="border-b border-slate-800 px-6 py-4 flex items-center gap-4">
-        <button onClick={() => router.push('/dashboard')} className="text-slate-400 hover:text-white text-sm">
-          ← Dashboard
-        </button>
-        <span className="text-slate-600">/</span>
-        <span className="text-sm font-medium">Analisis PSAK 117</span>
-      </nav>
+    <div style={{ minHeight: '100vh', color: '#eef2ef' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px 64px' }}>
+        <Navbar />
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
+        {/* Header */}
+        <div style={{ marginBottom: 26 }}>
+          <h1 style={{ fontSize: 26, fontWeight: 500, margin: 0 }}><span style={{ color: '#45e661' }}>PSAK 117</span> — analisis kepatuhan asuransi</h1>
+          <p style={{ fontSize: 12.5, color: '#8a949c', margin: '8px 0 0' }}>Upload laporan keuangan audited — AI mengekstrak rasio, kepatuhan, dan pemetaan risiko.</p>
+        </div>
 
-        {/* Step indicator */}
-        <div className="flex items-center gap-2 mb-8">
-          {STEPS.map((s, i) => (
-            <div key={s.n} className="flex items-center gap-2">
-              <div className={`flex items-center gap-2 ${step >= s.n ? 'text-blue-400' : 'text-slate-600'}`}>
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border ${
-                  step > s.n ? 'bg-blue-600 border-blue-600 text-white' :
-                  step === s.n ? 'border-blue-500 text-blue-400' :
-                  'border-slate-700 text-slate-600'
-                }`}>
-                  {step > s.n ? '✓' : s.n}
-                </div>
-                <span className="text-sm hidden sm:inline">{s.label}</span>
-              </div>
-              {i < STEPS.length - 1 && <div className="w-8 h-px bg-slate-700 mx-1" />}
+        {/* Steps */}
+        <div style={{ display: 'flex', gap: 32, marginBottom: 32 }}>
+          {STEPS.map(s => (
+            <div key={s.n} style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+              <span style={{ fontSize: 18, fontWeight: 300, color: step >= s.n ? '#45e661' : '#5a646c' }}>{s.n}</span>
+              <span style={{ fontSize: 12, color: step >= s.n ? '#eef2ef' : '#5a646c' }}>{s.label}</span>
             </div>
           ))}
         </div>
 
         {/* Log panel */}
         {log.length > 0 && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-6 max-h-40 overflow-y-auto">
-            {log.map((l, i) => (
-              <p key={i} className="text-xs font-mono text-slate-400">{l}</p>
-            ))}
-            {status === 'loading' && (
-              <p className="text-xs font-mono text-blue-400 animate-pulse">Memproses...</p>
-            )}
+          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 16, marginBottom: 20, maxHeight: 140, overflowY: 'auto' }}>
+            {log.map((l, i) => <p key={i} style={{ fontSize: 11, fontFamily: 'monospace', color: '#8a949c', margin: '2px 0' }}>{l}</p>)}
+            {status === 'loading' && <p style={{ fontSize: 11, fontFamily: 'monospace', color: '#45e661', margin: '4px 0' }}>Memproses...</p>}
           </div>
         )}
 
         {/* Step 1: Form upload */}
         {step === 1 && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
-            <div>
-              <h2 className="font-semibold text-lg">Analisis Laporan Keuangan PSAK 117</h2>
-              <p className="text-slate-400 text-sm mt-1">
-                Upload laporan keuangan audited (PDF) perusahaan asuransi konvensional.
-                AI akan mengekstrak data, menghitung rasio, dan menganalisis kepatuhan serta profil risiko.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 32, maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               <div>
-                <label className="block text-sm text-slate-400 mb-1.5">Nama Perusahaan</label>
-                <input
-                  value={namaEntitas}
-                  onChange={(e) => setNamaEntitas(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-                  placeholder="PT Asuransi Contoh Tbk"
-                />
+                <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Nama perusahaan</label>
+                <input value={namaEntitas} onChange={e => setNamaEntitas(e.target.value)} placeholder="PT Asuransi Jiwa Cahaya Abadi Tbk" className="input-underline" />
               </div>
               <div>
-                <label className="block text-sm text-slate-400 mb-1.5">Jenis Usaha</label>
-                <select
-                  value={jenisUsaha}
-                  onChange={(e) => setJenisUsaha(e.target.value as JenisUsaha)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-                >
+                <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Jenis usaha</label>
+                <select value={jenisUsaha} onChange={e => setJenisUsaha(e.target.value as JenisUsaha)} className="input-underline">
                   <option value="Jiwa">Asuransi Jiwa</option>
                   <option value="Umum">Asuransi Umum</option>
                 </select>
@@ -319,73 +261,47 @@ export default function Psak117Page() {
             </div>
 
             <div>
-              <label className="block text-sm text-slate-400 mb-1.5">Periode Laporan</label>
-              <input
-                value={periode}
-                onChange={(e) => setPeriode(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-                placeholder="FY 2024 / 31 Desember 2024"
-              />
+              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Periode laporan</label>
+              <input value={periode} onChange={e => setPeriode(e.target.value)} placeholder="31 Desember 2025" className="input-underline" />
             </div>
 
             <div>
-              <label className="block text-sm text-slate-400 mb-1.5">Laporan Keuangan Audited</label>
-              <div
-                onClick={() => fileRef.current?.click()}
-                className="border-2 border-dashed border-slate-700 rounded-xl p-8 text-center cursor-pointer hover:border-slate-500 transition-colors"
-              >
+              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 8 }}>Laporan keuangan audited</label>
+              <label style={{ display: 'block', border: '1px dashed rgba(69,230,97,0.45)', borderRadius: 18, padding: 30, textAlign: 'center', cursor: 'pointer' }}>
+                <input ref={fileRef} type="file" accept=".pdf,.txt" style={{ display: 'none' }} onChange={e => setFile(e.target.files?.[0] || null)} />
                 {file ? (
-                  <div>
-                    <p className="font-medium text-white">{file.name}</p>
-                    <p className="text-slate-500 text-sm mt-1">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                  </div>
+                  <div style={{ fontWeight: 500, fontSize: 13.5, color: '#45e661' }}>{file.name}</div>
                 ) : (
-                  <div>
-                    <p className="text-slate-400 text-2xl mb-2">📄</p>
-                    <p className="text-slate-300 font-medium">Klik untuk upload lapkeu</p>
-                    <p className="text-slate-500 text-sm mt-1">PDF dengan CALK — maks 50 MB</p>
-                  </div>
+                  <>
+                    <div style={{ fontWeight: 500, fontSize: 13.5, color: '#b7c0c6' }}>Klik untuk upload lapkeu (PDF)</div>
+                    <div style={{ fontSize: 11.5, color: '#5a646c', marginTop: 5 }}>Maks 50 MB · dengan CALK lengkap</div>
+                  </>
                 )}
-              </div>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".pdf,.txt"
-                className="hidden"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-              />
+              </label>
             </div>
 
-            <div className="bg-blue-900/20 border border-blue-800/40 rounded-lg px-4 py-3">
-              <p className="text-blue-400 text-sm">
-                <span className="font-medium">Referensi yang digunakan:</span> POJK No. 26/2025 (Solvabilitas),
-                POJK No. 5/2023 (Kesehatan Keuangan), SEDK No. 8/2021 (Pengawasan Berbasis Risiko)
-              </p>
-            </div>
-
-            <button
-              onClick={handleAnalisis}
-              disabled={status === 'loading'}
-              className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg py-3 text-sm font-semibold transition-colors"
-            >
-              Mulai Analisis PSAK 117 →
+            <button onClick={handleAnalisis} disabled={status === 'loading'} className="btn-filled" style={{ alignSelf: 'flex-start' }}>
+              Mulai analisis ↗
             </button>
           </div>
         )}
 
         {/* Riwayat */}
         {step === 1 && riwayat.length > 0 && (
-          <div className="mt-6">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Riwayat Analisis</p>
-            <div className="flex flex-wrap gap-2">
+          <div style={{ marginTop: 28 }}>
+            <div className="section-label" style={{ marginBottom: 12 }}>Riwayat analisis</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {riwayat.map(item => (
-                <button key={item.id}
-                  onClick={() => router.push(`/psak117/${item.id}`)}
-                  className="bg-slate-900 border border-slate-800 hover:border-blue-700 rounded-lg px-3 py-2 text-left transition-colors"
-                >
-                  <div className="text-sm font-medium text-slate-200">{item.nama_entitas}</div>
-                  <div className="text-xs text-slate-500 mt-0.5">{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                </button>
+                <div key={item.id} style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '12px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>{item.nama_entitas}</div>
+                    <div style={{ fontSize: 11, color: '#8a949c', marginTop: 3 }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => router.push(`/psak117/${item.id}`)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 999, padding: '5px 14px', fontSize: 11, color: '#8a949c', cursor: 'pointer', fontFamily: 'inherit' }}>Lihat</button>
+                    <button onClick={async () => { if (!confirm(`Hapus analisis "${item.nama_entitas}"?`)) return; await fetch(`/api/sessions/${item.id}`, { method: 'DELETE' }); setRiwayat(prev => prev.filter(r => r.id !== item.id)) }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '5px 10px', fontSize: 11, color: '#5a646c', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -393,72 +309,45 @@ export default function Psak117Page() {
 
         {/* Step 2: Processing */}
         {step === 2 && status === 'loading' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center space-y-4">
-            <div className="w-12 h-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
-            <div>
-              <p className="font-semibold text-lg">Menganalisis Laporan Keuangan</p>
-              <p className="text-slate-400 text-sm mt-1">
-                Proses ini memakan waktu 1–2 menit. AI sedang membaca lapkeu, menghitung rasio,
-                dan menyusun analisis kepatuhan serta pemetaan risiko.
-              </p>
-            </div>
+          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 56, textAlign: 'center', maxWidth: 640 }}>
+            <div style={{ width: 40, height: 40, border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#45e661', borderRadius: '50%', margin: '0 auto 20px', animation: 'spin 0.8s linear infinite' }} />
+            <div style={{ fontWeight: 500, fontSize: 15 }}>Menganalisis laporan keuangan…</div>
+            <div style={{ fontSize: 12, color: '#8a949c', marginTop: 8 }}>Menghitung rasio, kepatuhan POJK, dan pemetaan risiko.</div>
           </div>
         )}
 
         {/* Step 2: Error */}
         {step === 2 && status === 'error' && (
-          <div className="bg-red-900/20 border border-red-800/50 rounded-xl p-6 text-center space-y-3">
-            <p className="text-red-400 font-semibold">Analisis Gagal</p>
-            <p className="text-slate-400 text-sm">Lihat log di atas untuk detail error.</p>
-            <button onClick={() => { setStep(1); setStatus('idle') }} className="text-blue-400 text-sm hover:text-blue-300">
-              ← Kembali
-            </button>
+          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,100,97,0.3)', borderRadius: 24, padding: 32, textAlign: 'center' }}>
+            <p style={{ color: '#ff6f61', fontWeight: 500, margin: '0 0 8px' }}>Analisis Gagal</p>
+            <p style={{ color: '#8a949c', fontSize: 13, margin: '0 0 16px' }}>Lihat log di atas untuk detail error.</p>
+            <button onClick={() => { setStep(1); setStatus('idle') }} style={{ background: 'transparent', border: 'none', color: '#45e661', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>← Kembali</button>
           </div>
         )}
 
         {/* Step 3: Hasil */}
         {step === 3 && hasil && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 22 }}>
               <div>
-                <h2 className="font-semibold text-xl">
-                  {(hasil.metadata as Record<string, string>).namaEntitas}
-                </h2>
-                <p className="text-slate-400 text-sm">
-                  {(hasil.metadata as Record<string, string>).jenisUsaha} ·{' '}
-                  {(hasil.metadata as Record<string, string>).periode} · Sesi: {sessionId.slice(0, 8)}
-                </p>
+                <div style={{ fontSize: 17, fontWeight: 500 }}>{(hasil.metadata as Record<string, string>).namaEntitas}</div>
+                <div style={{ fontSize: 12, color: '#8a949c', marginTop: 3 }}>{(hasil.metadata as Record<string, string>).jenisUsaha} · {(hasil.metadata as Record<string, string>).periode}</div>
               </div>
-              <button
-                onClick={() => router.push(`/psak117/${sessionId}`)}
-                className="text-sm text-blue-400 hover:text-blue-300 border border-blue-800 px-3 py-1.5 rounded-lg"
-              >
-                Buka halaman penuh →
-              </button>
+              <button onClick={() => { setStep(1); setStatus('idle') }} style={{ background: 'transparent', color: '#8a949c', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 999, padding: '9px 18px', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit' }}>+ Analisis baru</button>
             </div>
 
             {/* Tab bar */}
-            <div className="flex gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+            <div style={{ display: 'flex', gap: 6, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: 5, marginBottom: 26, maxWidth: 560 }}>
               {([
-                { key: 'scorecard', label: '📊 Scorecard & Rasio' },
-                { key: 'compliance', label: '⚖️ Compliance POJK' },
-                { key: 'risiko', label: '⚠️ Pemetaan Risiko' },
-              ] as const).map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                    activeTab === tab.key
-                      ? 'bg-blue-600 text-white'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {tab.label}
-                </button>
+                { key: 'scorecard', label: 'Scorecard & Rasio' },
+                { key: 'compliance', label: 'Compliance POJK' },
+                { key: 'risiko', label: 'Pemetaan Risiko' },
+              ] as const).map(tab => (
+                <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{ flex: 1, padding: 9, border: 'none', borderRadius: 999, fontSize: 11.5, fontWeight: 500, cursor: 'pointer', background: activeTab === tab.key ? '#45e661' : 'transparent', color: activeTab === tab.key ? '#04120a' : '#8a949c', fontFamily: 'inherit' }}>{tab.label}</button>
               ))}
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 28 }}>
               {activeTab === 'scorecard' && renderScorecard()}
               {activeTab === 'compliance' && renderMarkdown(hasil.compliance as string)}
               {activeTab === 'risiko' && renderMarkdown(hasil.pemetaan_risiko as string)}

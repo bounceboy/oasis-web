@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Navbar from '@/components/oasis/Navbar'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -16,7 +17,7 @@ type Temuan   = {
   kluster: string; kluster_nama: string; pasal_terkait: string[]
   rekomendasi: string; sumber_tipe: string; sumber_nama: string
   tipe_analisis: 'risk_based' | 'compliance'
-  status: string; created_at: string
+  status: string; catatan_pengawas: string | null; created_at: string
 }
 type Stats = { dokumen: number; wawancara: number; temuan: number; kritis: number; dikonfirmasi: number }
 
@@ -73,46 +74,54 @@ export default function SessionPage() {
   useEffect(() => { load() }, [load])
 
   if (loading) return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-      <p className="text-slate-500 text-sm">Memuat sesi...</p>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <p style={{ color: '#8a949c', fontSize: 13 }}>Memuat sesi...</p>
     </div>
   )
   if (!session) return null
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col">
-      {/* Navbar */}
-      <nav className="border-b border-slate-800 px-6 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard" className="text-slate-500 hover:text-white text-sm transition-colors">← Dashboard</Link>
-          <span className="text-slate-700">/</span>
-          <span className="text-sm font-mono font-bold text-blue-400 tracking-widest">{kode}</span>
-          <span className="text-slate-500 text-sm hidden sm:inline">{session.nama_entitas}</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <StatChip label="Kritis" value={stats.kritis} color="text-red-400" />
-          <StatChip label="Dikonfirmasi" value={stats.dikonfirmasi} color="text-green-400" />
-        </div>
-      </nav>
+    <div style={{ minHeight: '100vh', color: '#eef2ef', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px 8px', width: '100%', boxSizing: 'border-box' }}>
+        <Navbar />
 
-      {/* Stat bar */}
-      <div className="border-b border-slate-800 px-6 py-2 flex gap-6 text-sm bg-slate-950 shrink-0">
-        <StatBar label="Dokumen" value={stats.dokumen} icon="📄" onClick={() => setActiveTab('dokumen')} active={activeTab === 'dokumen'} />
-        <StatBar label="Wawancara" value={stats.wawancara} icon="💬" onClick={() => setActiveTab('wawancara')} active={activeTab === 'wawancara'} />
-        <StatBar label="Temuan" value={stats.temuan} icon="🔎" onClick={() => setActiveTab('temuan')} active={activeTab === 'temuan'} />
+        {/* Session header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 8 }}>
+          <div>
+            <div style={{ fontSize: 12, color: '#45e661', letterSpacing: '0.15em' }}>{kode}</div>
+            <h1 style={{ fontSize: 26, fontWeight: 500, margin: '6px 0 0' }}>{session.nama_entitas}</h1>
+          </div>
+          <div style={{ display: 'flex', gap: 20 }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 22, fontWeight: 400, color: '#ff6f61' }}>{stats.kritis}</div>
+              <div style={{ fontSize: 10.5, color: '#8a949c' }}>Kritis</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 22, fontWeight: 400, color: '#45e661' }}>{stats.dikonfirmasi}</div>
+              <div style={{ fontSize: 10.5, color: '#8a949c' }}>Dikonfirmasi</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab bar */}
+        <div style={{ display: 'flex', gap: 26, borderBottom: '1px solid rgba(255,255,255,0.08)', margin: '26px 0 0' }}>
+          {([
+            ['dokumen', 'Dokumen', stats.dokumen],
+            ['wawancara', 'Wawancara', stats.wawancara],
+            ['temuan', 'Temuan', stats.temuan],
+          ] as const).map(([key, label, count]) => (
+            <button key={key} onClick={() => setActiveTab(key)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 14px', fontSize: 13, fontWeight: 500, color: activeTab === key ? '#eef2ef' : '#5a646c', borderBottom: `1px solid ${activeTab === key ? '#45e661' : 'transparent'}`, fontFamily: 'inherit' }}>
+              {label} <span style={{ color: '#5a646c', marginLeft: 4 }}>({count})</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden">
-        {activeTab === 'dokumen' && (
-          <TabDokumen kode={kode} items={dokumen} onRefresh={load} />
-        )}
-        {activeTab === 'wawancara' && (
-          <TabWawancara kode={kode} items={wawancara} onRefresh={load} />
-        )}
-        {activeTab === 'temuan' && (
-          <TabTemuan items={temuan} onRefresh={load} />
-        )}
+      <div style={{ flex: 1, overflow: 'hidden', maxWidth: 1200, margin: '0 auto', width: '100%', padding: '0 24px 48px', boxSizing: 'border-box' }}>
+        {activeTab === 'dokumen' && <TabDokumen kode={kode} items={dokumen} onRefresh={load} />}
+        {activeTab === 'wawancara' && <TabWawancara kode={kode} items={wawancara} onRefresh={load} />}
+        {activeTab === 'temuan' && <TabTemuan items={temuan} onRefresh={load} />}
       </div>
     </div>
   )
@@ -122,20 +131,19 @@ export default function SessionPage() {
 
 function StatChip({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <span className={`font-bold text-sm ${color}`}>{value}</span>
-      <span className="text-slate-600 text-xs">{label}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontWeight: 500, fontSize: 13, color }}>{value}</span>
+      <span style={{ color: '#5a646c', fontSize: 11 }}>{label}</span>
     </div>
   )
 }
 
 function StatBar({ label, value, icon, onClick, active }: { label: string; value: number; icon: string; onClick: () => void; active: boolean }) {
   return (
-    <button onClick={onClick}
-      className={`flex items-center gap-2 py-1 border-b-2 transition-colors ${active ? 'border-blue-500 text-white' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
+    <button onClick={onClick} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', color: active ? '#eef2ef' : '#5a646c', fontFamily: 'inherit', fontSize: 13 }}>
       <span>{icon}</span>
-      <span className="font-medium">{label}</span>
-      <span className={`text-xs px-1.5 py-0.5 rounded-full ${active ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>{value}</span>
+      <span style={{ fontWeight: 500 }}>{label}</span>
+      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: active ? '#45e661' : 'rgba(255,255,255,0.06)', color: active ? '#04120a' : '#5a646c' }}>{value}</span>
     </button>
   )
 }
@@ -169,82 +177,91 @@ function TabDokumen({ kode, items, onRefresh }: { kode: string; items: Dokumen[]
     finally { setUploading(false) }
   }
 
+  const panelStyle: React.CSSProperties = { width: 300, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.08)', padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }
+  const labelStyle: React.CSSProperties = { fontSize: 11, color: '#8a949c', marginBottom: 6, display: 'block' }
+  const selectStyle: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#eef2ef', padding: '8px 0', fontSize: 13, outline: 'none', fontFamily: 'inherit' }
+  const textareaStyle: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#eef2ef', padding: '8px 0', fontSize: 13, outline: 'none', fontFamily: 'inherit', resize: 'none' }
+
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Upload panel */}
-      <div className="w-80 shrink-0 border-r border-slate-800 p-5 overflow-y-auto space-y-4">
-        <h2 className="font-semibold text-sm">Upload Dokumen Pemeriksaan</h2>
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      <div style={panelStyle}>
+        <div style={{ fontSize: 14, fontWeight: 500 }}>Upload Dokumen Pemeriksaan</div>
 
         <div>
-          <label className="text-xs text-slate-400 mb-1.5 block">Departemen</label>
-          <select value={departemen} onChange={e => setDepartemen(e.target.value)}
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
-            {DEPARTEMEN.map(d => <option key={d}>{d}</option>)}
+          <label style={labelStyle}>Departemen</label>
+          <select value={departemen} onChange={e => setDepartemen(e.target.value)} style={selectStyle}>
+            {DEPARTEMEN.map(d => <option key={d} style={{ background: '#0d1117' }}>{d}</option>)}
           </select>
         </div>
 
         <div>
-          <label className="text-xs text-slate-400 mb-1.5 block">File Dokumen</label>
-          <div onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-slate-700 rounded-lg p-4 text-center cursor-pointer hover:border-slate-500 transition-colors">
+          <label style={labelStyle}>File Dokumen</label>
+          <div onClick={() => fileRef.current?.click()} style={{ border: '1px dashed rgba(69,230,97,0.3)', borderRadius: 12, padding: 16, textAlign: 'center', cursor: 'pointer' }}>
             {file ? (
               <div>
-                <p className="text-sm font-medium truncate">{file.name}</p>
-                <p className="text-slate-500 text-xs mt-0.5">{(file.size / 1024).toFixed(0)} KB</p>
+                <p style={{ fontSize: 13, fontWeight: 500 }}>{file.name}</p>
+                <p style={{ fontSize: 11, color: '#8a949c', marginTop: 4 }}>{(file.size / 1024).toFixed(0)} KB</p>
               </div>
             ) : (
-              <p className="text-slate-500 text-sm">Klik untuk pilih file<br/><span className="text-xs">PDF, DOCX, TXT — maks 20MB</span></p>
+              <p style={{ fontSize: 13, color: '#5a646c' }}>Klik untuk pilih file<br/><span style={{ fontSize: 11 }}>PDF, DOCX, TXT — maks 20MB</span></p>
             )}
           </div>
-          <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.txt" className="hidden"
+          <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.txt" style={{ display: 'none' }}
             onChange={e => setFile(e.target.files?.[0] ?? null)} />
         </div>
 
         <div>
-          <label className="text-xs text-slate-400 mb-1.5 block">Instruksi / Fokus Analisis <span className="text-slate-600">opsional</span></label>
+          <label style={labelStyle}>Fokus Analisis <span style={{ color: '#5a646c' }}>opsional</span></label>
           <textarea value={fokus} onChange={e => setFokus(e.target.value)} rows={3}
-            placeholder="Contoh: fokus pada kesesuaian struktur organisasi dengan POJK..."
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-blue-500 placeholder:text-slate-600" />
+            placeholder="Contoh: fokus pada kesesuaian struktur organisasi..." style={textareaStyle} />
         </div>
 
-        {error && <p className="text-red-400 text-xs">{error}</p>}
+        {error && <p style={{ color: '#ff6f61', fontSize: 12 }}>{error}</p>}
 
         <button onClick={handleUpload} disabled={!file || uploading}
-          className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-lg py-2.5 text-sm font-medium transition-colors">
+          style={{ background: file && !uploading ? '#45e661' : 'rgba(255,255,255,0.06)', color: file && !uploading ? '#04120a' : '#5a646c', border: 'none', borderRadius: 999, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: file && !uploading ? 'pointer' : 'default', fontFamily: 'inherit', width: '100%' }}>
           {uploading ? 'Menganalisis...' : 'Mulai Analisis'}
         </button>
       </div>
 
-      {/* List */}
-      <div className="flex-1 overflow-y-auto p-5">
+      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
         {items.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-slate-600 text-sm">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#5a646c', fontSize: 13 }}>
             Belum ada dokumen. Upload dokumen untuk memulai analisis.
           </div>
         ) : (
-          <div className="space-y-3">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {items.map(dok => (
-              <div key={dok.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs px-2 py-0.5 bg-slate-800 text-slate-400 rounded-full">{dok.departemen}</span>
+              <div key={dok.id} style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#8a949c' }}>{dok.departemen}</span>
                       <StatusBadge status={dok.status} />
                     </div>
-                    <p className="font-medium text-sm truncate">{dok.nama_file}</p>
-                    {dok.fokus && <p className="text-slate-500 text-xs mt-0.5 truncate">Fokus: {dok.fokus}</p>}
+                    <p style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dok.nama_file}</p>
+                    {dok.fokus && <p style={{ fontSize: 11, color: '#5a646c', marginTop: 2 }}>Fokus: {dok.fokus}</p>}
                   </div>
-                  {dok.ringkasan && (
-                    <button onClick={() => setExpanded(expanded === dok.id ? null : dok.id)}
-                      className="text-xs text-blue-400 hover:text-blue-300 shrink-0">
-                      {expanded === dok.id ? '▲' : '▼'}
-                    </button>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    {dok.status === 'done' && (
+                      <button onClick={() => setExpanded(expanded === dok.id ? null : dok.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#45e661', fontFamily: 'inherit' }}>
+                        {expanded === dok.id ? '▲' : '▼'}
+                      </button>
+                    )}
+                    <button onClick={async () => {
+                      if (!confirm(`Hapus dokumen "${dok.nama_file}" dan semua temuannya?`)) return
+                      await fetch(`/api/onsite/dokumen/${dok.id}`, { method: 'DELETE' })
+                      await onRefresh()
+                    }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#5a646c', fontFamily: 'inherit' }} title="Hapus">✕</button>
+                  </div>
                 </div>
-                {expanded === dok.id && dok.ringkasan && (
-                  <p className="text-slate-400 text-xs mt-3 leading-relaxed border-t border-slate-800 pt-3">{dok.ringkasan}</p>
+                {expanded === dok.id && (
+                  <p style={{ fontSize: 12, color: '#8a949c', marginTop: 12, lineHeight: 1.7, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+                    {dok.ringkasan || <span style={{ fontStyle: 'italic', color: '#5a646c' }}>Ringkasan tidak tersedia</span>}
+                  </p>
                 )}
-                <p className="text-slate-600 text-xs mt-2">{new Date(dok.created_at).toLocaleString('id-ID')}</p>
+                <p style={{ fontSize: 11, color: '#5a646c', marginTop: 8 }}>{new Date(dok.created_at).toLocaleString('id-ID')}</p>
               </div>
             ))}
           </div>
@@ -283,80 +300,91 @@ function TabWawancara({ kode, items, onRefresh }: { kode: string; items: Wawanca
     finally { setUploading(false) }
   }
 
+  const panelStyle: React.CSSProperties = { width: 300, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.08)', padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }
+  const labelStyle: React.CSSProperties = { fontSize: 11, color: '#8a949c', marginBottom: 6, display: 'block' }
+  const selectStyle: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#eef2ef', padding: '8px 0', fontSize: 13, outline: 'none', fontFamily: 'inherit' }
+  const textareaStyle: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#eef2ef', padding: '8px 0', fontSize: 13, outline: 'none', fontFamily: 'inherit', resize: 'none' }
+
   return (
-    <div className="flex h-full overflow-hidden">
-      <div className="w-80 shrink-0 border-r border-slate-800 p-5 overflow-y-auto space-y-4">
-        <h2 className="font-semibold text-sm">Upload Catatan / Bahan Tayang Wawancara</h2>
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      <div style={panelStyle}>
+        <div style={{ fontSize: 14, fontWeight: 500 }}>Upload Catatan / Bahan Tayang Wawancara</div>
 
         <div>
-          <label className="text-xs text-slate-400 mb-1.5 block">Departemen yang Diwawancara</label>
-          <select value={departemen} onChange={e => setDepartemen(e.target.value)}
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
-            {DEPARTEMEN.map(d => <option key={d}>{d}</option>)}
+          <label style={labelStyle}>Departemen yang Diwawancara</label>
+          <select value={departemen} onChange={e => setDepartemen(e.target.value)} style={selectStyle}>
+            {DEPARTEMEN.map(d => <option key={d} style={{ background: '#0d1117' }}>{d}</option>)}
           </select>
         </div>
 
         <div>
-          <label className="text-xs text-slate-400 mb-1.5 block">File Catatan / Paparan</label>
-          <div onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-slate-700 rounded-lg p-4 text-center cursor-pointer hover:border-slate-500 transition-colors">
+          <label style={labelStyle}>File Catatan / Paparan</label>
+          <div onClick={() => fileRef.current?.click()} style={{ border: '1px dashed rgba(69,230,97,0.3)', borderRadius: 12, padding: 16, textAlign: 'center', cursor: 'pointer' }}>
             {file ? (
               <div>
-                <p className="text-sm font-medium truncate">{file.name}</p>
-                <p className="text-slate-500 text-xs mt-0.5">{(file.size / 1024).toFixed(0)} KB</p>
+                <p style={{ fontSize: 13, fontWeight: 500 }}>{file.name}</p>
+                <p style={{ fontSize: 11, color: '#8a949c', marginTop: 4 }}>{(file.size / 1024).toFixed(0)} KB</p>
               </div>
             ) : (
-              <p className="text-slate-500 text-sm">Klik untuk pilih file<br/><span className="text-xs">PDF, DOCX, PPTX, TXT</span></p>
+              <p style={{ fontSize: 13, color: '#5a646c' }}>Klik untuk pilih file<br/><span style={{ fontSize: 11 }}>PDF, DOCX, PPTX, TXT</span></p>
             )}
           </div>
-          <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.pptx,.txt" className="hidden"
+          <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.pptx,.txt" style={{ display: 'none' }}
             onChange={e => setFile(e.target.files?.[0] ?? null)} />
         </div>
 
         <div>
-          <label className="text-xs text-slate-400 mb-1.5 block">Fokus Analisis <span className="text-slate-600">opsional</span></label>
+          <label style={labelStyle}>Fokus Analisis <span style={{ color: '#5a646c' }}>opsional</span></label>
           <textarea value={fokus} onChange={e => setFokus(e.target.value)} rows={3}
-            placeholder="Contoh: perhatikan konsistensi jawaban dengan laporan keuangan..."
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-blue-500 placeholder:text-slate-600" />
+            placeholder="Contoh: perhatikan konsistensi jawaban dengan laporan keuangan..." style={textareaStyle} />
         </div>
 
-        {error && <p className="text-red-400 text-xs">{error}</p>}
+        {error && <p style={{ color: '#ff6f61', fontSize: 12 }}>{error}</p>}
 
         <button onClick={handleUpload} disabled={!file || uploading}
-          className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-lg py-2.5 text-sm font-medium transition-colors">
+          style={{ background: file && !uploading ? '#45e661' : 'rgba(255,255,255,0.06)', color: file && !uploading ? '#04120a' : '#5a646c', border: 'none', borderRadius: 999, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: file && !uploading ? 'pointer' : 'default', fontFamily: 'inherit', width: '100%' }}>
           {uploading ? 'Menganalisis...' : 'Mulai Analisis Wawancara'}
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5">
+      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
         {items.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-slate-600 text-sm">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#5a646c', fontSize: 13 }}>
             Belum ada wawancara. Upload catatan atau bahan tayang untuk dianalisis.
           </div>
         ) : (
-          <div className="space-y-3">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {items.map(w => (
-              <div key={w.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs px-2 py-0.5 bg-slate-800 text-slate-400 rounded-full">{w.departemen}</span>
+              <div key={w.id} style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#8a949c' }}>{w.departemen}</span>
                       <StatusBadge status={w.status} />
                     </div>
-                    <p className="font-medium text-sm truncate">{w.nama_file}</p>
-                    {w.fokus && <p className="text-slate-500 text-xs mt-0.5 truncate">Fokus: {w.fokus}</p>}
+                    <p style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.nama_file}</p>
+                    {w.fokus && <p style={{ fontSize: 11, color: '#5a646c', marginTop: 2 }}>Fokus: {w.fokus}</p>}
                   </div>
-                  {w.ringkasan && (
-                    <button onClick={() => setExpanded(expanded === w.id ? null : w.id)}
-                      className="text-xs text-blue-400 hover:text-blue-300 shrink-0">
-                      {expanded === w.id ? '▲' : '▼'}
-                    </button>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    {w.status === 'done' && (
+                      <button onClick={() => setExpanded(expanded === w.id ? null : w.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#45e661', fontFamily: 'inherit' }}>
+                        {expanded === w.id ? '▲' : '▼'}
+                      </button>
+                    )}
+                    <button onClick={async () => {
+                      if (!confirm(`Hapus wawancara "${w.nama_file}" dan semua temuannya?`)) return
+                      await fetch(`/api/onsite/wawancara/${w.id}`, { method: 'DELETE' })
+                      await onRefresh()
+                    }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#5a646c', fontFamily: 'inherit' }} title="Hapus">✕</button>
+                  </div>
                 </div>
-                {expanded === w.id && w.ringkasan && (
-                  <p className="text-slate-400 text-xs mt-3 leading-relaxed border-t border-slate-800 pt-3">{w.ringkasan}</p>
+                {expanded === w.id && (
+                  <p style={{ fontSize: 12, color: '#8a949c', marginTop: 12, lineHeight: 1.7, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+                    {w.ringkasan || <span style={{ fontStyle: 'italic', color: '#5a646c' }}>Ringkasan tidak tersedia — coba upload ulang file</span>}
+                  </p>
                 )}
-                <p className="text-slate-600 text-xs mt-2">{new Date(w.created_at).toLocaleString('id-ID')}</p>
+                <p style={{ fontSize: 11, color: '#5a646c', marginTop: 8 }}>{new Date(w.created_at).toLocaleString('id-ID')}</p>
               </div>
             ))}
           </div>
@@ -375,6 +403,8 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
   const [filterKluster, setFilterKluster] = useState<string>('semua')
   const [filterStatus, setFilterStatus] = useState<string>('semua')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [catatan, setCatatan] = useState<Record<string, string>>({})
+  const [savingCatatan, setSavingCatatan] = useState<string | null>(null)
 
   const byTipe = items.filter(t => t.tipe_analisis === tipeTab)
 
@@ -395,140 +425,160 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
     await onRefresh()
   }
 
+  async function saveCatatan(id: string) {
+    setSavingCatatan(id)
+    await fetch(`/api/onsite/temuan/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ catatan_pengawas: catatan[id] ?? '' }),
+    })
+    setSavingCatatan(null)
+    await onRefresh()
+  }
+
+  const filterBtnStyle = (active: boolean): React.CSSProperties => ({
+    width: '100%', textAlign: 'left', fontSize: 11, padding: '6px 10px', borderRadius: 8, marginBottom: 4, background: active ? 'rgba(69,230,97,0.12)' : 'none', color: active ? '#45e661' : '#8a949c', border: 'none', cursor: 'pointer', fontFamily: 'inherit'
+  })
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Sub-tab Risk-Based / Compliance */}
-      <div className="flex border-b border-slate-800 px-4 pt-3 shrink-0">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {/* Sub-tab */}
+      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '12px 20px 0', flexShrink: 0, gap: 20 }}>
         {([
           ['risk_based', 'Risk-Based', items.filter(t => t.tipe_analisis === 'risk_based').length],
           ['compliance', 'Compliance', items.filter(t => t.tipe_analisis === 'compliance').length],
         ] as const).map(([key, label, count]) => (
           <button key={key} onClick={() => { setTipeTab(key); setFilterUrgensi('semua'); setFilterKluster('semua'); setFilterSifat('semua'); setFilterStatus('semua') }}
-            className={`px-4 py-2 text-sm border-b-2 -mb-px mr-2 transition-colors ${tipeTab === key ? 'border-blue-500 text-white font-medium' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
-            {label}
-            <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${tipeTab === key ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'}`}>{count}</span>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', paddingBottom: 12, fontSize: 13, fontWeight: 500, color: tipeTab === key ? '#eef2ef' : '#5a646c', borderBottom: `1px solid ${tipeTab === key ? '#45e661' : 'transparent'}`, fontFamily: 'inherit' }}>
+            {label} <span style={{ color: '#5a646c', marginLeft: 4 }}>({count})</span>
           </button>
         ))}
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
       {/* Filter sidebar */}
-      <div className="w-56 shrink-0 border-r border-slate-800 p-4 overflow-y-auto space-y-5">
-        <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Urgensi</p>
+      <div style={{ width: 220, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.08)', padding: 16, overflowY: 'auto' }}>
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: 10, color: '#5a646c', letterSpacing: '0.12em', marginBottom: 8 }}>URGENSI</p>
           {['semua', 'kritis', 'signifikan', 'perlu_perhatian'].map(v => (
-            <button key={v} onClick={() => setFilterUrgensi(v)}
-              className={`w-full text-left text-xs px-2.5 py-1.5 rounded-lg mb-1 transition-colors ${filterUrgensi === v ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+            <button key={v} onClick={() => setFilterUrgensi(v)} style={filterBtnStyle(filterUrgensi === v)}>
               {v === 'semua' ? 'Semua' : URGENSI_LABEL[v]}
-              <span className="float-right text-slate-500">{v === 'semua' ? byTipe.length : byTipe.filter(t => t.urgensi === v).length}</span>
+              <span style={{ float: 'right', color: '#5a646c' }}>{v === 'semua' ? byTipe.length : byTipe.filter(t => t.urgensi === v).length}</span>
             </button>
           ))}
         </div>
 
-        <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Sifat</p>
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: 10, color: '#5a646c', letterSpacing: '0.12em', marginBottom: 8 }}>SIFAT</p>
           {['semua', 'pelanggaran_ketentuan', 'potensi_pelanggaran', 'perlu_perbaikan'].map(v => (
-            <button key={v} onClick={() => setFilterSifat(v)}
-              className={`w-full text-left text-xs px-2.5 py-1.5 rounded-lg mb-1 transition-colors ${filterSifat === v ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+            <button key={v} onClick={() => setFilterSifat(v)} style={filterBtnStyle(filterSifat === v)}>
               {v === 'semua' ? 'Semua' : v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
             </button>
           ))}
         </div>
 
-        <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Kluster</p>
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: 10, color: '#5a646c', letterSpacing: '0.12em', marginBottom: 8 }}>KLUSTER</p>
           {['semua', ...KLUSTER_LIST.map(k => k.kode)].map(v => (
-            <button key={v} onClick={() => setFilterKluster(v)}
-              className={`w-full text-left text-xs px-2.5 py-1.5 rounded-lg mb-1 transition-colors ${filterKluster === v ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+            <button key={v} onClick={() => setFilterKluster(v)} style={filterBtnStyle(filterKluster === v)}>
               {v === 'semua' ? 'Semua' : `${v} — ${KLUSTER_LIST.find(k => k.kode === v)?.nama}`}
-              {v !== 'semua' && <span className="float-right text-slate-500">{byTipe.filter(t => t.kluster === v).length}</span>}
+              {v !== 'semua' && <span style={{ float: 'right', color: '#5a646c' }}>{byTipe.filter(t => t.kluster === v).length}</span>}
             </button>
           ))}
         </div>
 
         <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Status</p>
+          <p style={{ fontSize: 10, color: '#5a646c', letterSpacing: '0.12em', marginBottom: 8 }}>STATUS</p>
           {['semua', 'draft', 'dikonfirmasi', 'di_drop'].map(v => (
-            <button key={v} onClick={() => setFilterStatus(v)}
-              className={`w-full text-left text-xs px-2.5 py-1.5 rounded-lg mb-1 transition-colors ${filterStatus === v ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+            <button key={v} onClick={() => setFilterStatus(v)} style={filterBtnStyle(filterStatus === v)}>
               {v === 'semua' ? 'Semua' : v.charAt(0).toUpperCase() + v.slice(1).replace('_', ' ')}
-              <span className="float-right text-slate-500">{v === 'semua' ? byTipe.length : byTipe.filter(t => t.status === v).length}</span>
+              <span style={{ float: 'right', color: '#5a646c' }}>{v === 'semua' ? byTipe.length : byTipe.filter(t => t.status === v).length}</span>
             </button>
           ))}
         </div>
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto p-5">
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-slate-400">{filtered.length} temuan ditampilkan</p>
-          <p className="text-xs text-green-400">{dikonfirmasi} dikonfirmasi</p>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <p style={{ fontSize: 12, color: '#8a949c' }}>{filtered.length} temuan ditampilkan</p>
+          <p style={{ fontSize: 12, color: '#45e661' }}>{dikonfirmasi} dikonfirmasi</p>
         </div>
 
         {filtered.length === 0 ? (
-          <div className="flex items-center justify-center h-48 text-slate-600 text-sm">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: '#5a646c', fontSize: 13 }}>
             Tidak ada temuan sesuai filter.
           </div>
         ) : (
-          <div className="space-y-3">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {filtered.map(t => (
-              <div key={t.id}
-                className={`bg-slate-900 border rounded-xl p-4 transition-opacity ${t.status === 'di_drop' ? 'opacity-40' : ''}`}
-                style={{ borderColor: t.urgensi === 'kritis' ? '#991b1b' : t.urgensi === 'signifikan' ? '#92400e' : '#1e3a5f' }}>
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                      <span className={`text-xs px-2 py-0.5 rounded-full border ${URGENSI_COLOR[t.urgensi]}`}>
+              <div key={t.id} style={{ background: 'rgba(8,12,18,0.85)', border: `1px solid ${t.urgensi === 'kritis' ? 'rgba(255,111,97,0.35)' : t.urgensi === 'signifikan' ? 'rgba(255,190,80,0.25)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 16, padding: 16, opacity: t.status === 'di_drop' ? 0.4 : 1 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, border: `1px solid ${t.urgensi === 'kritis' ? 'rgba(255,111,97,0.5)' : t.urgensi === 'signifikan' ? 'rgba(255,190,80,0.4)' : 'rgba(255,255,255,0.15)'}`, color: t.urgensi === 'kritis' ? '#ff6f61' : t.urgensi === 'signifikan' ? '#ffbe50' : '#8a949c' }}>
                         {URGENSI_LABEL[t.urgensi]}
                       </span>
                       {t.kluster && (
-                        <span className="text-xs px-2 py-0.5 bg-slate-800 text-slate-400 rounded-full">
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#8a949c' }}>
                           {t.kluster} · {t.kluster_nama}
                         </span>
                       )}
                       {t.sumber_tipe && (
-                        <span className="text-xs text-slate-600">dari {t.sumber_tipe}</span>
+                        <span style={{ fontSize: 11, color: '#5a646c' }}>dari {t.sumber_tipe}</span>
                       )}
                     </div>
-                    <p className="font-medium text-sm">{t.judul}</p>
+                    <p style={{ fontSize: 13, fontWeight: 500 }}>{t.judul}</p>
                     {expanded === t.id && (
-                      <div className="mt-3 space-y-2 text-xs text-slate-400 leading-relaxed">
-                        {t.uraian && <p>{t.uraian}</p>}
+                      <div style={{ marginTop: 12, fontSize: 12, color: '#8a949c', lineHeight: 1.7 }}>
+                        {t.uraian && <p style={{ marginBottom: 8 }}>{t.uraian}</p>}
                         {t.pasal_terkait?.length > 0 && (
-                          <p className="text-blue-400">Pasal: {t.pasal_terkait.join(', ')}</p>
+                          <p style={{ color: '#45e661', marginBottom: 8 }}>Pasal: {t.pasal_terkait.join(', ')}</p>
                         )}
                         {t.rekomendasi && (
-                          <p className="text-slate-300 italic">Rekomendasi: {t.rekomendasi}</p>
+                          <p style={{ color: '#eef2ef', fontStyle: 'italic' }}>Rekomendasi: {t.rekomendasi}</p>
                         )}
+                      </div>
+                    )}
+
+                    {t.status === 'dikonfirmasi' && (
+                      <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+                        <p style={{ fontSize: 11, color: '#8a949c', marginBottom: 8 }}>Catatan Pengawas <span style={{ color: '#5a646c' }}>(setelah konfirmasi ke perusahaan)</span></p>
+                        <textarea
+                          rows={3}
+                          value={catatan[t.id] ?? (t.catatan_pengawas || '')}
+                          onChange={e => setCatatan(prev => ({ ...prev, [t.id]: e.target.value }))}
+                          placeholder="Isi catatan pengawas di sini..."
+                          style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#eef2ef', padding: '6px 0', fontSize: 12, outline: 'none', fontFamily: 'inherit', resize: 'none', boxSizing: 'border-box' }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                          <button onClick={() => saveCatatan(t.id)} disabled={savingCatatan === t.id}
+                            style={{ fontSize: 11, padding: '5px 14px', borderRadius: 999, background: 'rgba(69,230,97,0.12)', color: '#45e661', border: '1px solid rgba(69,230,97,0.3)', cursor: 'pointer', fontFamily: 'inherit', opacity: savingCatatan === t.id ? 0.5 : 1 }}>
+                            {savingCatatan === t.id ? 'Menyimpan...' : 'Simpan Catatan'}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex flex-col items-end gap-2 shrink-0">
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
                     <button onClick={() => setExpanded(expanded === t.id ? null : t.id)}
-                      className="text-slate-600 hover:text-slate-400 text-sm">
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#5a646c', fontFamily: 'inherit' }}>
                       {expanded === t.id ? '▲' : '▼'}
                     </button>
                     {t.status === 'draft' && (
-                      <div className="flex gap-1">
+                      <div style={{ display: 'flex', gap: 6 }}>
                         <button onClick={() => updateStatus(t.id, 'dikonfirmasi')}
-                          className="text-xs px-2 py-1 bg-green-900/40 text-green-400 hover:bg-green-900/60 rounded transition-colors">
-                          ✓
-                        </button>
+                          style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, background: 'rgba(69,230,97,0.12)', color: '#45e661', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>✓</button>
                         <button onClick={() => updateStatus(t.id, 'di_drop')}
-                          className="text-xs px-2 py-1 bg-slate-800 text-slate-500 hover:bg-slate-700 rounded transition-colors">
-                          ✕
-                        </button>
+                          style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#8a949c', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
                       </div>
                     )}
                     {t.status === 'dikonfirmasi' && (
-                      <span className="text-xs text-green-500">✓ Dikonfirmasi</span>
+                      <span style={{ fontSize: 11, color: '#45e661' }}>✓ Dikonfirmasi</span>
                     )}
                     {t.status === 'di_drop' && (
                       <button onClick={() => updateStatus(t.id, 'draft')}
-                        className="text-xs text-slate-600 hover:text-slate-400">
-                        Batalkan drop
-                      </button>
+                        style={{ fontSize: 11, color: '#5a646c', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Batalkan drop</button>
                     )}
                   </div>
                 </div>
@@ -543,14 +593,15 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    uploaded: 'bg-slate-800 text-slate-400',
-    analyzing: 'bg-yellow-900/40 text-yellow-400',
-    done: 'bg-green-900/40 text-green-400',
-    error: 'bg-red-900/40 text-red-400',
+  const colors: Record<string, { bg: string; color: string }> = {
+    uploaded: { bg: 'rgba(255,255,255,0.06)', color: '#8a949c' },
+    analyzing: { bg: 'rgba(255,190,80,0.12)', color: '#ffbe50' },
+    done: { bg: 'rgba(69,230,97,0.12)', color: '#45e661' },
+    error: { bg: 'rgba(255,111,97,0.12)', color: '#ff6f61' },
   }
   const label: Record<string, string> = {
-    uploaded: 'Diupload', analyzing: 'Menganalisis...', done: 'Selesai', error: 'Error',
+    uploaded: 'Diupload', analyzing: 'Menganalisis...', done: 'Selesai', error: 'Gagal',
   }
-  return <span className={`text-xs px-2 py-0.5 rounded-full ${map[status] ?? map.uploaded}`}>{label[status] ?? status}</span>
+  const c = colors[status] ?? colors.uploaded
+  return <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: c.bg, color: c.color }}>{label[status] ?? status}</span>
 }

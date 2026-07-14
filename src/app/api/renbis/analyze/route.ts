@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     const { error: updateErr } = await db()
       .from('offsite_sessions')
-      .update({ status: 'done', hasil: hasilData })
+      .update({ status: 'selesai', hasil: hasilData })
       .eq('id', sessionId)
 
     if (updateErr) console.error('[renbis] gagal update session:', updateErr.message)

@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
 
     await db()
       .from('offsite_sessions')
-      .update({ status: 'done', hasil: hasilData })
+      .update({ status: 'selesai', hasil: hasilData })
       .eq('id', sessionId)
 
     // Return tanpa docx_b64 (terlalu besar untuk JSON response)

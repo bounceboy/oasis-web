@@ -1,89 +1,85 @@
 import { redirect } from 'next/navigation'
 import { getUser } from '@/lib/auth'
 import Link from 'next/link'
+import Navbar from '@/components/oasis/Navbar'
 
 export default async function DashboardPage() {
   const user = await getUser()
   if (!user) redirect('/login')
 
   const isAdmin = user.role === 'admin'
+  const firstName = (user.nama_lengkap || user.username).split(' ')[0]
 
   const offsiteModules = [
-    { href: '/psak117',  icon: '📊', label: 'PSAK 117',       sub: 'Analisis Lapkeu Asuransi' },
-    { href: '/lhptl',   icon: '📋', label: 'LHPTL',          sub: 'Pengawasan Pialang' },
-    { href: '/kyic',    icon: '🏷️', label: 'KYIC/KYNBFI',    sub: 'Know Your Insurance Company' },
-    { href: '/renbis',  icon: '📈', label: 'Renbis',          sub: 'Evaluasi Rencana Bisnis' },
+    { href: '/psak117', label: 'PSAK 117',    sub: 'Analisis Lapkeu Asuransi' },
+    { href: '/lhptl',   label: 'LHPTL',       sub: 'Pengawasan Tidak Langsung Pialang' },
+    { href: '/kyic',    label: 'KYIC/KYNBFI', sub: 'Know Your Insurance Company' },
+    { href: '/renbis',  label: 'Renbis',       sub: 'Evaluasi Rencana Bisnis Tahunan' },
   ]
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <nav className="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">O</span>
+    <div style={{ minHeight: '100vh', color: '#eef2ef' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px 64px' }}>
+        <Navbar
+          userName={user.nama_lengkap || user.username}
+          userRole={user.role}
+          showAdmin={isAdmin}
+        />
+
+        {/* Welcome */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 40, flexWrap: 'wrap', gap: 20 }}>
+          <div>
+            <h1 style={{ fontSize: 34, fontWeight: 500, margin: 0, lineHeight: 1.3, letterSpacing: '-0.01em' }}>
+              Selamat datang, {firstName}.<br />
+              <span style={{ color: '#45e661' }}>Pantau pengawasan</span> Anda di sini.
+            </h1>
+            <p style={{ fontSize: 13, color: '#8a949c', margin: '12px 0 0' }}>Onsite &amp; offsite, dalam satu tempat — didukung AI.</p>
           </div>
-          <span className="font-bold text-lg">OASIS</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-slate-300">{user.nama_lengkap || user.username}</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${
-            user.role === 'admin' ? 'text-purple-400 bg-purple-900/30' :
-            user.role === 'supervisor' ? 'text-blue-400 bg-blue-900/30' :
-            'text-slate-400 bg-slate-800'
-          }`}>{user.role}</span>
-          <form action="/api/auth/signout" method="POST">
-            <button className="text-slate-500 hover:text-white text-sm transition-colors ml-2">Keluar</button>
-          </form>
-        </div>
-      </nav>
-
-      <div className="max-w-4xl mx-auto px-6 py-10 space-y-10">
-
-        {/* Onsite */}
-        <section>
-          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Pemeriksaan Onsite</h2>
-          <Link href="/pemeriksaan"
-            className="flex items-center gap-4 bg-slate-900 border border-slate-800 hover:border-blue-700 rounded-xl p-5 transition-colors group">
-            <div className="text-3xl">🔍</div>
-            <div>
-              <p className="font-semibold text-base group-hover:text-blue-400 transition-colors">Pemeriksaan Onsite</p>
-              <p className="text-slate-500 text-sm mt-0.5">Pemeriksaan lapangan berbasis kode sesi</p>
-            </div>
-            <span className="ml-auto text-slate-600 group-hover:text-slate-400 transition-colors text-lg">→</span>
+          <Link href="/pemeriksaan" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'transparent', color: '#45e661', border: '1px solid #45e661', borderRadius: 999, padding: '11px 24px', fontSize: 11, fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', textDecoration: 'none' }}>
+            Sesi baru
+            <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#45e661', color: '#04120a', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>↗</span>
           </Link>
-        </section>
+        </div>
 
-        {/* Offsite */}
-        <section>
-          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Pengawasan Offsite</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {offsiteModules.map((m) => (
-              <Link key={m.href} href={m.href}
-                className="bg-slate-900 border border-slate-800 hover:border-blue-700 rounded-xl p-4 transition-colors group">
-                <div className="text-2xl mb-2">{m.icon}</div>
-                <p className="font-medium text-sm group-hover:text-blue-400 transition-colors">{m.label}</p>
-                <p className="text-slate-500 text-xs mt-0.5">{m.sub}</p>
+        {/* Onsite card */}
+        <div style={{ marginBottom: 44 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#5a646c', marginBottom: 14 }}>Pemeriksaan Onsite</div>
+          <Link href="/pemeriksaan" style={{ display: 'flex', alignItems: 'center', gap: 24, background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: '22px 28px', textDecoration: 'none', color: 'inherit' }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 500, color: '#eef2ef' }}>Pemeriksaan Onsite</div>
+              <div style={{ fontSize: 12.5, color: '#8a949c', marginTop: 4 }}>Pemeriksaan lapangan berbasis kode sesi — dokumen, wawancara, dan temuan</div>
+            </div>
+            <span style={{ marginLeft: 'auto', color: '#45e661', fontSize: 18 }}>↗</span>
+          </Link>
+        </div>
+
+        {/* Offsite modules */}
+        <div style={{ marginBottom: 44 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#5a646c', marginBottom: 14 }}>Pengawasan Offsite</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            {offsiteModules.map(m => (
+              <Link key={m.href} href={m.href} style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '22px 24px', textDecoration: 'none', color: 'inherit', display: 'block' }}>
+                <div style={{ fontSize: 15, fontWeight: 500, color: '#eef2ef', marginBottom: 6 }}><span style={{ color: '#45e661' }}>{m.label.split('/')[0].split(' ')[0]}</span>{m.label.includes('/') ? '/'+m.label.split('/')[1] : m.label.replace(m.label.split(' ')[0], '')}</div>
+                <div style={{ fontSize: 11.5, color: '#8a949c', lineHeight: 1.6 }}>{m.sub}</div>
+                <div style={{ marginTop: 16, color: '#45e661', fontSize: 13 }}>↗</div>
               </Link>
             ))}
           </div>
-        </section>
+        </div>
 
-        {/* Admin — hanya untuk role admin */}
+        {/* Admin */}
         {isAdmin && (
-          <section>
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Administrasi</h2>
-            <Link href="/admin"
-              className="flex items-center gap-4 bg-slate-900 border border-slate-800 hover:border-purple-700 rounded-xl p-5 transition-colors group">
-              <div className="text-3xl">⚙️</div>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#5a646c', marginBottom: 14 }}>Administrasi</div>
+            <Link href="/admin" style={{ display: 'flex', alignItems: 'center', gap: 24, background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: '22px 28px', textDecoration: 'none', color: 'inherit' }}>
               <div>
-                <p className="font-semibold text-base group-hover:text-purple-400 transition-colors">Panel Admin</p>
-                <p className="text-slate-500 text-sm mt-0.5">Kelola user, skills config, dan konfigurasi sistem</p>
+                <div style={{ fontSize: 16, fontWeight: 500, color: '#eef2ef' }}>Panel Admin</div>
+                <div style={{ fontSize: 12.5, color: '#8a949c', marginTop: 4 }}>Kelola user, sesi pemeriksaan, dan konfigurasi sistem</div>
               </div>
-              <span className="ml-auto text-slate-600 group-hover:text-slate-400 transition-colors text-lg">→</span>
+              <span style={{ marginLeft: 'auto', color: '#45e661', fontSize: 18 }}>↗</span>
             </Link>
-          </section>
+          </div>
         )}
-
       </div>
     </div>
   )

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { RisikoRating, RiskLevel } from '@/lib/kyic'
+import Navbar from '@/components/oasis/Navbar'
 
 interface KyicResult {
   sessionId: string
@@ -58,6 +59,7 @@ export default function KyicPage() {
   const [activeRisk, setActiveRisk] = useState<string | null>(null)
   const [activeComposit, setActiveComposit] = useState<string | null>(null)
   const [riwayat, setRiwayat] = useState<{id: string; nama_entitas: string; created_at: string}[]>([])
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   useEffect(() => {
     fetch('/api/sessions?modul=kyic')
@@ -105,12 +107,30 @@ export default function KyicPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Terjadi kesalahan')
       setResult(data)
+      setSaveState('idle')
       if (data.progress_log) setProgressLog(data.progress_log)
       setStep('hasil')
       fetch('/api/sessions?modul=kyic').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gagal menganalisis')
       setStep('upload')
+    }
+  }
+
+  async function handleSimpan() {
+    if (!result?.sessionId) return
+    setSaveState('saving')
+    try {
+      const res = await fetch(`/api/sessions/${result.sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hasil: result }),
+      })
+      if (!res.ok) throw new Error()
+      setSaveState('saved')
+      fetch('/api/sessions?modul=kyic').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
+    } catch {
+      setSaveState('error')
     }
   }
 
@@ -123,88 +143,82 @@ export default function KyicPage() {
   return (
     <>
       <style jsx>{`
-        .container { max-width: 1000px; margin: 0 auto; padding: 2rem 1rem; }
-        .back { color: #64748b; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 1.5rem; }
-        .back:hover { color: #94a3b8; }
-        .title { font-size: 1.4rem; font-weight: 700; color: #f1f5f9; }
-        .subtitle { color: #64748b; font-size: 0.9rem; margin-bottom: 2rem; margin-top: 0.2rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px 24px 64px; }
+        .title { font-size: 26px; font-weight: 500; color: #eef2ef; }
+        .title span { color: #45e661; }
+        .subtitle { color: #8a949c; font-size: 12.5px; margin: 8px 0 0; margin-bottom: 0; }
 
-        .steps { display: flex; gap: 0; margin-bottom: 2.5rem; }
-        .step-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.4rem; position: relative; }
-        .step-item:not(:last-child)::after { content: ''; position: absolute; top: 14px; left: 60%; width: 80%; height: 2px; background: #1e293b; }
-        .step-item.active::after { background: #2563eb; }
-        .step-item.done::after { background: #16a34a; }
-        .step-dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; background: #1e293b; color: #475569; border: 2px solid #334155; z-index: 1; }
-        .step-item.active .step-dot { background: #2563eb; color: white; border-color: #2563eb; }
-        .step-item.done .step-dot { background: #16a34a; color: white; border-color: #16a34a; }
-        .step-label { font-size: 0.75rem; color: #475569; }
-        .step-item.active .step-label { color: #93c5fd; }
-        .step-item.done .step-label { color: #86efac; }
+        .steps { display: flex; gap: 32px; margin-bottom: 32px; }
+        .step-item { display: flex; align-items: baseline; gap: 10px; }
+        .step-dot { font-size: 18px; font-weight: 300; color: #5a646c; }
+        .step-item.active .step-dot { color: #45e661; }
+        .step-item.done .step-dot { color: #45e661; }
+        .step-label { font-size: 12px; color: #5a646c; }
+        .step-item.active .step-label { color: #eef2ef; }
+        .step-item.done .step-label { color: #eef2ef; }
 
-        .card { background: #0f172a; border: 1px solid #1e293b; border-radius: 1rem; padding: 2rem; margin-bottom: 1.5rem; }
-        .card-title { font-size: 1rem; font-weight: 700; color: #e2e8f0; margin-bottom: 1rem; }
+        .card { background: rgba(8,12,18,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; padding: 28px; margin-bottom: 16px; }
+        .card-title { font-size: 14px; font-weight: 500; color: #eef2ef; margin-bottom: 16px; }
 
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
-        label { display: block; font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.4rem; font-weight: 500; }
-        input[type="text"] { width: 100%; background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; padding: 0.6rem 0.75rem; color: #f1f5f9; font-size: 0.9rem; outline: none; box-sizing: border-box; }
-        input[type="text"]:focus { border-color: #2563eb; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        label { display: block; font-size: 12px; color: #8a949c; margin-bottom: 6px; }
+        input[type="text"] { width: 100%; background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.15); padding: 8px 0; color: #eef2ef; font-size: 13.5px; outline: none; box-sizing: border-box; font-family: inherit; }
+        input[type="text"]:focus { border-bottom-color: #45e661; }
 
-        .upload-zone { border: 2px dashed #334155; border-radius: 0.75rem; padding: 1.5rem; text-align: center; cursor: pointer; transition: border-color 0.2s; }
-        .upload-zone:hover, .upload-zone.active { border-color: #2563eb; }
-        .upload-icon { font-size: 2rem; margin-bottom: 0.5rem; }
-        .upload-hint { color: #64748b; font-size: 0.8rem; }
-        .file-chip { display: inline-flex; align-items: center; gap: 0.4rem; background: #1e293b; border: 1px solid #334155; border-radius: 0.4rem; padding: 0.25rem 0.6rem; font-size: 0.78rem; color: #94a3b8; margin: 0.2rem; }
-        .file-chip button { background: none; border: none; color: #475569; cursor: pointer; padding: 0; font-size: 0.85rem; line-height: 1; }
-        .file-chip button:hover { color: #f87171; }
+        .upload-zone { border: 1px dashed rgba(69,230,97,0.45); border-radius: 18px; padding: 24px; text-align: center; cursor: pointer; }
+        .upload-icon { font-size: 1.8rem; margin-bottom: 8px; }
+        .upload-hint { color: #5a646c; font-size: 11.5px; margin-top: 5px; }
+        .file-chip { display: inline-flex; align-items: center; gap: 6px; background: rgba(8,12,18,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; padding: 4px 12px; font-size: 11.5px; color: #8a949c; margin: 3px; }
+        .file-chip button { background: none; border: none; color: #5a646c; cursor: pointer; padding: 0; font-size: 13px; line-height: 1; }
+        .file-chip button:hover { color: #ff6f61; }
 
-        .btn { padding: 0.7rem 1.5rem; border-radius: 0.5rem; border: none; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; }
-        .btn-primary { background: #2563eb; color: white; }
-        .btn-primary:hover { background: #1d4ed8; }
+        .btn { padding: 12px 28px; border-radius: 999px; border: none; cursor: pointer; font-weight: 600; font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; font-family: inherit; }
+        .btn-primary { background: #45e661; color: #04120a; }
         .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-success { background: #16a34a; color: white; }
-        .btn-success:hover { background: #15803d; }
-        .btn-outline { background: transparent; color: #94a3b8; border: 1px solid #334155; }
-        .btn-outline:hover { border-color: #64748b; color: #f1f5f9; }
+        .btn-success { background: #45e661; color: #04120a; }
+        .btn-outline { background: transparent; color: #8a949c; border: 1px solid rgba(255,255,255,0.15); }
 
-        .error-box { background: #450a0a; border: 1px solid #991b1b; border-radius: 0.5rem; padding: 0.75rem 1rem; color: #fca5a5; font-size: 0.85rem; margin-bottom: 1rem; }
+        .error-box { background: rgba(255,111,97,0.08); border: 1px solid rgba(255,111,97,0.3); border-radius: 12px; padding: 12px 16px; color: #ff6f61; font-size: 12.5px; margin-bottom: 16px; }
 
         /* Processing */
-        .processing-center { text-align: center; padding: 2rem 1rem; }
-        .spinner { width: 48px; height: 48px; border: 4px solid #1e293b; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1.5rem; }
+        .processing-center { text-align: center; padding: 56px 16px; }
+        .spinner { width: 40px; height: 40px; border: 2px solid rgba(255,255,255,0.1); border-top-color: #45e661; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 20px; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .progress-log { text-align: left; background: #0a0f1e; border: 1px solid #1e293b; border-radius: 0.75rem; padding: 1rem; margin-top: 1.5rem; max-height: 200px; overflow-y: auto; }
-        .log-item { font-size: 0.8rem; color: #64748b; padding: 0.2rem 0; }
-        .log-item.active { color: #93c5fd; }
+        .progress-log { text-align: left; background: rgba(8,12,18,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 16px; margin-top: 20px; max-height: 200px; overflow-y: auto; }
+        .log-item { font-size: 11.5px; color: #5a646c; padding: 2px 0; }
+        .log-item.active { color: #45e661; }
         .log-item::before { content: '→ '; }
 
         /* Hasil */
-        .hasil-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
-        .section-label { font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; margin: 1.5rem 0 0.75rem; }
-        .narasi-box { background: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; padding: 1rem 1.25rem; color: #cbd5e1; font-size: 0.875rem; line-height: 1.7; white-space: pre-wrap; }
+        .hasil-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+        .section-label { font-size: 10.5px; font-weight: 500; color: #5a646c; text-transform: uppercase; letter-spacing: 0.12em; margin: 24px 0 12px; }
+        .narasi-box { background: rgba(8,12,18,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 20px 24px; color: #b7c0c6; font-size: 13.5px; line-height: 1.9; white-space: pre-wrap; }
 
         /* Risk matrix */
-        .risk-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-        .risk-table th { background: #1e293b; color: #94a3b8; font-weight: 600; padding: 0.5rem 0.75rem; text-align: center; border: 1px solid #334155; }
+        .risk-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+        .risk-table th { background: rgba(8,12,18,0.8); color: #8a949c; font-weight: 500; padding: 10px 12px; text-align: center; border: 1px solid rgba(255,255,255,0.07); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; }
         .risk-table th:first-child { text-align: left; }
-        .risk-table td { padding: 0.45rem 0.75rem; border: 1px solid #1e293b; text-align: center; vertical-align: middle; }
-        .risk-table tr:nth-child(even) td { background: #0c1525; }
-        .risk-table td:first-child { text-align: left; color: #94a3b8; cursor: pointer; }
-        .risk-table td:first-child:hover { color: #93c5fd; }
-        .risk-table tr.selected td { background: #1e293b44; }
+        .risk-table td { padding: 9px 12px; border: 1px solid rgba(255,255,255,0.05); text-align: center; vertical-align: middle; color: #b7c0c6; }
+        .risk-table tr:nth-child(even) td { background: rgba(255,255,255,0.01); }
+        .risk-table td:first-child { text-align: left; color: #8a949c; cursor: pointer; }
+        .risk-table td:first-child:hover { color: #45e661; }
+        .risk-table tr.selected td { background: rgba(69,230,97,0.06); }
 
-        .analisis-panel { background: #172033; border: 1px solid #2563eb33; border-radius: 0.75rem; padding: 1rem 1.25rem; margin-top: 0.75rem; color: #cbd5e1; font-size: 0.85rem; line-height: 1.7; }
-        .analisis-label { font-size: 0.75rem; font-weight: 700; color: #3b82f6; margin-bottom: 0.4rem; }
+        .analisis-panel { background: rgba(8,12,18,0.6); border: 1px solid rgba(69,230,97,0.2); border-radius: 16px; padding: 16px 20px; margin-top: 12px; color: #b7c0c6; font-size: 13px; line-height: 1.7; }
+        .analisis-label { font-size: 10.5px; font-weight: 500; color: #45e661; margin-bottom: 6px; letter-spacing: 0.08em; text-transform: uppercase; }
 
-        .composite-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
-        .composite-item { flex: 1; min-width: 140px; background: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; padding: 0.75rem 1rem; text-align: center; }
-        .composite-label { font-size: 0.75rem; color: #64748b; margin-bottom: 0.4rem; }
-        .composite-value { font-size: 1.1rem; font-weight: 700; }
+        .composite-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+        .composite-item { flex: 1; min-width: 140px; background: rgba(8,12,18,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 14px 16px; text-align: center; }
+        .composite-label { font-size: 11px; color: #8a949c; margin-bottom: 6px; }
+        .composite-value { font-size: 18px; font-weight: 500; }
       `}</style>
 
       <div className="container">
-        <Link href="/dashboard" className="back">← Dashboard</Link>
-        <div className="title">Know Your Insurance Company (KYIC)</div>
-        <div className="subtitle">Upload template KYIC + dokumen pendukung — AI akan menganalisis dan mengisi KK secara otomatis</div>
+        <Navbar />
+        <div style={{ marginBottom: 26 }}>
+          <div className="title"><span>KYIC/KYNBFI</span> — know your insurance company</div>
+          <div className="subtitle">Upload template KYIC + dokumen pendukung — AI mengisi profil risiko secara otomatis.</div>
+        </div>
 
         {/* Steps */}
         <div className="steps">
@@ -214,7 +228,7 @@ export default function KyicPage() {
             { key: 'hasil' as Step, label: 'Hasil KYIC' },
           ].map((s, i) => (
             <div key={s.key} className={`step-item ${step === s.key ? 'active' : stepDone(s.key) ? 'done' : ''}`}>
-              <div className="step-dot">{stepDone(s.key) ? '✓' : i + 1}</div>
+              <div className="step-dot">{i + 1}</div>
               <div className="step-label">{s.label}</div>
             </div>
           ))}
@@ -379,21 +393,34 @@ export default function KyicPage() {
         {step === 'upload' && riwayat.length > 0 && (
           <div style={{ marginTop: '1.5rem' }}>
             <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Riwayat Analisis</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {riwayat.map(item => (
-                <button key={item.id}
-                  onClick={async () => {
-                    const r = await fetch(`/api/sessions?modul=kyic`).then(x => x.json())
-                    const found = Array.isArray(r) ? r.find((s: {id: string; hasil: KyicResult}) => s.id === item.id) : null
-                    if (found?.hasil) { setResult({ ...found.hasil, sessionId: found.id }); setStep('hasil') }
-                  }}
-                  style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '0.5rem', padding: '0.5rem 0.75rem', cursor: 'pointer', textAlign: 'left' }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#2563eb')}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = '#1e293b')}
-                >
-                  <div style={{ color: '#e2e8f0', fontSize: '0.85rem', fontWeight: 500 }}>{item.nama_entitas}</div>
-                  <div style={{ color: '#475569', fontSize: '0.75rem', marginTop: '0.1rem' }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                </button>
+                <div key={item.id} style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '0.75rem', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: '#e2e8f0', fontSize: '0.85rem', fontWeight: 600 }}>{item.nama_entitas}</div>
+                    <div style={{ color: '#475569', fontSize: '0.75rem', marginTop: '0.1rem' }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0, marginLeft: '1rem' }}>
+                    <button onClick={async () => {
+                      const r = await fetch(`/api/sessions?modul=kyic`).then(x => x.json())
+                      const found = Array.isArray(r) ? r.find((s: {id: string; hasil: KyicResult}) => s.id === item.id) : null
+                      if (found?.hasil) { setResult({ ...found.hasil, sessionId: found.id }); setSaveState('saved'); setStep('hasil') }
+                    }}
+                      style={{ background: 'transparent', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.3rem 0.75rem', cursor: 'pointer', color: '#94a3b8', fontSize: '0.8rem' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.color = '#93c5fd' }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.color = '#94a3b8' }}
+                    >Lihat</button>
+                    <button onClick={async () => {
+                      if (!confirm(`Hapus analisis "${item.nama_entitas}"?`)) return
+                      await fetch(`/api/sessions/${item.id}`, { method: 'DELETE' })
+                      setRiwayat(prev => prev.filter(r => r.id !== item.id))
+                    }}
+                      style={{ background: 'transparent', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.3rem 0.5rem', cursor: 'pointer', color: '#475569', fontSize: '0.8rem' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#991b1b'; e.currentTarget.style.color = '#f87171' }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.color = '#475569' }}
+                    >✕</button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -442,8 +469,14 @@ export default function KyicPage() {
                     ))}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0, alignItems: 'center' }}>
                   <button className="btn btn-outline" onClick={() => { setStep('upload'); setResult(null) }}>← Baru</button>
+                  {saveState === 'saved'
+                    ? <span style={{ fontSize: '0.85rem', color: '#86efac' }}>✓ Tersimpan</span>
+                    : <button className="btn btn-outline" onClick={handleSimpan} disabled={saveState === 'saving'}>
+                        {saveState === 'saving' ? '⏳ Menyimpan...' : saveState === 'error' ? '⚠ Coba Lagi' : '💾 Simpan'}
+                      </button>
+                  }
                   <button className="btn btn-success" onClick={() => window.open(`/api/kyic/download/${result.sessionId}`, '_blank')}>
                     ⬇ Unduh KYIC (.docx)
                   </button>
@@ -567,7 +600,13 @@ export default function KyicPage() {
               <div className="narasi-box">{result.supervisory_action}</div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', alignItems: 'center' }}>
+              {saveState !== 'saved' && (
+                <button className="btn btn-outline" onClick={handleSimpan} disabled={saveState === 'saving'}>
+                  {saveState === 'saving' ? '⏳ Menyimpan...' : saveState === 'error' ? '⚠ Coba Lagi Simpan' : '💾 Simpan Analisis'}
+                </button>
+              )}
+              {saveState === 'saved' && <span style={{ fontSize: '0.85rem', color: '#86efac' }}>✓ Tersimpan</span>}
               <button className="btn btn-success" onClick={() => window.open(`/api/kyic/download/${result.sessionId}`, '_blank')}>
                 ⬇ Unduh KYIC (.docx)
               </button>

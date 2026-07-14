@@ -19,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data, error } = await query.single()
   if (error || !data) return NextResponse.json({ error: 'Tidak ditemukan' }, { status: 404 })
-  if (data.status !== 'done') return NextResponse.json({ error: 'Analisis belum selesai' }, { status: 400 })
+  if (!data.hasil) return NextResponse.json({ error: 'Data hasil tidak tersedia' }, { status: 400 })
 
   const hasil = data.hasil as {
     nama_perusahaan: string

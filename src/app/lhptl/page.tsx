@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import type { HasilPengawasan } from '@/lib/lhptl-rules'
+import Navbar from '@/components/oasis/Navbar'
 
 type JenisEntitas = 'pialang_asuransi' | 'pialang_reasuransi'
 type Step = 1 | 2 | 3
@@ -20,6 +21,7 @@ type HasilData = {
 
 export default function LhptlPage() {
   const fileRef = useRef<HTMLInputElement>(null)
+  const fileGcgRef = useRef<HTMLInputElement>(null)
 
   const [step, setStep] = useState<Step>(1)
   const [loading, setLoading] = useState(false)
@@ -29,11 +31,13 @@ export default function LhptlPage() {
   const [jenisEntitas, setJenisEntitas]   = useState<JenisEntitas>('pialang_asuransi')
   const [periode, setPeriode]             = useState('')
   const [file, setFile]                   = useState<File | null>(null)
+  const [fileGcg, setFileGcg]             = useState<File | null>(null)
 
   const [hasil, setHasil]                 = useState<HasilData | null>(null)
   const [activeTab, setActiveTab]         = useState<'semua' | 'pelanggaran' | 'perhatian' | 'informasional'>('semua')
   const [error, setError]                 = useState('')
   const [riwayat, setRiwayat] = useState<{id: string; nama_entitas: string; created_at: string}[]>([])
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   useEffect(() => {
     fetch('/api/sessions?modul=lhptl')
@@ -42,19 +46,38 @@ export default function LhptlPage() {
       .catch(() => {})
   }, [])
 
+  async function handleSimpan() {
+    if (!hasil?.sessionId) return
+    setSaveState('saving')
+    try {
+      const res = await fetch(`/api/sessions/${hasil.sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hasil }),
+      })
+      if (!res.ok) throw new Error()
+      setSaveState('saved')
+      fetch('/api/sessions?modul=lhptl').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
+    } catch {
+      setSaveState('error')
+    }
+  }
+
   function addLog(msg: string) {
     setLog(prev => [...prev, `[${new Date().toLocaleTimeString('id-ID')}] ${msg}`])
   }
 
   async function handleAnalisis() {
-    if (!file || !namaEntitas.trim() || !periode.trim()) return
+    if (!file || !fileGcg || !namaEntitas.trim() || !periode.trim()) return
     setLoading(true); setError(''); setLog([]); setStep(2)
 
     try {
-      addLog(`Mengupload file: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`)
+      addLog(`Mengupload file laporan keuangan: ${file.name}`)
+      addLog(`Mengupload file laporan GCG: ${fileGcg.name}`)
       addLog('Membaca sheet Excel...')
       const fd = new FormData()
       fd.append('file', file)
+      fd.append('fileGcg', fileGcg)
       fd.append('namaEntitas', namaEntitas)
       fd.append('jenisEntitas', jenisEntitas)
       fd.append('periode', periode)
@@ -68,6 +91,7 @@ export default function LhptlPage() {
       if (!res.ok) throw new Error(data.error || 'Analisis gagal')
 
       setHasil(data)
+      setSaveState('idle')
       addLog(`Selesai: ${data.ringkasan.total} temuan`)
       setStep(3)
       fetch('/api/sessions?modul=lhptl').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
@@ -93,115 +117,109 @@ export default function LhptlPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      {/* Navbar */}
-      <nav className="border-b border-slate-800 px-6 py-4 flex items-center gap-4">
-        <Link href="/dashboard" className="text-slate-400 hover:text-white text-sm transition-colors">← Dashboard</Link>
-        <span className="text-slate-700">/</span>
-        <span className="text-sm font-medium">LHPTL</span>
-      </nav>
+    <div style={{ minHeight: '100vh', color: '#eef2ef' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px 64px' }}>
+        <Navbar />
 
-      <div className="max-w-4xl mx-auto px-6 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-xl font-bold">Modul LHPTL</h1>
-          <p className="text-slate-500 text-sm mt-1">Laporan Hasil Pengawasan Tidak Langsung — Pialang Asuransi</p>
+        <div style={{ marginBottom: 26 }}>
+          <h1 style={{ fontSize: 26, fontWeight: 500, margin: 0 }}><span style={{ color: '#45e661' }}>LHPTL</span> — pengawasan tidak langsung pialang</h1>
+          <p style={{ fontSize: 12.5, color: '#8a949c', margin: '8px 0 0' }}>Upload form laporan keuangan pialang (Excel) — AI &amp; rules deterministik menyusun temuan.</p>
         </div>
 
-        {/* Stepper */}
-        <div className="flex items-center gap-2 mb-8">
-          {STEPS.map((s, i) => (
-            <div key={s.n} className="flex items-center gap-2">
-              <div className="flex items-center gap-2">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border ${
-                  step > s.n ? 'bg-green-600 border-green-600 text-white' :
-                  step === s.n ? 'border-blue-500 text-blue-400' :
-                  'border-slate-700 text-slate-600'
-                }`}>
-                  {step > s.n ? '✓' : s.n}
-                </div>
-                <span className={`text-sm ${step === s.n ? 'text-white font-medium' : 'text-slate-600'}`}>{s.label}</span>
-              </div>
-              {i < STEPS.length - 1 && <div className="w-8 h-px bg-slate-800 mx-1" />}
+        {/* Steps */}
+        <div style={{ display: 'flex', gap: 32, marginBottom: 32 }}>
+          {STEPS.map(s => (
+            <div key={s.n} style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+              <span style={{ fontSize: 18, fontWeight: 300, color: step >= s.n ? '#45e661' : '#5a646c' }}>{s.n}</span>
+              <span style={{ fontSize: 12, color: step >= s.n ? '#eef2ef' : '#5a646c' }}>{s.label}</span>
             </div>
           ))}
         </div>
 
         {/* Step 1: Form */}
         {step === 1 && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-xl space-y-5">
-            <h2 className="font-semibold">Data Entitas & Upload Excel</h2>
-
+          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 32, maxWidth: 600, display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
-              <label className="text-xs text-slate-400 mb-1.5 block">Nama Entitas</label>
+              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Nama entitas</label>
               <input value={namaEntitas} onChange={e => setNamaEntitas(e.target.value)}
-                placeholder="contoh: PT Howden Insurance Brokers Indonesia"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" />
+                placeholder="PT Pialang Asuransi Mitra Utama"
+                className="input-underline" />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               <div>
-                <label className="text-xs text-slate-400 mb-1.5 block">Jenis Entitas</label>
+                <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Jenis entitas</label>
                 <select value={jenisEntitas} onChange={e => setJenisEntitas(e.target.value as JenisEntitas)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                  className="input-underline">
                   <option value="pialang_asuransi">Pialang Asuransi</option>
                   <option value="pialang_reasuransi">Pialang Reasuransi</option>
                 </select>
               </div>
               <div>
-                <label className="text-xs text-slate-400 mb-1.5 block">Periode</label>
+                <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Periode</label>
                 <input value={periode} onChange={e => setPeriode(e.target.value)}
-                  placeholder="contoh: 31 Desember 2025"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" />
+                  placeholder="31 Desember 2025"
+                  className="input-underline" />
               </div>
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 mb-1.5 block">File Excel (Form Laporan Keuangan Pialang)</label>
-              <div onClick={() => fileRef.current?.click()}
-                className="border-2 border-dashed border-slate-700 rounded-xl p-6 text-center cursor-pointer hover:border-slate-500 transition-colors">
-                {file ? (
-                  <div>
-                    <p className="text-sm font-medium text-blue-400">📊 {file.name}</p>
-                    <p className="text-slate-500 text-xs mt-1">{(file.size / 1024).toFixed(0)} KB</p>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-slate-400 text-sm">Klik untuk pilih file Excel (.xlsx / .xlsm)</p>
-                  </div>
-                )}
-              </div>
-              <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.xls" className="hidden"
-                onChange={e => setFile(e.target.files?.[0] ?? null)} />
+              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 8 }}>File Excel — Form Laporan Keuangan Pialang <span style={{ color: '#ff6f61' }}>*wajib</span></label>
+              <label style={{ display: 'block', border: '1px dashed rgba(69,230,97,0.45)', borderRadius: 18, padding: 28, textAlign: 'center', cursor: 'pointer' }}>
+                <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.xls" style={{ display: 'none' }} onChange={e => setFile(e.target.files?.[0] ?? null)} />
+                {file ? <div style={{ fontWeight: 500, fontSize: 13.5, color: '#45e661' }}>📊 {file.name}</div>
+                  : <div style={{ fontSize: 13.5, color: '#b7c0c6' }}>Klik untuk pilih file Excel (.xlsx / .xlsm)</div>}
+              </label>
             </div>
 
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 8 }}>File Excel — Laporan GCG <span style={{ color: '#ff6f61' }}>*wajib</span></label>
+              <label style={{ display: 'block', border: '1px dashed rgba(69,230,97,0.45)', borderRadius: 18, padding: 28, textAlign: 'center', cursor: 'pointer' }}>
+                <input ref={fileGcgRef} type="file" accept=".xlsx,.xlsm,.xls" style={{ display: 'none' }} onChange={e => setFileGcg(e.target.files?.[0] ?? null)} />
+                {fileGcg ? <div style={{ fontWeight: 500, fontSize: 13.5, color: '#45e661' }}>📊 {fileGcg.name}</div>
+                  : <div style={{ fontSize: 13.5, color: '#b7c0c6' }}>Klik untuk pilih file Excel Laporan GCG (.xlsx / .xlsm)</div>}
+              </label>
+            </div>
+
+            {error && <p style={{ fontSize: 12.5, color: '#ff6f61', margin: 0 }}>{error}</p>}
 
             <button onClick={handleAnalisis}
-              disabled={!file || !namaEntitas.trim() || !periode.trim() || loading}
-              className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-lg py-2.5 text-sm font-medium transition-colors">
-              Mulai Analisis LHPTL
+              disabled={!file || !fileGcg || !namaEntitas.trim() || !periode.trim() || loading}
+              className="btn-filled" style={{ alignSelf: 'flex-start' }}>
+              Mulai Analisis LHPTL ↗
             </button>
           </div>
         )}
 
         {/* Riwayat */}
         {step === 1 && riwayat.length > 0 && (
-          <div className="mt-6">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Riwayat Analisis</p>
-            <div className="flex flex-wrap gap-2">
+          <div style={{ marginTop: 28 }}>
+            <div className="section-label" style={{ marginBottom: 12 }}>Riwayat analisis</div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
               {riwayat.map(item => (
-                <button key={item.id}
-                  onClick={async () => {
-                    const r = await fetch(`/api/sessions?modul=lhptl`).then(x => x.json())
-                    const found = Array.isArray(r) ? r.find((s: {id: string; hasil: HasilData}) => s.id === item.id) : null
-                    if (found?.hasil) { setHasil({ ...found.hasil, sessionId: found.id }); setStep(3) }
-                  }}
-                  className="bg-slate-900 border border-slate-800 hover:border-blue-700 rounded-lg px-3 py-2 text-left transition-colors"
-                >
-                  <div className="text-sm font-medium text-slate-200">{item.nama_entitas}</div>
-                  <div className="text-xs text-slate-500 mt-0.5">{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                </button>
+                <div key={item.id} style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '12px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>{item.nama_entitas}</div>
+                    <div style={{ fontSize: 11, color: '#8a949c', marginTop: 3 }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={async () => {
+                      const r = await fetch(`/api/sessions?modul=lhptl`).then(x => x.json())
+                      const found = Array.isArray(r) ? r.find((s: {id: string; hasil: HasilData}) => s.id === item.id) : null
+                      if (found?.hasil) { setHasil({ ...found.hasil, sessionId: found.id }); setSaveState('saved'); setStep(3) }
+                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 999, padding: '5px 14px', fontSize: 11, color: '#8a949c', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      Lihat
+                    </button>
+                    <button onClick={async () => {
+                      if (!confirm(`Hapus analisis "${item.nama_entitas}"?`)) return
+                      await fetch(`/api/sessions/${item.id}`, { method: 'DELETE' })
+                      setRiwayat(prev => prev.filter(r => r.id !== item.id))
+                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '5px 10px', fontSize: 11, color: '#5a646c', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      ✕
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -209,128 +227,95 @@ export default function LhptlPage() {
 
         {/* Step 2: Loading */}
         {step === 2 && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-            <h2 className="font-semibold">⏳ Memproses Analisis...</h2>
-            <div className="bg-slate-950 rounded-lg p-4 font-mono text-xs space-y-1 min-h-32 max-h-64 overflow-y-auto">
-              {log.map((l, i) => (
-                <p key={i} className="text-slate-400">{l}</p>
-              ))}
-              {loading && <p className="text-blue-400 animate-pulse">▋</p>}
+          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 56, textAlign: 'center', maxWidth: 600 }}>
+            <div style={{ width: 40, height: 40, border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#45e661', borderRadius: '50%', margin: '0 auto 20px', animation: 'spin 0.8s linear infinite' }} />
+            <div style={{ fontWeight: 500, fontSize: 15 }}>Membaca sheet &amp; menjalankan rules pengawasan…</div>
+            <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 12, marginTop: 16, maxHeight: 140, overflowY: 'auto', textAlign: 'left' }}>
+              {log.map((l, i) => <p key={i} style={{ fontSize: 11, fontFamily: 'monospace', color: '#8a949c', margin: '2px 0' }}>{l}</p>)}
+              {loading && <p style={{ fontSize: 11, fontFamily: 'monospace', color: '#45e661', margin: '4px 0' }}>▋</p>}
             </div>
           </div>
         )}
 
         {/* Step 3: Hasil */}
         {step === 3 && hasil && (
-          <div className="space-y-5">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* Scorecard */}
-            <div className="grid grid-cols-4 gap-3">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 24 }}>
               {[
-                { label: 'Total Temuan',    value: hasil.ringkasan.total,          cls: 'bg-slate-900 border-slate-800 text-white' },
-                { label: 'Pelanggaran',     value: hasil.ringkasan.pelanggaran,    cls: 'bg-red-950/60 border-red-900/50 text-red-300' },
-                { label: 'Perlu Perhatian', value: hasil.ringkasan.perlu_perhatian, cls: 'bg-orange-950/60 border-orange-900/50 text-orange-300' },
-                { label: 'Informasional',   value: hasil.ringkasan.informasional,  cls: 'bg-green-950/60 border-green-900/50 text-green-300' },
-              ].map(s => (
-                <div key={s.label} className={`border rounded-xl p-4 text-center ${s.cls}`}>
-                  <p className="text-2xl font-bold">{s.value}</p>
-                  <p className="text-xs mt-1 opacity-70">{s.label}</p>
+                { label: 'Total Temuan',    value: hasil.ringkasan.total,           color: '#eef2ef' },
+                { label: 'Pelanggaran',     value: hasil.ringkasan.pelanggaran,     color: '#ff6f61' },
+                { label: 'Perlu Perhatian', value: hasil.ringkasan.perlu_perhatian, color: '#f5a142' },
+                { label: 'Informasional',   value: hasil.ringkasan.informasional,   color: '#45e661' },
+              ].map((s, i) => (
+                <div key={s.label} style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 14 }}>
+                  <div style={{ fontSize: 11, color: '#8a949c' }}>{s.label} <span style={{ float: 'right' }}>({String(i+1).padStart(2,'0')})</span></div>
+                  <div style={{ fontSize: 44, fontWeight: 300, marginTop: 8, color: s.color }}>{s.value}</div>
                 </div>
               ))}
             </div>
 
-            {/* Download */}
-            <div className="flex justify-end">
-              <a href={`/api/lhptl/download/${hasil.sessionId}`} download
-                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                ⬇ Download LHPTL (.docx)
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              {saveState !== 'saved'
+                ? <button onClick={handleSimpan} disabled={saveState === 'saving'} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 999, padding: '9px 18px', fontSize: 11, color: '#8a949c', cursor: 'pointer', fontFamily: 'inherit', opacity: saveState === 'saving' ? 0.5 : 1 }}>
+                    {saveState === 'saving' ? 'Menyimpan...' : saveState === 'error' ? '⚠ Coba Lagi Simpan' : 'Simpan Analisis'}
+                  </button>
+                : <span style={{ fontSize: 12, color: '#45e661' }}>✓ Tersimpan</span>
+              }
+              <a href={`/api/lhptl/download/${hasil.sessionId}`} download className="btn-filled" style={{ textDecoration: 'none', padding: '9px 20px', fontSize: 11 }}>
+                Download LHPTL (.docx)
               </a>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 border-b border-slate-800">
+            <div style={{ display: 'flex', gap: 6, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: 5, maxWidth: 700, overflowX: 'auto' }}>
               {([
                 ['semua',        `Semua (${hasil.ringkasan.total})`],
                 ['pelanggaran',  `Pelanggaran (${hasil.ringkasan.pelanggaran})`],
                 ['perhatian',    `Perlu Perhatian (${hasil.ringkasan.perlu_perhatian})`],
                 ['informasional',`Informasional (${hasil.ringkasan.informasional})`],
               ] as const).map(([key, label]) => (
-                <button key={key} onClick={() => setActiveTab(key)}
-                  className={`px-4 py-2 text-sm border-b-2 -mb-px transition-colors ${
-                    activeTab === key ? 'border-blue-500 text-white font-medium' : 'border-transparent text-slate-500 hover:text-slate-300'
-                  }`}>
-                  {label}
-                </button>
+                <button key={key} onClick={() => setActiveTab(key)} style={{ flexShrink: 0, padding: '9px 16px', border: 'none', borderRadius: 999, fontSize: 11.5, fontWeight: 500, cursor: 'pointer', background: activeTab === key ? '#45e661' : 'transparent', color: activeTab === key ? '#04120a' : '#8a949c', fontFamily: 'inherit' }}>{label}</button>
               ))}
             </div>
 
             {/* Tabel */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-800">
-                <h2 className="font-semibold text-sm">Hasil Pengawasan Tidak Langsung</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-800">
-                      <th className="px-4 py-3 text-left text-xs text-slate-400 font-medium w-10">No</th>
-                      <th className="px-4 py-3 text-left text-xs text-slate-400 font-medium">Hasil Pengawasan</th>
-                      <th className="px-4 py-3 text-center text-xs text-slate-400 font-medium w-36">Indikasi</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+            <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <tbody>
                     {filteredHasil.map(h => (
-                      <tr key={h.nomor}
-                        className={`border-b border-slate-800/50 ${
-                          h.tipe === 'pelanggaran' ? 'bg-red-950/20' :
-                          h.tipe === 'perlu_perhatian' ? 'bg-orange-950/20' : ''
-                        }`}>
-                        <td className="px-4 py-3 text-center text-slate-500 text-xs">{h.nomor}</td>
-                        <td className="px-4 py-3 text-slate-300 leading-relaxed">{h.catatan}</td>
-                        <td className="px-4 py-3 text-center">
-                          {h.tipe === 'pelanggaran' && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-red-900/50 text-red-400 border border-red-800/50">Pelanggaran</span>
-                          )}
-                          {h.tipe === 'perlu_perhatian' && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-orange-900/50 text-orange-400 border border-orange-800/50">Perlu Perhatian</span>
-                          )}
+                      <tr key={h.nomor} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                        <td style={{ padding: '14px 24px', color: '#45e661', width: 40, fontWeight: 300 }}>{h.nomor}</td>
+                        <td style={{ padding: '14px 24px', lineHeight: 1.7, color: '#b7c0c6' }}>{h.catatan}</td>
+                        <td style={{ padding: '14px 24px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          {h.tipe === 'pelanggaran' && <span style={{ background: 'rgba(255,111,97,0.15)', color: '#ff6f61', padding: '4px 12px', borderRadius: 999, fontSize: 10.5, fontWeight: 500 }}>Pelanggaran</span>}
+                          {h.tipe === 'perlu_perhatian' && <span style={{ background: 'rgba(245,161,66,0.15)', color: '#f5a142', padding: '4px 12px', borderRadius: 999, fontSize: 10.5, fontWeight: 500 }}>Perlu Perhatian</span>}
+                          {h.tipe === 'informasional' && <span style={{ background: 'rgba(69,230,97,0.15)', color: '#45e661', padding: '4px 12px', borderRadius: 999, fontSize: 10.5, fontWeight: 500 }}>Informasional</span>}
                         </td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                </tbody>
+              </table>
             </div>
 
             {/* Kesimpulan */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
-              <h2 className="font-semibold text-sm">Kesimpulan Pengawasan</h2>
-              <div className="text-slate-300 text-sm leading-relaxed space-y-2">
-                {hasil.kesimpulan.split('\n').filter(Boolean).map((p, i) => <p key={i}>{p}</p>)}
+            <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 26 }}>
+              <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 10 }}><span style={{ color: '#45e661' }}>Kesimpulan</span> pengawasan</div>
+              <div style={{ fontSize: 13, lineHeight: 1.9, color: '#b7c0c6' }}>
+                {hasil.kesimpulan.split('\n').filter(Boolean).map((p, i) => <p key={i} style={{ margin: '4px 0' }}>{p}</p>)}
               </div>
             </div>
 
             {/* Tindak Lanjut */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
-              <h2 className="font-semibold text-sm">Tindak Lanjut</h2>
-              <div className="space-y-3">
-                {hasil.tindak_lanjut.split(/\d+\.\s+/).filter(Boolean).map((poin, i) => (
-                  <div key={i} className="flex gap-3">
-                    <span className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">{i + 1}</span>
-                    <p className="text-slate-300 text-sm leading-relaxed">{poin}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button onClick={() => { setStep(1); setHasil(null); setLog([]) }}
-                className="border border-slate-700 text-slate-300 hover:text-white px-4 py-2 rounded-lg text-sm transition-colors">
-                ← Analisis Baru
-              </button>
-              <a href={`/api/lhptl/download/${hasil.sessionId}`} download
-                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                ⬇ Download LHPTL (.docx)
-              </a>
+            <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 26 }}>
+              <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 14 }}><span style={{ color: '#45e661' }}>Tindak</span> lanjut</div>
+              {hasil.tindak_lanjut.split(/\d+\.\s+/).filter(Boolean).map((poin, i) => (
+                <div key={i} style={{ display: 'flex', gap: 16, padding: '10px 0', borderTop: i > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+                  <span style={{ fontSize: 14, fontWeight: 300, color: '#45e661', minWidth: 20 }}>{i + 1}</span>
+                  <div style={{ fontSize: 13, lineHeight: 1.7, color: '#b7c0c6' }}>{poin}</div>
+                </div>
+              ))}
             </div>
           </div>
         )}

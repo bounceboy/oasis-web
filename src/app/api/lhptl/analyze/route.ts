@@ -13,16 +13,21 @@ export async function POST(req: NextRequest) {
 
   const formData = await req.formData()
   const file = formData.get('file') as File | null
+  const fileGcg = formData.get('fileGcg') as File | null
   const namaEntitas = (formData.get('namaEntitas') as string | null)?.trim()
   const jenisEntitas = (formData.get('jenisEntitas') as string | null) as 'pialang_asuransi' | 'pialang_reasuransi' | null
   const periode = (formData.get('periode') as string | null)?.trim()
 
-  if (!file) return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 400 })
+  if (!file) return NextResponse.json({ error: 'File laporan keuangan tidak ditemukan' }, { status: 400 })
+  if (!fileGcg) return NextResponse.json({ error: 'File laporan GCG tidak ditemukan' }, { status: 400 })
   if (!namaEntitas || !jenisEntitas || !periode)
     return NextResponse.json({ error: 'namaEntitas, jenisEntitas, dan periode wajib diisi' }, { status: 400 })
-  if (file.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'File melebihi 20 MB' }, { status: 413 })
+  if (file.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'File laporan keuangan melebihi 20 MB' }, { status: 413 })
+  if (fileGcg.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'File laporan GCG melebihi 20 MB' }, { status: 413 })
   if (!file.name.toLowerCase().match(/\.(xlsx|xlsm|xls)$/))
-    return NextResponse.json({ error: 'Hanya file Excel (.xlsx/.xlsm/.xls) yang diterima' }, { status: 400 })
+    return NextResponse.json({ error: 'File laporan keuangan harus berformat Excel (.xlsx/.xlsm/.xls)' }, { status: 400 })
+  if (!fileGcg.name.toLowerCase().match(/\.(xlsx|xlsm|xls)$/))
+    return NextResponse.json({ error: 'File laporan GCG harus berformat Excel (.xlsx/.xlsm/.xls)' }, { status: 400 })
 
   // Buat session dulu
   const { data: session, error: sessionErr } = await db()
@@ -35,9 +40,14 @@ export async function POST(req: NextRequest) {
   const sessionId = session.id
 
   try {
-    // 1. Parse Excel
+    // 1. Parse Excel — gabung sheets dari kedua file
     const buf = Buffer.from(await file.arrayBuffer())
-    const sheets = extractExcelSheets(buf)
+    const sheetsLapkeu = extractExcelSheets(buf)
+
+    const bufGcg = Buffer.from(await fileGcg.arrayBuffer())
+    const sheetsGcg = extractExcelSheets(bufGcg).map(s => ({ ...s, name: `GCG_${s.name}` }))
+
+    const sheets = [...sheetsLapkeu, ...sheetsGcg]
 
     // 2. AI extraction
     const extracted = await ekstrakDataLhptl(sheets, namaEntitas, jenisEntitas, periode)
@@ -65,7 +75,7 @@ export async function POST(req: NextRequest) {
     // Simpan ke session
     await db()
       .from('offsite_sessions')
-      .update({ status: 'done', hasil: hasilData })
+      .update({ status: 'selesai', hasil: hasilData })
       .eq('id', sessionId)
 
     return NextResponse.json({ ...hasilData, sessionId })
