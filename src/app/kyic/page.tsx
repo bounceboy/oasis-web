@@ -214,7 +214,7 @@ export default function KyicPage() {
       `}</style>
 
       <div className="container">
-        <Navbar />
+        <Navbar simple />
         <div style={{ marginBottom: 26 }}>
           <div className="title"><span>KYIC/KYNBFI</span> — know your insurance company</div>
           <div className="subtitle">Upload template KYIC + dokumen pendukung — AI mengisi profil risiko secara otomatis.</div>

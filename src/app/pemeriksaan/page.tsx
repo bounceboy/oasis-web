@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import Navbar from '@/components/oasis/Navbar'
 
 interface OnsiteSession {
   kode: string
@@ -46,86 +46,82 @@ export default function PemeriksaanPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
-        <div className="mb-8">
-          <Link href="/dashboard" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">
-            ← Kembali ke Dashboard
-          </Link>
+    <div style={{ minHeight: '100vh', color: '#eef2ef' }}>
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '20px 24px 64px' }}>
+        <Navbar simple />
+
+        {/* Header */}
+        <div style={{ marginBottom: 40 }}>
+          <h1 style={{ fontSize: 30, fontWeight: 500, margin: 0 }}>
+            <span style={{ color: '#45e661' }}>Pemeriksaan</span> onsite
+          </h1>
+          <p style={{ fontSize: 13, color: '#8a949c', margin: '8px 0 0' }}>Masukkan kode sesi dari admin untuk memulai atau melanjutkan.</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-lg">🔍</div>
-            <div>
-              <h1 className="font-bold text-lg">Pemeriksaan Onsite</h1>
-              <p className="text-slate-500 text-sm">Masukkan kode sesi dari admin</p>
-            </div>
-          </div>
+        {/* Two column: form + riwayat */}
+        <div style={{ display: 'flex', gap: 40, alignItems: 'flex-start' }}>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs text-slate-400 mb-2 uppercase tracking-wide">Kode Pemeriksaan</label>
+          {/* Form */}
+          <div style={{ flex: 1, background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 32 }}>
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: 'block', fontSize: 10.5, letterSpacing: '0.12em', color: '#5a646c', marginBottom: 16 }}>KODE PEMERIKSAAN</label>
               <input
                 value={kode}
                 onChange={e => { setKode(e.target.value.toUpperCase()); setError('') }}
                 onKeyDown={e => e.key === 'Enter' && handleMasuk()}
-                placeholder="Contoh: KITABISA"
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-lg font-mono tracking-widest text-center text-white focus:outline-none focus:border-blue-500 uppercase placeholder:normal-case placeholder:tracking-normal placeholder:text-slate-600"
+                placeholder="CONTOH: KITABISA"
                 autoFocus
+                style={{
+                  width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
+                  padding: '16px 20px', fontSize: 18, fontFamily: 'monospace', letterSpacing: '0.2em', textAlign: 'center',
+                  color: '#eef2ef', outline: 'none', boxSizing: 'border-box', textTransform: 'uppercase',
+                }}
               />
-              {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
+              {error && <p style={{ color: '#ff6f61', fontSize: 12, marginTop: 8 }}>{error}</p>}
             </div>
 
             <button
               onClick={handleMasuk}
               disabled={loading || !kode.trim()}
-              className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl py-3 font-medium transition-colors"
+              style={{
+                width: '100%', background: kode.trim() && !loading ? '#45e661' : 'rgba(255,255,255,0.06)',
+                color: kode.trim() && !loading ? '#04120a' : '#5a646c',
+                border: 'none', borderRadius: 999, padding: '14px 0', fontSize: 11.5,
+                fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
+                cursor: kode.trim() && !loading ? 'pointer' : 'default', fontFamily: 'inherit',
+              }}
             >
-              {loading ? 'Memeriksa...' : 'Masuk ke Pemeriksaan →'}
+              {loading ? 'Memeriksa...' : 'Masuk ke Pemeriksaan ↗'}
             </button>
           </div>
 
-          <div className="mt-6 pt-6 border-t border-slate-800 space-y-2">
-            <div className="flex gap-3 text-xs text-slate-500">
-              <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center shrink-0 text-slate-400">1</span>
-              <span>Kode baru — mulai sesi pemeriksaan baru</span>
-            </div>
-            <div className="flex gap-3 text-xs text-slate-500">
-              <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center shrink-0 text-slate-400">2</span>
-              <span>Kode lama — lanjutkan sesi yang sudah ada</span>
-            </div>
-            <div className="flex gap-3 text-xs text-slate-500">
-              <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center shrink-0 text-slate-400">3</span>
-              <span>Kode bersifat case-insensitive</span>
-            </div>
+          {/* Riwayat sesi */}
+          <div style={{ width: 320, flexShrink: 0 }}>
+            <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#5a646c', marginBottom: 16 }}>SESI PEMERIKSAAN ANDA</div>
+            {riwayat.length === 0 ? (
+              <p style={{ fontSize: 12, color: '#5a646c' }}>Belum ada sesi aktif.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {riwayat.map(s => (
+                  <button
+                    key={s.kode}
+                    onClick={() => router.push(`/pemeriksaan/${s.kode}`)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', fontFamily: 'inherit', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, width: '100%' }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 11, color: '#45e661', letterSpacing: '0.15em', marginBottom: 4 }}>{s.kode}</div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: '#eef2ef' }}>{s.nama_entitas}</div>
+                      <div style={{ fontSize: 11, color: '#8a949c', marginTop: 2 }}>
+                        {new Date(s.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })} · {s.jenis_usaha}
+                      </div>
+                    </div>
+                    <span style={{ color: '#45e661', fontSize: 16, flexShrink: 0 }}>↗</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Riwayat sesi */}
-        {riwayat.length > 0 && (
-          <div className="mt-6">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Sesi Pemeriksaan</p>
-            <div className="space-y-2">
-              {riwayat.map(s => (
-                <button key={s.kode}
-                  onClick={() => router.push(`/pemeriksaan/${s.kode}`)}
-                  className="w-full bg-slate-900 border border-slate-800 hover:border-blue-700 rounded-xl px-4 py-3 text-left transition-colors flex items-center justify-between group"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm font-bold text-blue-400">{s.kode}</span>
-                      <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">{s.jenis_usaha}</span>
-                    </div>
-                    <div className="text-sm text-slate-300 mt-0.5">{s.nama_entitas}</div>
-                    <div className="text-xs text-slate-600 mt-0.5">{new Date(s.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-                  </div>
-                  <span className="text-slate-600 group-hover:text-slate-400 transition-colors">→</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

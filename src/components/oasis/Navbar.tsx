@@ -8,9 +8,10 @@ interface NavbarProps {
   userName?: string
   userRole?: string
   showAdmin?: boolean
+  simple?: boolean  // mode sederhana: hanya ← Dashboard + user info
 }
 
-export default function Navbar({ userName, userRole, showAdmin }: NavbarProps) {
+export default function Navbar({ userName, userRole, showAdmin, simple }: NavbarProps) {
   const [offsiteOpen, setOffsiteOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
@@ -45,6 +46,27 @@ export default function Navbar({ userName, userRole, showAdmin }: NavbarProps) {
     { label: 'Renbis', href: '/renbis' },
   ]
 
+  // Mode simple: hanya ← Dashboard + user info/logout
+  if (simple) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 36 }}>
+        <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: '#8a949c', fontSize: 13 }}>
+          ← Dashboard
+        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {userName && (
+            <span style={{ fontSize: 12, color: '#8a949c' }}>
+              {userName} · {userRole === 'supervisor' ? 'Supervisor' : userRole === 'admin' ? 'Admin' : 'Pemeriksa'}
+            </span>
+          )}
+          <button onClick={handleLogout} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '7px 16px', fontSize: 11, color: '#8a949c', cursor: 'pointer', fontFamily: 'inherit' }}>
+            Keluar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ background: 'rgba(6,10,15,0.82)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 999, padding: '12px 12px 12px 26px', display: 'flex', alignItems: 'center', gap: 22, backdropFilter: 'blur(10px)', marginBottom: 36 }}>
       <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 9, marginRight: 12, textDecoration: 'none' }}>
@@ -57,10 +79,7 @@ export default function Navbar({ userName, userRole, showAdmin }: NavbarProps) {
         <button onClick={() => router.push('/pemeriksaan')} style={navBtn(isOnsite)}>Onsite</button>
 
         <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => setOffsiteOpen(o => !o)}
-            style={{ ...navBtn(isOffsite) }}
-          >Offsite ▾</button>
+          <button onClick={() => setOffsiteOpen(o => !o)} style={{ ...navBtn(isOffsite) }}>Offsite ▾</button>
           {offsiteOpen && (
             <div style={{ position: 'absolute', top: 'calc(100% + 10px)', left: 0, background: '#070b10', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: 8, minWidth: 220, zIndex: 40 }}
               onMouseLeave={() => setOffsiteOpen(false)}

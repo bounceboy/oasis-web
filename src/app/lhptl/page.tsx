@@ -119,7 +119,7 @@ export default function LhptlPage() {
   return (
     <div style={{ minHeight: '100vh', color: '#eef2ef' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px 64px' }}>
-        <Navbar />
+        <Navbar simple />
 
         {/* Header */}
         <div style={{ marginBottom: 26 }}>

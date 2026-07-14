@@ -83,7 +83,7 @@ export default function SessionPage() {
   return (
     <div style={{ minHeight: '100vh', color: '#eef2ef', display: 'flex', flexDirection: 'column' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px 8px', width: '100%', boxSizing: 'border-box' }}>
-        <Navbar />
+        <Navbar simple />
 
         {/* Session header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 8 }}>

@@ -38,6 +38,7 @@ export default async function AdminPage() {
           userName={profile.nama_lengkap || profile.username}
           userRole={profile.role}
           showAdmin={true}
+          simple
         />
 
         <div style={{ marginBottom: 32 }}>

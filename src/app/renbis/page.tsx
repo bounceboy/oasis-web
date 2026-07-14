@@ -187,7 +187,7 @@ export default function RenbisPage() {
       `}</style>
 
       <div className="container">
-        <Navbar />
+        <Navbar simple />
         <div style={{ marginBottom: 26, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 16 }}>
           <div>
             <div className="title"><span>Renbis</span> — evaluasi rencana bisnis</div>
