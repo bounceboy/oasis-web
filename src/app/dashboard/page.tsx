@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getUser } from '@/lib/auth'
 import Link from 'next/link'
-import Navbar from '@/components/oasis/Navbar'
 
 export default async function DashboardPage() {
   const user = await getUser()
@@ -20,11 +19,11 @@ export default async function DashboardPage() {
   return (
     <div style={{ minHeight: '100vh', color: '#eef2ef' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px 64px' }}>
-        <Navbar
-          userName={user.nama_lengkap || user.username}
-          userRole={user.role}
-          showAdmin={isAdmin}
-        />
+        {/* Top bar: user info + logout */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16, marginBottom: 48 }}>
+          <span style={{ fontSize: 12, color: '#8a949c' }}>{user.nama_lengkap || user.username} · <span style={{ color: '#5a646c' }}>{user.role}</span></span>
+          <Link href="/api/auth/logout" style={{ fontSize: 11.5, color: '#eef2ef', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '6px 16px', textDecoration: 'none', letterSpacing: '0.05em' }}>Keluar</Link>
+        </div>
 
         {/* Welcome */}
         <div style={{ marginBottom: 40 }}>
