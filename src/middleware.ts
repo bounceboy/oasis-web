@@ -6,17 +6,19 @@ const SECRET = new TextEncoder().encode(
 )
 const COOKIE = 'oasis_session'
 
-const PUBLIC_PATHS = ['/login', '/register']
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Static / public
-  if (PUBLIC_PATHS.includes(pathname) || pathname.startsWith('/api/auth')) {
+  // Route publik — tidak perlu auth
+  if (
+    pathname === '/app' || pathname.startsWith('/app/') ||
+    pathname.startsWith('/api/auth') ||
+    pathname === '/login' || pathname === '/register'
+  ) {
     return NextResponse.next()
   }
 
-  // Verifikasi JWT dari cookie
+  // Verifikasi JWT
   const token = request.cookies.get(COOKIE)?.value
   let user: { role?: string } | null = null
 
@@ -29,24 +31,19 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Belum login → redirect ke /login
+  // Root → redirect ke dashboard jika login, login jika belum
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL(user ? '/dashboard' : '/login', request.url))
+  }
+
+  // Belum login → ke /login
   if (!user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Sudah login, coba akses /login atau /register → redirect ke /dashboard
-  if (PUBLIC_PATHS.includes(pathname)) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
-
-  // Redirect / dan /dashboard ke /app (main OASIS app)
-  if (pathname === '/' || pathname === '/dashboard') {
-    return NextResponse.redirect(new URL('/app', request.url))
-  }
-
   // Proteksi /admin — hanya role admin
   if (pathname.startsWith('/admin') && user.role !== 'admin') {
-    return NextResponse.redirect(new URL('/app', request.url))
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   return NextResponse.next()

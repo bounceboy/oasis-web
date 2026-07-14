@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-type Direktorat = { id: string; kode: string; nama: string }
-type Departemen = { id: string; direktorat_id: string; kode: string; nama: string }
+
+type Departemen = { id: string; kode: string; nama: string }
+type Direktorat = { id: string; kode: string; nama: string; departemen_id: string }
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -12,9 +13,9 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
+  const [departemenList, setDepartemenList] = useState<Departemen[]>([])
   const [direktoratList, setDirektoratList] = useState<Direktorat[]>([])
-  const [departeменList, setDepartemenList] = useState<Departemen[]>([])
-  const [filteredDep, setFilteredDep] = useState<Departemen[]>([])
+  const [filteredDir, setFilteredDir] = useState<Direktorat[]>([])
 
   const [form, setForm] = useState({
     username: '',
@@ -22,29 +23,31 @@ export default function RegisterPage() {
     konfirmasi_password: '',
     nama_lengkap: '',
     nip: '',
-    direktorat_id: '',
     departemen_id: '',
+    direktorat_id: '',
   })
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/org/direktorat').then((r) => r.json()),
       fetch('/api/org/departemen').then((r) => r.json()),
-    ]).then(([dirs, deps]) => {
-      setDirektoratList(dirs ?? [])
+      fetch('/api/org/direktorat').then((r) => r.json()),
+    ]).then(([deps, dirs]) => {
       setDepartemenList(deps ?? [])
+      setDirektoratList(dirs ?? [])
     })
   }, [])
 
-  // Filter departemen berdasarkan direktorat yang dipilih
+  // Filter direktorat berdasarkan departemen yang dipilih
   useEffect(() => {
-    if (form.direktorat_id) {
-      setFilteredDep(departeменList.filter((d) => d.direktorat_id === form.direktorat_id))
-      setForm((f) => ({ ...f, departemen_id: '' }))
+    if (form.departemen_id) {
+      const filtered = direktoratList.filter((d) => d.departemen_id === form.departemen_id)
+      setFilteredDir(filtered)
+      setForm((f) => ({ ...f, direktorat_id: '' }))
     } else {
-      setFilteredDep([])
+      setFilteredDir([])
     }
-  }, [form.direktorat_id, departeменList])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.departemen_id, direktoratList])
 
   function set(field: string, value: string) {
     setForm((f) => ({ ...f, [field]: value }))
@@ -69,8 +72,8 @@ export default function RegisterPage() {
         password: form.password,
         nama_lengkap: form.nama_lengkap,
         nip: form.nip,
-        direktorat_id: form.direktorat_id || null,
         departemen_id: form.departemen_id || null,
+        direktorat_id: form.direktorat_id || null,
       }),
     })
 
@@ -92,15 +95,18 @@ export default function RegisterPage() {
           </div>
           <h2 className="text-white text-xl font-semibold mb-2">Akun berhasil dibuat</h2>
           <p className="text-slate-400 text-sm mb-6">
-            Akun Anda sedang menunggu aktivasi dari administrator. Anda akan dihubungi setelah akun diaktifkan.
+            Silakan login dengan username dan password yang telah dibuat.
           </p>
-          <Link href="/login" className="text-blue-400 hover:text-blue-300 text-sm">
-            ← Kembali ke halaman login
+          <Link href="/app" className="text-blue-400 hover:text-blue-300 text-sm">
+            ← Login ke OASIS
           </Link>
         </div>
       </div>
     )
   }
+
+  const selectedDep = departemenList.find((d) => d.id === form.departemen_id)
+  const hasChildDir = filteredDir.length > 0
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
@@ -117,7 +123,6 @@ export default function RegisterPage() {
 
         <form onSubmit={handleRegister} className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
 
-          {/* Informasi akun */}
           <div className="pb-2 border-b border-slate-800">
             <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Informasi Akun</p>
           </div>
@@ -182,41 +187,54 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* Struktur organisasi */}
           <div className="pt-2 pb-2 border-b border-slate-800">
             <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Unit Kerja</p>
           </div>
 
-          <div>
-            <label className="block text-sm text-slate-300 mb-1.5">Direktorat</label>
-            <select
-              value={form.direktorat_id}
-              onChange={(e) => set('direktorat_id', e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-            >
-              <option value="">Pilih direktorat</option>
-              {direktoratList.map((d) => (
-                <option key={d.id} value={d.id}>{d.kode} — {d.nama}</option>
-              ))}
-            </select>
-          </div>
-
+          {/* Departemen — pilih dulu */}
           <div>
             <label className="block text-sm text-slate-300 mb-1.5">Departemen</label>
             <select
               value={form.departemen_id}
               onChange={(e) => set('departemen_id', e.target.value)}
-              disabled={!form.direktorat_id}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 disabled:opacity-40"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
             >
-              <option value="">
-                {form.direktorat_id ? 'Pilih departemen' : 'Pilih direktorat dulu'}
-              </option>
-              {filteredDep.map((d) => (
+              <option value="">Pilih departemen</option>
+              {departemenList.map((d) => (
                 <option key={d.id} value={d.id}>{d.kode} — {d.nama}</option>
               ))}
             </select>
           </div>
+
+          {/* Direktorat — tampil jika departemen punya anak direktorat */}
+          {form.departemen_id && (
+            <div>
+              <label className="block text-sm text-slate-300 mb-1.5">
+                Direktorat
+                {!hasChildDir && (
+                  <span className="text-slate-500 font-normal ml-1">
+                    ({selectedDep?.kode} tidak memiliki direktorat)
+                  </span>
+                )}
+              </label>
+              {hasChildDir ? (
+                <select
+                  value={form.direktorat_id}
+                  onChange={(e) => set('direktorat_id', e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">Pilih direktorat</option>
+                  {filteredDir.map((d) => (
+                    <option key={d.id} value={d.id}>{d.kode} — {d.nama}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-500">
+                  {selectedDep?.nama}
+                </div>
+              )}
+            </div>
+          )}
 
           {error && (
             <div className="bg-red-900/30 border border-red-800 rounded-lg px-3 py-2 text-red-400 text-sm">{error}</div>
@@ -231,13 +249,13 @@ export default function RegisterPage() {
           </button>
 
           <p className="text-slate-600 text-xs text-center">
-            Akun akan aktif setelah diverifikasi oleh administrator
+            Akun Anda langsung aktif setelah registrasi
           </p>
         </form>
 
         <p className="text-center text-slate-500 text-sm mt-4">
           Sudah punya akun?{' '}
-          <Link href="/login" className="text-blue-400 hover:text-blue-300">Masuk</Link>
+          <Link href="/app" className="text-blue-400 hover:text-blue-300">Masuk</Link>
         </p>
       </div>
     </div>

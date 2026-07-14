@@ -24,21 +24,28 @@ export default async function AdminPage() {
     { label: 'Total Pemeriksaan', value: totalSessions ?? 0, href: '/dashboard' },
   ]
 
+  const adminMenus = [
+    { href: '/admin/users',    icon: '👥', label: 'Kelola User',      sub: 'Tambah, edit, suspend pengguna' },
+    { href: '/admin/sessions', icon: '🔑', label: 'Sesi Onsite',      sub: 'Buat & kelola kode pemeriksaan' },
+    { href: '/admin/skills',   icon: '🧠', label: 'Skills Config',    sub: 'Edit prompt & parameter per modul' },
+  ]
+
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       <nav className="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard" className="text-slate-400 hover:text-white text-sm">← Dashboard</Link>
+          <Link href="/dashboard" className="text-slate-400 hover:text-white text-sm transition-colors">← Dashboard</Link>
           <span className="text-slate-600">/</span>
           <span className="text-sm font-medium">Admin Panel</span>
         </div>
-        <span className="text-xs text-blue-400 bg-blue-900/30 px-2 py-1 rounded-full">Admin</span>
+        <span className="text-xs text-purple-400 bg-purple-900/30 px-2 py-1 rounded-full">Admin</span>
       </nav>
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
-        <h1 className="text-xl font-semibold mb-6">Panel Administrasi OASIS</h1>
+      <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+        <h1 className="text-xl font-semibold">Panel Administrasi OASIS</h1>
 
-        <div className="grid grid-cols-2 gap-4 mb-8">
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4">
           {stats.map((s) => (
             <Link key={s.label} href={s.href}
               className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-600 transition-colors">
@@ -48,30 +55,43 @@ export default async function AdminPage() {
           ))}
         </div>
 
-        <div className="flex gap-3 mb-8">
-          <Link href="/admin/users"
-            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            Kelola User
-          </Link>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <h2 className="font-medium mb-4 text-slate-300">User Terbaru</h2>
-          <div className="space-y-3">
-            {recentUsers?.map((u) => (
-              <div key={u.id} className="flex items-center justify-between">
+        {/* Menu Admin */}
+        <section>
+          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Menu</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {adminMenus.map((m) => (
+              <Link key={m.href} href={m.href}
+                className="flex items-center gap-4 bg-slate-900 border border-slate-800 hover:border-blue-700 rounded-xl p-4 transition-colors group">
+                <span className="text-2xl">{m.icon}</span>
                 <div>
-                  <p className="text-sm font-medium">{u.nama_lengkap || u.username}</p>
-                  <p className="text-slate-500 text-xs">{u.username}</p>
+                  <p className="font-medium text-sm group-hover:text-blue-400 transition-colors">{m.label}</p>
+                  <p className="text-slate-500 text-xs mt-0.5">{m.sub}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <RoleBadge role={u.role} />
-                  <StatusBadge status={u.status} />
-                </div>
-              </div>
+              </Link>
             ))}
           </div>
-        </div>
+        </section>
+
+        {/* Recent Users */}
+        <section>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h2 className="font-medium mb-4 text-slate-300">User Terbaru</h2>
+            <div className="space-y-3">
+              {recentUsers?.map((u) => (
+                <div key={u.id} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{u.nama_lengkap || u.username}</p>
+                    <p className="text-slate-500 text-xs">{u.username}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RoleBadge role={u.role} />
+                    <StatusBadge status={u.status} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   )

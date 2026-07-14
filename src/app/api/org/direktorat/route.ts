@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 export async function GET() {
   const { data } = await db()
     .from('oasis_direktorat')
-    .select('id, kode, nama')
+    .select('id, kode, nama, departemen_id')
     .eq('aktif', true)
     .order('urutan')
   return NextResponse.json(data ?? [])

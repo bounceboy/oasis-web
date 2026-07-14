@@ -63,7 +63,7 @@ ${maskedText.slice(0, 25000)}`
   return callOpenRouter(systemPrompt, userPrompt)
 }
 
-async function callOpenRouter(systemPrompt: string, userPrompt: string): Promise<string> {
+export async function callOpenRouter(systemPrompt: string, userPrompt: string, maxTokens = 4000): Promise<string> {
   const res = await fetch(OPENROUTER_URL, {
     method: 'POST',
     headers: {
@@ -74,7 +74,7 @@ async function callOpenRouter(systemPrompt: string, userPrompt: string): Promise
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 4000,
+      max_tokens: maxTokens,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },

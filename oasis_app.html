@@ -4671,6 +4671,9 @@ function App() {
   const [codeInput, setCodeInput] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [loginErr, setLoginErr] = useState("");
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
   const [direktorat, setDirektorat] = useState(localStorage.getItem("oasis:direktorat")||"");
   const [screen, setScreen] = useState(localStorage.getItem("oasis:direktorat") ? "home" : "login"); // login | home | onsite
 
@@ -4886,11 +4889,34 @@ JSON:{"matriks":[{"no":1,"cluster":"A","clusterName":"nama","title":"judul","has
 
   // ── Login ──
   if (screen === "login") {
-    const doLogin = () => {
-      if(!direktorat){setLoginErr("Pilih direktorat Anda terlebih dahulu");return;}
-      localStorage.setItem("oasis:direktorat",direktorat);
-      loadPojkBawaan(direktorat);
-      setScreen("home");
+    const doLogin = async () => {
+      if (!loginUsername.trim() || !loginPassword.trim()) {
+        setLoginErr("Username dan password wajib diisi");
+        return;
+      }
+      setLoginLoading(true);
+      setLoginErr("");
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({ username: loginUsername.trim(), password: loginPassword })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setLoginErr(data.error || "Login gagal");
+          setLoginLoading(false);
+          return;
+        }
+        const dir = data.direktorat || "DPSS";
+        localStorage.setItem("oasis:direktorat", dir);
+        setDirektorat(dir);
+        loadPojkBawaan(dir);
+        setScreen("home");
+      } catch(e) {
+        setLoginErr("Koneksi gagal. Coba lagi.");
+      }
+      setLoginLoading(false);
     };
     const F = {fontFamily:"'Helvetica',Arial,sans-serif"};
     const inp = {
@@ -5044,51 +5070,40 @@ JSON:{"matriks":[{"no":1,"cluster":"A","clusterName":"nama","title":"judul","has
                     fontStyle:"italic",color:"#1246A8",letterSpacing:0.2}}>OASIS</span>
                 </h1>
                 <p style={{...F,fontSize:13,color:"#8492A6",fontWeight:400,margin:0,lineHeight:1.6}}>
-                  Pilih direktorat dan masukkan API key Anda.
+                  Masukkan username dan password Anda.
                 </p>
               </div>
 
-              {/* Direktorat */}
+              {/* Username */}
               <div style={{marginBottom:16}}>
                 <label style={{...F,fontSize:11,fontWeight:700,color:"#374151",marginBottom:7,
-                  display:"block",letterSpacing:0.8,textTransform:"uppercase"}}>Direktorat</label>
-                <div style={{position:"relative"}}>
-                  <select value={direktorat} onChange={e=>setDirektorat(e.target.value)}
-                    className="oasis-login-select"
-                    style={{...F,border:"1px solid #E0E4EC",borderRadius:10,padding:"12px 14px",fontSize:13.5,width:"100%",
-                      outline:"none",boxSizing:"border-box",transition:"border-color 0.15s, box-shadow 0.15s",
-                      appearance:"none",WebkitAppearance:"none",paddingRight:36,
-                      color:direktorat?"#0F172A":"#A0ABBE",cursor:"pointer",
-                      borderColor:direktorat?"#1246A8":"#E0E4EC",
-                      background:direktorat?"#fff":"#FAFBFD",
-                      boxShadow:direktorat?"0 0 0 3px rgba(18,70,168,0.07)":"none"}}>
-                    <option value="">Pilih direktorat</option>
-                    <option value="DPSS">DPSS — Asuransi &amp; Reasuransi Syariah</option>
-                    <option value="DAJI">DAJI — Asuransi Jiwa</option>
-                    <option value="DASR">DASR — Asuransi Umum</option>
-                    <option value="DPJP">DPJP — Jasa Penunjang</option>
-                  </select>
-                  <svg style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}
-                    width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#A0ABBE" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
+                  display:"block",letterSpacing:0.8,textTransform:"uppercase"}}>Username</label>
+                <input
+                  className="oasis-login-input"
+                  style={{...F,border:"1px solid #E0E4EC",borderRadius:10,padding:"12px 14px",fontSize:13.5,width:"100%",
+                    outline:"none",boxSizing:"border-box",transition:"border-color 0.15s, box-shadow 0.15s",
+                    background:"#FAFBFD",color:"#0F172A"}}
+                  placeholder="Username Anda"
+                  value={loginUsername}
+                  onChange={e=>setLoginUsername(e.target.value)}
+                  onKeyDown={e=>{if(e.key==="Enter")doLogin();}}
+                  autoComplete="username"
+                />
               </div>
 
-              {/* API Key */}
+              {/* Password */}
               <div style={{marginBottom:26}}>
                 <label style={{...F,fontSize:11,fontWeight:700,color:"#374151",marginBottom:7,
-                  display:"block",letterSpacing:0.8,textTransform:"uppercase"}}>API Key</label>
+                  display:"block",letterSpacing:0.8,textTransform:"uppercase"}}>Password</label>
                 <div style={{position:"relative"}}>
                   <input type={showKey?"text":"password"}
                     className="oasis-login-input"
-                    style={{...F,border:"1px solid #E0E4EC",borderRadius:10,padding:"12px 14px",fontSize:12,width:"100%",
+                    style={{...F,border:"1px solid #E0E4EC",borderRadius:10,padding:"12px 14px",fontSize:13.5,width:"100%",
                       outline:"none",boxSizing:"border-box",transition:"border-color 0.15s, box-shadow 0.15s",
-                      fontFamily:"'Courier New',monospace",letterSpacing:0.2,paddingRight:44,
-                      background:"#FAFBFD",color:"#0F172A",fontWeight:400}}
-                    placeholder="sk-ant-api03-..."
-                    value={apiKeyInput}
-                    onChange={e=>setApiKeyInput(e.target.value)}
+                      paddingRight:44,background:"#FAFBFD",color:"#0F172A",fontWeight:400}}
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={e=>setLoginPassword(e.target.value)}
                     onKeyDown={e=>{if(e.key==="Enter")doLogin();}}/>
                   <button onClick={()=>setShowKey(!showKey)}
                     style={{position:"absolute",right:0,top:0,bottom:0,width:44,
@@ -5104,11 +5119,7 @@ JSON:{"matriks":[{"no":1,"cluster":"A","clusterName":"nama","title":"judul","has
                   </button>
                 </div>
                 <p style={{...F,fontSize:11,color:"#A0ABBE",marginTop:7,fontWeight:400,lineHeight:1.5}}>
-                  Dapatkan di{" "}
-                  <a href="https://console.anthropic.com" target="_blank"
-                    style={{color:"#1246A8",fontWeight:700,textDecoration:"none"}}>
-                    console.anthropic.com
-                  </a>{" "}— disimpan di browser lokal.
+                  Login dengan akun OASIS yang terdaftar.
                 </p>
               </div>
 
@@ -5125,9 +5136,10 @@ JSON:{"matriks":[{"no":1,"cluster":"A","clusterName":"nama","title":"judul","has
                   letterSpacing:0.2,transition:"opacity 0.18s, transform 0.18s, box-shadow 0.18s",
                   boxShadow:"0 4px 20px rgba(18,70,168,0.28)"}}
                 onClick={doLogin}
-                onMouseEnter={e=>{e.currentTarget.style.opacity="0.90";e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 8px 28px rgba(18,70,168,0.38)";}}
-                onMouseLeave={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 4px 20px rgba(18,70,168,0.28)";}}>
-                Masuk
+                disabled={loginLoading}
+                onMouseEnter={e=>{if(!loginLoading){e.currentTarget.style.opacity="0.90";e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 8px 28px rgba(18,70,168,0.38)";}}}
+                onMouseLeave={e=>{e.currentTarget.style.opacity=loginLoading?"0.7":"1";e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 4px 20px rgba(18,70,168,0.28)";}}>
+                {loginLoading ? "Masuk..." : "Masuk"}
               </button>
 
               <div style={{display:"flex",alignItems:"center",gap:12,margin:"22px 0 0"}}>
@@ -5192,22 +5204,7 @@ JSON:{"matriks":[{"no":1,"cluster":"A","clusterName":"nama","title":"judul","has
           </svg>
         ),
       },
-      {
-        id:"workspace",
-        num:"03",
-        label:"Workspace",
-        sub:"Chat AI interaktif, kelola database regulasi & pola temuan, analisis dokumen ZIP secara mendalam.",
-        tag:"KB + Chat",
-        tagColor:"#0F766E",
-        tagBg:"rgba(15,118,110,0.08)",
-        gradient:"linear-gradient(135deg,#0F766E 0%,#34D399 100%)",
-        glowColor:"rgba(15,118,110,0.18)",
-        icon:(
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-          </svg>
-        ),
-      },
+      // [Workspace module hidden]
     ];
 
     return (
@@ -5266,7 +5263,7 @@ JSON:{"matriks":[{"no":1,"cluster":"A","clusterName":"nama","title":"judul","has
               {direktorat} · {rm.label}
             </span>
             <button onClick={()=>{
-                fetch('/api/auth/signout',{method:'POST'}).then(()=>{window.location.href='/login';});
+                fetch('/api/auth/signout',{method:'POST'}).then(()=>{ localStorage.removeItem('oasis:direktorat'); window.location.reload(); });
               }}
               style={{...F,background:"transparent",border:"1px solid #D8DCE3",borderRadius:100,
                 color:"#8492A6",cursor:"pointer",fontSize:11,fontWeight:600,padding:"5px 14px",
