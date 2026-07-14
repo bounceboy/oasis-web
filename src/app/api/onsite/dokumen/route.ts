@@ -18,7 +18,8 @@ const KLUSTER: Record<string, string> = {
 async function extractText(buf: Buffer, filename: string): Promise<string> {
   const ext = filename.toLowerCase().split('.').pop() ?? ''
   if (ext === 'pdf') {
-    const pdfParse = require('pdf-parse/lib/pdf-parse.js')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const m = require('pdf-parse'); const pdfParse = m.default ?? m
     const result = await pdfParse(buf)
     return result.text
   }
