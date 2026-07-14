@@ -17,7 +17,7 @@ interface RiwayatItem {
   id: string
   nama_entitas: string
   created_at: string
-  hasil: RenbisResult
+  hasil: RenbisResult & { tahun?: string }
 }
 
 type Step = 'upload' | 'processing' | 'hasil'
@@ -185,24 +185,6 @@ export default function RenbisPage() {
           )}
         </div>
 
-        {/* Riwayat */}
-        {riwayat.length > 0 && step === 'upload' && (
-          <div style={{ marginBottom: '1.5rem' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Riwayat Analisis</div>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {riwayat.map(item => (
-                <button key={item.id} onClick={() => loadRiwayat(item)}
-                  style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '0.5rem', padding: '0.5rem 0.75rem', cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.2s' }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#2563eb')}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = '#1e293b')}
-                >
-                  <div style={{ color: '#e2e8f0', fontSize: '0.85rem', fontWeight: 500 }}>{item.nama_entitas}</div>
-                  <div style={{ color: '#475569', fontSize: '0.75rem', marginTop: '0.1rem' }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Step indicator */}
         <div className="steps">
@@ -361,6 +343,37 @@ export default function RenbisPage() {
             </div>
           </div>
         )}
+        {/* Riwayat — selalu tampil di bawah */}
+        <div style={{ marginTop: '2rem' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+            Riwayat Analisis
+          </div>
+          {riwayat.length === 0 ? (
+            <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '0.75rem', padding: '1.25rem', color: '#475569', fontSize: '0.85rem', textAlign: 'center' }}>
+              Belum ada riwayat analisis
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {riwayat.map(item => (
+                <button key={item.id} onClick={() => loadRiwayat(item)}
+                  style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '0.75rem', padding: '0.75rem 1rem', cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.2s', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#2563eb')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = '#1e293b')}
+                >
+                  <div>
+                    <div style={{ color: '#e2e8f0', fontSize: '0.9rem', fontWeight: 600 }}>{item.nama_entitas}</div>
+                    <div style={{ color: '#475569', fontSize: '0.78rem', marginTop: '0.15rem' }}>
+                      {new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      {item.hasil?.tahun && <span style={{ marginLeft: '0.5rem', color: '#334155' }}>· Tahun {item.hasil.tahun}</span>}
+                    </div>
+                  </div>
+                  <span style={{ color: '#334155', fontSize: '0.85rem' }}>Lihat →</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
       </div>
     </>
   )

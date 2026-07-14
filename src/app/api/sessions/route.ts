@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
     .select('id, modul, nama_entitas, status, created_at, hasil')
     .eq('user_id', user.id)
     .eq('modul', modul)
-    .eq('status', 'done')
+    .in('status', ['done', 'error'])
+    .not('hasil', 'is', null)
     .order('created_at', { ascending: false })
     .limit(20)
 
