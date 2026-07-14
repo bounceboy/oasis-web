@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 type JenisUsaha = 'Jiwa' | 'Umum'
 
@@ -30,6 +30,14 @@ export default function Psak117Page() {
   const [sessionId, setSessionId] = useState('')
   const [hasil, setHasil] = useState<Record<string, unknown> | null>(null)
   const [activeTab, setActiveTab] = useState<'scorecard' | 'compliance' | 'risiko'>('scorecard')
+  const [riwayat, setRiwayat] = useState<{id: string; nama_entitas: string; created_at: string}[]>([])
+
+  useEffect(() => {
+    fetch('/api/sessions?modul=psak117')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setRiwayat(data) })
+      .catch(() => {})
+  }, [])
 
   function addLog(msg: string) {
     setLog((prev) => [...prev, `[${new Date().toLocaleTimeString('id-ID')}] ${msg}`])
@@ -99,6 +107,7 @@ export default function Psak117Page() {
       setSessionId(data.sessionId)
       setHasil(data)
       setStep(3)
+      fetch('/api/sessions?modul=psak117').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
       setStatus('done')
     } catch (err) {
       addLog(`Error: ${err instanceof Error ? err.message : String(err)}`)
@@ -361,6 +370,24 @@ export default function Psak117Page() {
             >
               Mulai Analisis PSAK 117 →
             </button>
+          </div>
+        )}
+
+        {/* Riwayat */}
+        {step === 1 && riwayat.length > 0 && (
+          <div className="mt-6">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Riwayat Analisis</p>
+            <div className="flex flex-wrap gap-2">
+              {riwayat.map(item => (
+                <button key={item.id}
+                  onClick={() => router.push(`/psak117/${item.id}`)}
+                  className="bg-slate-900 border border-slate-800 hover:border-blue-700 rounded-lg px-3 py-2 text-left transition-colors"
+                >
+                  <div className="text-sm font-medium text-slate-200">{item.nama_entitas}</div>
+                  <div className="text-xs text-slate-500 mt-0.5">{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

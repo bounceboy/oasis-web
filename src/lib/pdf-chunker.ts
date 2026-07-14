@@ -32,8 +32,13 @@ export interface PageClassifierConfig {
  * Catatan: pdf-parse memberi teks halaman-per-halaman via pagerender callback.
  */
 export async function extractPdfPages(buffer: Buffer): Promise<PageChunk[]> {
-  // pdf-parse tidak export types, pakai require
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // pdfjs-dist (dipakai pdf-parse) butuh DOMMatrix — polyfill untuk Node.js
+  if (typeof globalThis.DOMMatrix === 'undefined') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(globalThis as any).DOMMatrix = class DOMMatrix {
+      constructor() { Object.assign(this, { a:1,b:0,c:0,d:1,e:0,f:0,m11:1,m12:0,m21:0,m22:1,m41:0,m42:0 }) }
+    }
+  }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const m = require('pdf-parse'); const pdfParse = m.default ?? m
 

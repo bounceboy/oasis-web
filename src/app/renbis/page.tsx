@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { KkRow } from '@/lib/renbis'
 
@@ -13,6 +13,13 @@ interface RenbisResult {
   kesimpulan: string
 }
 
+interface RiwayatItem {
+  id: string
+  nama_entitas: string
+  created_at: string
+  hasil: RenbisResult
+}
+
 type Step = 'upload' | 'processing' | 'hasil'
 
 export default function RenbisPage() {
@@ -22,7 +29,20 @@ export default function RenbisPage() {
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<RenbisResult | null>(null)
+  const [riwayat, setRiwayat] = useState<RiwayatItem[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fetch('/api/sessions?modul=renbis')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setRiwayat(data) })
+      .catch(() => {})
+  }, [])
+
+  function loadRiwayat(item: RiwayatItem) {
+    setResult({ ...item.hasil, sessionId: item.id })
+    setStep('hasil')
+  }
 
   async function handleAnalyze() {
     if (!file || !namaEntitas.trim() || !tahun.trim()) {
@@ -43,6 +63,8 @@ export default function RenbisPage() {
       if (!res.ok) throw new Error(data.error ?? 'Terjadi kesalahan')
       setResult(data)
       setStep('hasil')
+      // Refresh riwayat
+      fetch('/api/sessions?modul=renbis').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gagal menganalisis')
       setStep('upload')
@@ -153,8 +175,34 @@ export default function RenbisPage() {
 
       <div className="container">
         <Link href="/dashboard" className="back">← Dashboard</Link>
-        <div className="title">Evaluasi Rencana Bisnis</div>
-        <div className="subtitle">Upload PDF Rencana Bisnis perusahaan asuransi — AI akan mengisi KK secara otomatis</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.25rem' }}>
+          <div>
+            <div className="title">Evaluasi Rencana Bisnis</div>
+            <div className="subtitle">Upload PDF Rencana Bisnis perusahaan asuransi — AI akan mengisi KK secara otomatis</div>
+          </div>
+          {step === 'hasil' && (
+            <button className="btn btn-outline" style={{ marginTop: '0.25rem' }} onClick={() => { setStep('upload'); setResult(null) }}>+ Analisis Baru</button>
+          )}
+        </div>
+
+        {/* Riwayat */}
+        {riwayat.length > 0 && step === 'upload' && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Riwayat Analisis</div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {riwayat.map(item => (
+                <button key={item.id} onClick={() => loadRiwayat(item)}
+                  style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '0.5rem', padding: '0.5rem 0.75rem', cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.2s' }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#2563eb')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = '#1e293b')}
+                >
+                  <div style={{ color: '#e2e8f0', fontSize: '0.85rem', fontWeight: 500 }}>{item.nama_entitas}</div>
+                  <div style={{ color: '#475569', fontSize: '0.75rem', marginTop: '0.1rem' }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Step indicator */}
         <div className="steps">
@@ -242,7 +290,6 @@ export default function RenbisPage() {
                   <div className="hasil-meta">Tahun {result.tahun}</div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button className="btn btn-outline" onClick={() => { setStep('upload'); setResult(null) }}>← Baru</button>
                   <button className="btn btn-success" onClick={handleDownload}>⬇ Unduh .docx</button>
                 </div>
               </div>

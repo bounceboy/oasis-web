@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { RisikoRating, RiskLevel } from '@/lib/kyic'
 
@@ -57,6 +57,14 @@ export default function KyicPage() {
   const [progressLog, setProgressLog] = useState<string[]>([])
   const [activeRisk, setActiveRisk] = useState<string | null>(null)
   const [activeComposit, setActiveComposit] = useState<string | null>(null)
+  const [riwayat, setRiwayat] = useState<{id: string; nama_entitas: string; created_at: string}[]>([])
+
+  useEffect(() => {
+    fetch('/api/sessions?modul=kyic')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setRiwayat(data) })
+      .catch(() => {})
+  }, [])
 
   const templateRef = useRef<HTMLInputElement>(null)
   const dokRef = useRef<HTMLInputElement>(null)
@@ -99,6 +107,7 @@ export default function KyicPage() {
       setResult(data)
       if (data.progress_log) setProgressLog(data.progress_log)
       setStep('hasil')
+      fetch('/api/sessions?modul=kyic').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gagal menganalisis')
       setStep('upload')
@@ -362,6 +371,30 @@ export default function KyicPage() {
               >
                 Mulai Analisis →
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Riwayat */}
+        {step === 'upload' && riwayat.length > 0 && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Riwayat Analisis</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {riwayat.map(item => (
+                <button key={item.id}
+                  onClick={async () => {
+                    const r = await fetch(`/api/sessions?modul=kyic`).then(x => x.json())
+                    const found = Array.isArray(r) ? r.find((s: {id: string; hasil: KyicResult}) => s.id === item.id) : null
+                    if (found?.hasil) { setResult({ ...found.hasil, sessionId: found.id }); setStep('hasil') }
+                  }}
+                  style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '0.5rem', padding: '0.5rem 0.75rem', cursor: 'pointer', textAlign: 'left' }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#2563eb')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = '#1e293b')}
+                >
+                  <div style={{ color: '#e2e8f0', fontSize: '0.85rem', fontWeight: 500 }}>{item.nama_entitas}</div>
+                  <div style={{ color: '#475569', fontSize: '0.75rem', marginTop: '0.1rem' }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                </button>
+              ))}
             </div>
           </div>
         )}

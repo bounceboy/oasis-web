@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import type { HasilPengawasan } from '@/lib/lhptl-rules'
 
@@ -33,6 +33,14 @@ export default function LhptlPage() {
   const [hasil, setHasil]                 = useState<HasilData | null>(null)
   const [activeTab, setActiveTab]         = useState<'semua' | 'pelanggaran' | 'perhatian' | 'informasional'>('semua')
   const [error, setError]                 = useState('')
+  const [riwayat, setRiwayat] = useState<{id: string; nama_entitas: string; created_at: string}[]>([])
+
+  useEffect(() => {
+    fetch('/api/sessions?modul=lhptl')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setRiwayat(data) })
+      .catch(() => {})
+  }, [])
 
   function addLog(msg: string) {
     setLog(prev => [...prev, `[${new Date().toLocaleTimeString('id-ID')}] ${msg}`])
@@ -62,6 +70,7 @@ export default function LhptlPage() {
       setHasil(data)
       addLog(`Selesai: ${data.ringkasan.total} temuan`)
       setStep(3)
+      fetch('/api/sessions?modul=lhptl').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
       setStep(1)
@@ -173,6 +182,28 @@ export default function LhptlPage() {
               className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-lg py-2.5 text-sm font-medium transition-colors">
               Mulai Analisis LHPTL
             </button>
+          </div>
+        )}
+
+        {/* Riwayat */}
+        {step === 1 && riwayat.length > 0 && (
+          <div className="mt-6">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Riwayat Analisis</p>
+            <div className="flex flex-wrap gap-2">
+              {riwayat.map(item => (
+                <button key={item.id}
+                  onClick={async () => {
+                    const r = await fetch(`/api/sessions?modul=lhptl`).then(x => x.json())
+                    const found = Array.isArray(r) ? r.find((s: {id: string; hasil: HasilData}) => s.id === item.id) : null
+                    if (found?.hasil) { setHasil({ ...found.hasil, sessionId: found.id }); setStep(3) }
+                  }}
+                  className="bg-slate-900 border border-slate-800 hover:border-blue-700 rounded-lg px-3 py-2 text-left transition-colors"
+                >
+                  <div className="text-sm font-medium text-slate-200">{item.nama_entitas}</div>
+                  <div className="text-xs text-slate-500 mt-0.5">{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
