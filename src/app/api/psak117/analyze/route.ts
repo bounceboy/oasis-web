@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const maxDuration = 300
 import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { searchRelevantPojk } from '@/lib/pojk-search'

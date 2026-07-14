@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+
+export const maxDuration = 300 // 5 menit — AI analysis butuh waktu
 import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { searchRelevantPojk } from '@/lib/pojk-search'
@@ -53,10 +55,12 @@ export async function POST(req: NextRequest) {
       kesimpulan,
     }
 
-    await db()
+    const { error: updateErr } = await db()
       .from('offsite_sessions')
       .update({ status: 'done', hasil: hasilData })
       .eq('id', sessionId)
+
+    if (updateErr) console.error('[renbis] gagal update session:', updateErr.message)
 
     return NextResponse.json({ ...hasilData, sessionId })
   } catch (err) {
