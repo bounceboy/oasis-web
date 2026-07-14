@@ -19,7 +19,7 @@ async function extractText(buf: Buffer, filename: string): Promise<string> {
   const ext = filename.toLowerCase().split('.').pop() ?? ''
   if (ext === 'pdf') {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const m = require('pdf-parse'); const pdfParse = m.default ?? m
+    const pdfParse = require('pdf-parse')
     const result = await pdfParse(buf)
     return result.text
   }
