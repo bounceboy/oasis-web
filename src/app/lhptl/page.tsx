@@ -137,9 +137,13 @@ export default function LhptlPage() {
           ))}
         </div>
 
+        {/* Two-column layout */}
+        <div style={{ display: 'flex', gap: 40, alignItems: 'flex-start' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+
         {/* Step 1: Form */}
         {step === 1 && (
-          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 32, maxWidth: 600, display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 32, display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
               <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Nama entitas</label>
               <input value={namaEntitas} onChange={e => setNamaEntitas(e.target.value)}
@@ -192,42 +196,9 @@ export default function LhptlPage() {
           </div>
         )}
 
-        {/* Riwayat */}
-        {step === 1 && riwayat.length > 0 && (
-          <div style={{ marginTop: 28 }}>
-            <div className="section-label" style={{ marginBottom: 12 }}>Riwayat analisis</div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {riwayat.map(item => (
-                <div key={item.id} style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '12px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>{item.nama_entitas}</div>
-                    <div style={{ fontSize: 11, color: '#8a949c', marginTop: 3 }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={async () => {
-                      const r = await fetch(`/api/sessions?modul=lhptl`).then(x => x.json())
-                      const found = Array.isArray(r) ? r.find((s: {id: string; hasil: HasilData}) => s.id === item.id) : null
-                      if (found?.hasil) { setHasil({ ...found.hasil, sessionId: found.id }); setSaveState('saved'); setStep(3) }
-                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 999, padding: '5px 14px', fontSize: 11, color: '#8a949c', cursor: 'pointer', fontFamily: 'inherit' }}>
-                      Lihat
-                    </button>
-                    <button onClick={async () => {
-                      if (!confirm(`Hapus analisis "${item.nama_entitas}"?`)) return
-                      await fetch(`/api/sessions/${item.id}`, { method: 'DELETE' })
-                      setRiwayat(prev => prev.filter(r => r.id !== item.id))
-                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '5px 10px', fontSize: 11, color: '#5a646c', cursor: 'pointer', fontFamily: 'inherit' }}>
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Step 2: Loading */}
         {step === 2 && (
-          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 56, textAlign: 'center', maxWidth: 600 }}>
+          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 56, textAlign: 'center' }}>
             <div style={{ width: 40, height: 40, border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#45e661', borderRadius: '50%', margin: '0 auto 20px', animation: 'spin 0.8s linear infinite' }} />
             <div style={{ fontWeight: 500, fontSize: 15 }}>Membaca sheet &amp; menjalankan rules pengawasan…</div>
             <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 12, marginTop: 16, maxHeight: 140, overflowY: 'auto', textAlign: 'left' }}>
@@ -319,6 +290,39 @@ export default function LhptlPage() {
             </div>
           </div>
         )}
+
+        </div>{/* end flex-1 */}
+
+        {/* Riwayat sidebar */}
+        <div style={{ width: 280, flexShrink: 0 }}>
+          <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#5a646c', marginBottom: 16 }}>RIWAYAT ANALISIS</div>
+          {riwayat.length === 0 ? (
+            <p style={{ fontSize: 12, color: '#5a646c' }}>Belum ada analisis tersimpan.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {riwayat.map(item => (
+                <div key={item.id} style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nama_entitas}</div>
+                  <div style={{ fontSize: 11, color: '#8a949c', marginTop: 3 }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    <button onClick={async () => {
+                      const r = await fetch(`/api/sessions?modul=lhptl`).then(x => x.json())
+                      const found = Array.isArray(r) ? r.find((s: {id: string; hasil: HasilData}) => s.id === item.id) : null
+                      if (found?.hasil) { setHasil({ ...found.hasil, sessionId: found.id }); setSaveState('saved'); setStep(3) }
+                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, color: '#8a949c', cursor: 'pointer', fontFamily: 'inherit' }}>Lihat</button>
+                    <button onClick={async () => {
+                      if (!confirm(`Hapus analisis "${item.nama_entitas}"?`)) return
+                      await fetch(`/api/sessions/${item.id}`, { method: 'DELETE' })
+                      setRiwayat(prev => prev.filter(r => r.id !== item.id))
+                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 999, padding: '4px 8px', fontSize: 10.5, color: '#5a646c', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        </div>{/* end two-column */}
       </div>
     </div>
   )

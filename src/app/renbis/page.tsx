@@ -212,6 +212,10 @@ export default function RenbisPage() {
           ))}
         </div>
 
+        {/* Two-column: main + riwayat sidebar */}
+        <div style={{ display: 'flex', gap: 40, alignItems: 'flex-start' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+
         {/* Upload step */}
         {step === 'upload' && (
           <div className="card">
@@ -367,50 +371,38 @@ export default function RenbisPage() {
             </div>
           </div>
         )}
-        {/* Riwayat — selalu tampil di bawah */}
-        <div style={{ marginTop: '2rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
-            Riwayat Analisis
-          </div>
+        </div>{/* end flex-1 */}
+
+        {/* Riwayat sidebar */}
+        <div style={{ width: 280, flexShrink: 0 }}>
+          <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#5a646c', marginBottom: 16 }}>RIWAYAT ANALISIS</div>
           {riwayat.length === 0 ? (
-            <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '0.75rem', padding: '1.25rem', color: '#475569', fontSize: '0.85rem', textAlign: 'center' }}>
-              Belum ada riwayat analisis
-            </div>
+            <p style={{ fontSize: 12, color: '#5a646c' }}>Belum ada analisis tersimpan.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {riwayat.map(item => (
-                <div key={item.id}
-                  style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '0.75rem', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: '#e2e8f0', fontSize: '0.9rem', fontWeight: 600 }}>{item.nama_entitas}</div>
-                    <div style={{ color: '#475569', fontSize: '0.78rem', marginTop: '0.15rem' }}>
-                      {new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                      {item.hasil?.tahun && <span style={{ marginLeft: '0.5rem', color: '#334155' }}>· Tahun {item.hasil.tahun}</span>}
-                    </div>
+                <div key={item.id} style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nama_entitas}</div>
+                  <div style={{ fontSize: 11, color: '#8a949c', marginTop: 3 }}>
+                    {new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {item.hasil?.tahun && <span style={{ marginLeft: 6, color: '#5a646c' }}>· {item.hasil.tahun}</span>}
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0, marginLeft: '1rem' }}>
-                    <button onClick={() => loadRiwayat(item)}
-                      style={{ background: 'transparent', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.3rem 0.75rem', cursor: 'pointer', color: '#94a3b8', fontSize: '0.8rem', transition: 'all 0.15s' }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.color = '#93c5fd' }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.color = '#94a3b8' }}
-                    >Lihat</button>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    <button onClick={() => loadRiwayat(item)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, color: '#8a949c', cursor: 'pointer', fontFamily: 'inherit' }}>Lihat</button>
                     <button onClick={async () => {
                       if (!confirm(`Hapus analisis "${item.nama_entitas}"?`)) return
                       await fetch(`/api/sessions/${item.id}`, { method: 'DELETE' })
                       setRiwayat(prev => prev.filter(r => r.id !== item.id))
                       if (result?.sessionId === item.id) { setResult(null); setStep('upload') }
-                    }}
-                      style={{ background: 'transparent', border: '1px solid #334155', borderRadius: '0.4rem', padding: '0.3rem 0.5rem', cursor: 'pointer', color: '#475569', fontSize: '0.8rem', transition: 'all 0.15s' }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#991b1b'; e.currentTarget.style.color = '#f87171' }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.color = '#475569' }}
-                    >✕</button>
+                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 999, padding: '4px 8px', fontSize: 10.5, color: '#5a646c', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
+
+        </div>{/* end two-column */}
 
       </div>
     </>

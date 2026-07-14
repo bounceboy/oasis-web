@@ -214,6 +214,37 @@ export default function Psak117Page() {
 
   // ─── Main render ─────────────────────────────────────────────────────────────
 
+  const riwayatPanel = (
+    <div style={{ width: 280, flexShrink: 0 }}>
+      <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#5a646c', marginBottom: 16 }}>RIWAYAT ANALISIS</div>
+      {riwayat.length === 0 ? (
+        <p style={{ fontSize: 12, color: '#5a646c' }}>Belum ada analisis tersimpan.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {riwayat.map(item => (
+            <div key={item.id} style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nama_entitas}</div>
+                  <div style={{ fontSize: 11, color: '#8a949c', marginTop: 3 }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                  {(item as { hasil?: { scorecard?: { predikat?: string } } }).hasil?.scorecard?.predikat && (
+                    <div style={{ marginTop: 6, display: 'inline-block', fontSize: 10.5, padding: '2px 10px', borderRadius: 999, background: 'rgba(69,230,97,0.1)', color: '#45e661', border: '1px solid rgba(69,230,97,0.25)' }}>
+                      {(item as { hasil?: { scorecard?: { predikat?: string } } }).hasil!.scorecard!.predikat}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => router.push(`/psak117/${item.id}`)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, color: '#8a949c', cursor: 'pointer', fontFamily: 'inherit' }}>Lihat</button>
+                  <button onClick={async () => { if (!confirm(`Hapus analisis "${item.nama_entitas}"?`)) return; await fetch(`/api/sessions/${item.id}`, { method: 'DELETE' }); setRiwayat(prev => prev.filter(r => r.id !== item.id)) }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 999, padding: '4px 8px', fontSize: 10.5, color: '#5a646c', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <div style={{ minHeight: '100vh', color: '#eef2ef' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px 64px' }}>
@@ -243,117 +274,106 @@ export default function Psak117Page() {
           </div>
         )}
 
-        {/* Step 1: Form upload */}
-        {step === 1 && (
-          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 32, maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Nama perusahaan</label>
-                <input value={namaEntitas} onChange={e => setNamaEntitas(e.target.value)} placeholder="PT Asuransi Jiwa Cahaya Abadi Tbk" className="input-underline" />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Jenis usaha</label>
-                <select value={jenisUsaha} onChange={e => setJenisUsaha(e.target.value as JenisUsaha)} className="input-underline">
-                  <option value="Jiwa">Asuransi Jiwa</option>
-                  <option value="Umum">Asuransi Umum</option>
-                </select>
-              </div>
-            </div>
+        {/* Two-column layout: main content + riwayat */}
+        <div style={{ display: 'flex', gap: 40, alignItems: 'flex-start' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
 
-            <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Periode laporan</label>
-              <input value={periode} onChange={e => setPeriode(e.target.value)} placeholder="31 Desember 2025" className="input-underline" />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 8 }}>Laporan keuangan audited</label>
-              <label style={{ display: 'block', border: '1px dashed rgba(69,230,97,0.45)', borderRadius: 18, padding: 30, textAlign: 'center', cursor: 'pointer' }}>
-                <input ref={fileRef} type="file" accept=".pdf,.txt" style={{ display: 'none' }} onChange={e => setFile(e.target.files?.[0] || null)} />
-                {file ? (
-                  <div style={{ fontWeight: 500, fontSize: 13.5, color: '#45e661' }}>{file.name}</div>
-                ) : (
-                  <>
-                    <div style={{ fontWeight: 500, fontSize: 13.5, color: '#b7c0c6' }}>Klik untuk upload lapkeu (PDF)</div>
-                    <div style={{ fontSize: 11.5, color: '#5a646c', marginTop: 5 }}>Maks 50 MB · dengan CALK lengkap</div>
-                  </>
-                )}
-              </label>
-            </div>
-
-            <button onClick={handleAnalisis} disabled={status === 'loading'} className="btn-filled" style={{ alignSelf: 'flex-start' }}>
-              Mulai analisis ↗
-            </button>
-          </div>
-        )}
-
-        {/* Riwayat */}
-        {step === 1 && riwayat.length > 0 && (
-          <div style={{ marginTop: 28 }}>
-            <div className="section-label" style={{ marginBottom: 12 }}>Riwayat analisis</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {riwayat.map(item => (
-                <div key={item.id} style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '12px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* Step 1: Form upload */}
+            {step === 1 && (
+              <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 32, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                   <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>{item.nama_entitas}</div>
-                    <div style={{ fontSize: 11, color: '#8a949c', marginTop: 3 }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                    <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Nama perusahaan</label>
+                    <input value={namaEntitas} onChange={e => setNamaEntitas(e.target.value)} placeholder="PT Asuransi Jiwa Cahaya Abadi Tbk" className="input-underline" />
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => router.push(`/psak117/${item.id}`)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 999, padding: '5px 14px', fontSize: 11, color: '#8a949c', cursor: 'pointer', fontFamily: 'inherit' }}>Lihat</button>
-                    <button onClick={async () => { if (!confirm(`Hapus analisis "${item.nama_entitas}"?`)) return; await fetch(`/api/sessions/${item.id}`, { method: 'DELETE' }); setRiwayat(prev => prev.filter(r => r.id !== item.id)) }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '5px 10px', fontSize: 11, color: '#5a646c', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Jenis usaha</label>
+                    <select value={jenisUsaha} onChange={e => setJenisUsaha(e.target.value as JenisUsaha)} className="input-underline">
+                      <option value="Jiwa">Asuransi Jiwa</option>
+                      <option value="Umum">Asuransi Umum</option>
+                    </select>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
 
-        {/* Step 2: Processing */}
-        {step === 2 && status === 'loading' && (
-          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 56, textAlign: 'center', maxWidth: 640 }}>
-            <div style={{ width: 40, height: 40, border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#45e661', borderRadius: '50%', margin: '0 auto 20px', animation: 'spin 0.8s linear infinite' }} />
-            <div style={{ fontWeight: 500, fontSize: 15 }}>Menganalisis laporan keuangan…</div>
-            <div style={{ fontSize: 12, color: '#8a949c', marginTop: 8 }}>Menghitung rasio, kepatuhan POJK, dan pemetaan risiko.</div>
-          </div>
-        )}
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Periode laporan</label>
+                  <input value={periode} onChange={e => setPeriode(e.target.value)} placeholder="31 Desember 2025" className="input-underline" />
+                </div>
 
-        {/* Step 2: Error */}
-        {step === 2 && status === 'error' && (
-          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,100,97,0.3)', borderRadius: 24, padding: 32, textAlign: 'center' }}>
-            <p style={{ color: '#ff6f61', fontWeight: 500, margin: '0 0 8px' }}>Analisis Gagal</p>
-            <p style={{ color: '#8a949c', fontSize: 13, margin: '0 0 16px' }}>Lihat log di atas untuk detail error.</p>
-            <button onClick={() => { setStep(1); setStatus('idle') }} style={{ background: 'transparent', border: 'none', color: '#45e661', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>← Kembali</button>
-          </div>
-        )}
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 8 }}>Laporan keuangan audited</label>
+                  <label style={{ display: 'block', border: '1px dashed rgba(69,230,97,0.45)', borderRadius: 18, padding: 30, textAlign: 'center', cursor: 'pointer' }}>
+                    <input ref={fileRef} type="file" accept=".pdf,.txt" style={{ display: 'none' }} onChange={e => setFile(e.target.files?.[0] || null)} />
+                    {file ? (
+                      <div style={{ fontWeight: 500, fontSize: 13.5, color: '#45e661' }}>{file.name}</div>
+                    ) : (
+                      <>
+                        <div style={{ fontWeight: 500, fontSize: 13.5, color: '#b7c0c6' }}>Klik untuk upload lapkeu (PDF)</div>
+                        <div style={{ fontSize: 11.5, color: '#5a646c', marginTop: 5 }}>Maks 50 MB · dengan CALK lengkap</div>
+                      </>
+                    )}
+                  </label>
+                </div>
 
-        {/* Step 3: Hasil */}
-        {step === 3 && hasil && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 22 }}>
-              <div>
-                <div style={{ fontSize: 17, fontWeight: 500 }}>{(hasil.metadata as Record<string, string>).namaEntitas}</div>
-                <div style={{ fontSize: 12, color: '#8a949c', marginTop: 3 }}>{(hasil.metadata as Record<string, string>).jenisUsaha} · {(hasil.metadata as Record<string, string>).periode}</div>
+                <button onClick={handleAnalisis} disabled={status === 'loading'} className="btn-filled" style={{ alignSelf: 'flex-start' }}>
+                  Mulai analisis ↗
+                </button>
               </div>
-              <button onClick={() => { setStep(1); setStatus('idle') }} style={{ background: 'transparent', color: '#8a949c', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 999, padding: '9px 18px', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit' }}>+ Analisis baru</button>
-            </div>
+            )}
 
-            {/* Tab bar */}
-            <div style={{ display: 'flex', gap: 6, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: 5, marginBottom: 26, maxWidth: 560 }}>
-              {([
-                { key: 'scorecard', label: 'Scorecard & Rasio' },
-                { key: 'compliance', label: 'Compliance POJK' },
-                { key: 'risiko', label: 'Pemetaan Risiko' },
-              ] as const).map(tab => (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{ flex: 1, padding: 9, border: 'none', borderRadius: 999, fontSize: 11.5, fontWeight: 500, cursor: 'pointer', background: activeTab === tab.key ? '#45e661' : 'transparent', color: activeTab === tab.key ? '#04120a' : '#8a949c', fontFamily: 'inherit' }}>{tab.label}</button>
-              ))}
-            </div>
+            {/* Step 2: Processing */}
+            {step === 2 && status === 'loading' && (
+              <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 56, textAlign: 'center' }}>
+                <div style={{ width: 40, height: 40, border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#45e661', borderRadius: '50%', margin: '0 auto 20px', animation: 'spin 0.8s linear infinite' }} />
+                <div style={{ fontWeight: 500, fontSize: 15 }}>Menganalisis laporan keuangan…</div>
+                <div style={{ fontSize: 12, color: '#8a949c', marginTop: 8 }}>Menghitung rasio, kepatuhan POJK, dan pemetaan risiko.</div>
+              </div>
+            )}
 
-            <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 28 }}>
-              {activeTab === 'scorecard' && renderScorecard()}
-              {activeTab === 'compliance' && renderMarkdown(hasil.compliance as string)}
-              {activeTab === 'risiko' && renderMarkdown(hasil.pemetaan_risiko as string)}
-            </div>
+            {/* Step 2: Error */}
+            {step === 2 && status === 'error' && (
+              <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,100,97,0.3)', borderRadius: 24, padding: 32, textAlign: 'center' }}>
+                <p style={{ color: '#ff6f61', fontWeight: 500, margin: '0 0 8px' }}>Analisis Gagal</p>
+                <p style={{ color: '#8a949c', fontSize: 13, margin: '0 0 16px' }}>Lihat log di atas untuk detail error.</p>
+                <button onClick={() => { setStep(1); setStatus('idle') }} style={{ background: 'transparent', border: 'none', color: '#45e661', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>← Kembali</button>
+              </div>
+            )}
+
+            {/* Step 3: Hasil */}
+            {step === 3 && hasil && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 22 }}>
+                  <div>
+                    <div style={{ fontSize: 17, fontWeight: 500 }}>{(hasil.metadata as Record<string, string>).namaEntitas}</div>
+                    <div style={{ fontSize: 12, color: '#8a949c', marginTop: 3 }}>{(hasil.metadata as Record<string, string>).jenisUsaha} · {(hasil.metadata as Record<string, string>).periode}</div>
+                  </div>
+                  <button onClick={() => { setStep(1); setStatus('idle') }} style={{ background: 'transparent', color: '#8a949c', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 999, padding: '9px 18px', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit' }}>+ Analisis baru</button>
+                </div>
+
+                {/* Tab bar */}
+                <div style={{ display: 'flex', gap: 6, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: 5, marginBottom: 26 }}>
+                  {([
+                    { key: 'scorecard', label: 'Scorecard & Rasio' },
+                    { key: 'compliance', label: 'Compliance POJK' },
+                    { key: 'risiko', label: 'Pemetaan Risiko' },
+                  ] as const).map(tab => (
+                    <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{ flex: 1, padding: 9, border: 'none', borderRadius: 999, fontSize: 11.5, fontWeight: 500, cursor: 'pointer', background: activeTab === tab.key ? '#45e661' : 'transparent', color: activeTab === tab.key ? '#04120a' : '#8a949c', fontFamily: 'inherit' }}>{tab.label}</button>
+                  ))}
+                </div>
+
+                <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 28 }}>
+                  {activeTab === 'scorecard' && renderScorecard()}
+                  {activeTab === 'compliance' && renderMarkdown(hasil.compliance as string)}
+                  {activeTab === 'risiko' && renderMarkdown(hasil.pemetaan_risiko as string)}
+                </div>
+              </div>
+            )}
+
           </div>
-        )}
+
+          {/* Riwayat sidebar */}
+          {riwayatPanel}
+        </div>
       </div>
     </div>
   )
