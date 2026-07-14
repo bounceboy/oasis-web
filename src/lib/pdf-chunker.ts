@@ -33,7 +33,7 @@ export interface PageClassifierConfig {
  */
 export async function extractPdfPages(buffer: Buffer): Promise<PageChunk[]> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require('pdf-parse')
+  const pdfParse = require('pdf-parse/lib/pdf-parse')
 
   const pages: PageChunk[] = []
   let currentPage = 0
