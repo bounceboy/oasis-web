@@ -1,14 +1,29 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+
+interface OnsiteSession {
+  kode: string
+  nama_entitas: string
+  jenis_usaha: string
+  created_at: string
+}
 
 export default function PemeriksaanPage() {
   const router = useRouter()
   const [kode, setKode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [riwayat, setRiwayat] = useState<OnsiteSession[]>([])
+
+  useEffect(() => {
+    fetch('/api/onsite/my-sessions')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setRiwayat(data) })
+      .catch(() => {})
+  }, [])
 
   async function handleMasuk() {
     const k = kode.trim().toUpperCase()
@@ -86,6 +101,31 @@ export default function PemeriksaanPage() {
             </div>
           </div>
         </div>
+
+        {/* Riwayat sesi */}
+        {riwayat.length > 0 && (
+          <div className="mt-6">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Sesi Pemeriksaan</p>
+            <div className="space-y-2">
+              {riwayat.map(s => (
+                <button key={s.kode}
+                  onClick={() => router.push(`/pemeriksaan/${s.kode}`)}
+                  className="w-full bg-slate-900 border border-slate-800 hover:border-blue-700 rounded-xl px-4 py-3 text-left transition-colors flex items-center justify-between group"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-bold text-blue-400">{s.kode}</span>
+                      <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">{s.jenis_usaha}</span>
+                    </div>
+                    <div className="text-sm text-slate-300 mt-0.5">{s.nama_entitas}</div>
+                    <div className="text-xs text-slate-600 mt-0.5">{new Date(s.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                  </div>
+                  <span className="text-slate-600 group-hover:text-slate-400 transition-colors">→</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
