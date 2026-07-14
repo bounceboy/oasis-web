@@ -1,10 +1,12 @@
 import { db } from '@/lib/db'
 import OpenAI from 'openai'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+}
 
 async function embedQuery(text: string): Promise<number[]> {
-  const res = await openai.embeddings.create({
+  const res = await getOpenAI().embeddings.create({
     model: 'text-embedding-3-small',
     input: text.slice(0, 8000),
   })
