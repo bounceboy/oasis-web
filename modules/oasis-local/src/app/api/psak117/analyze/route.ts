@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 export const maxDuration = 300
 import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -49,6 +49,31 @@ export async function POST(req: NextRequest) {
 
   const sessionId = session.id
 
+  // ─── Background job ──────────────────────────────────────────────────────────
+  // after() menjaga job tetap hidup setelah response terkirim (wajib di Vercel serverless).
+  // Client poll status via GET /api/sessions/{id}
+  after(async () => {
+    await runPsak117Analysis(sessionId, user.id, teksLapkeu, namaEntitas, jenisUsaha, periode).catch(err => {
+      console.error(`[PSAK117 ${sessionId}] Background job error:`, err)
+    })
+  })
+
+  // Return sessionId segera (status: processing)
+  return NextResponse.json({
+    sessionId,
+    status: 'processing',
+    message: 'Analisis dimulai. Polling untuk melihat progres.',
+  })
+}
+
+async function runPsak117Analysis(
+  sessionId: string,
+  userId: string,
+  teksLapkeu: string,
+  namaEntitas: string,
+  jenisUsaha: JenisUsaha,
+  periode: string
+) {
   try {
     // Step 1: Ekstrak data keuangan dari PDF text
     const dataKeuangan = await ekstrakDataKeuangan(teksLapkeu, namaEntitas, jenisUsaha)
@@ -95,18 +120,12 @@ export async function POST(req: NextRequest) {
       .from('offsite_sessions')
       .update({ status: 'selesai', hasil })
       .eq('id', sessionId)
-
-    return NextResponse.json({ sessionId, ...hasil })
   } catch (err) {
     await db()
       .from('offsite_sessions')
       .update({ status: 'error' })
       .eq('id', sessionId)
-
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Analisis gagal' },
-      { status: 500 }
-    )
+    throw err
   }
 }
 

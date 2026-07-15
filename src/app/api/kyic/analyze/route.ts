@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 export const maxDuration = 300
 import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -59,11 +59,14 @@ export async function POST(req: NextRequest) {
   if (sessionErr || !session) return NextResponse.json({ error: 'Gagal membuat session' }, { status: 500 })
   const sessionId = session.id
 
-  // ─── Background job (fire-and-forget) ───────────────────────────────────────
+  // ─── Background job ──────────────────────────────────────────────────────────
+  // after() menjaga job tetap hidup setelah response terkirim (wajib di Vercel serverless).
   const templateBuf = Buffer.from(await templateFile.arrayBuffer())
 
-  runKyicAnalysis(sessionId, templateBuf, dokumenFiles, catatanPengawas).catch(err => {
-    console.error(`[KYIC ${sessionId}] Background job error:`, err)
+  after(async () => {
+    await runKyicAnalysis(sessionId, templateBuf, dokumenFiles, catatanPengawas).catch(err => {
+      console.error(`[KYIC ${sessionId}] Background job error:`, err)
+    })
   })
 
   // Return sessionId segera (status: processing)
@@ -77,7 +80,7 @@ export async function POST(req: NextRequest) {
 async function runKyicAnalysis(
   sessionId: string,
   templateBuf: Buffer,
-  dokumenFiles: File[],
+  dokumenFiles: Array<{ name: string; buf: Buffer; type: string }>,
   catatanPengawas: string
 ) {
   try {

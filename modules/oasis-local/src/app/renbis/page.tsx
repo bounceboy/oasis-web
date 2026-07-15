@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { KkRow } from '@/lib/renbis'
 import Navbar from '@/components/oasis/Navbar'
+import { useSessionPolling } from '@/lib/useSessionPolling'
 
 interface RenbisResult {
   sessionId: string
@@ -32,6 +33,21 @@ export default function RenbisPage() {
   const [result, setResult] = useState<RenbisResult | null>(null)
   const [riwayat, setRiwayat] = useState<RiwayatItem[]>([])
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [pollingId, setPollingId] = useState<string | null>(null)
+
+  useSessionPolling(pollingId, (data) => {
+    const id = pollingId
+    setPollingId(null)
+    if (data.status === 'selesai' && data.hasil) {
+      setResult({ ...(data.hasil as unknown as RenbisResult), sessionId: id! })
+      setSaveState('saved')
+      setStep('hasil')
+      fetch('/api/sessions?modul=renbis').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
+    } else {
+      setError('Analisis gagal di server. Coba lagi.')
+      setStep('upload')
+    }
+  })
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -81,11 +97,8 @@ export default function RenbisPage() {
       const res = await fetch('/api/renbis/analyze', { method: 'POST', body: fd })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Terjadi kesalahan')
-      setResult(data)
-      setSaveState('idle')
-      setStep('hasil')
-      // Refresh riwayat
-      fetch('/api/sessions?modul=renbis').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
+      // Analisis berjalan di server — polling sampai selesai
+      setPollingId(data.sessionId)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gagal menganalisis')
       setStep('upload')

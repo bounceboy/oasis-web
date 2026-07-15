@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 export const maxDuration = 300
 import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { extractExcelSheets } from '@/lib/xlsx-extractor'
+import { extractExcelSheets, type SheetText } from '@/lib/xlsx-extractor'
 import { ekstrakDataLhptl, analisisLhptl } from '@/lib/lhptl'
 
 const MAX_FILE_SIZE = 20_971_520 // 20 MB
@@ -39,8 +39,9 @@ export async function POST(req: NextRequest) {
   if (sessionErr || !session) return NextResponse.json({ error: 'Gagal membuat session' }, { status: 500 })
   const sessionId = session.id
 
-  // ─── Background job (fire-and-forget) ───────────────────────────────────────
-  // Parse Excel & analisis jalan async. Simpan sheets ke session dulu, background job ambil
+  // ─── Background job ──────────────────────────────────────────────────────────
+  // Parse Excel dulu (cepat), lalu analisis AI jalan via after() agar tetap hidup
+  // setelah response terkirim (wajib di Vercel serverless).
   const buf = Buffer.from(await file.arrayBuffer())
   const sheetsLapkeu = extractExcelSheets(buf)
 
@@ -49,15 +50,10 @@ export async function POST(req: NextRequest) {
 
   const sheets = [...sheetsLapkeu, ...sheetsGcg]
 
-  // Store sheets ke temp field di session sebelum background job jalankan
-  await db()
-    .from('offsite_sessions')
-    .update({ metadata: { sheets } })
-    .eq('id', sessionId)
-    .catch(() => {}) // Ignore error, background job tetap jalan
-
-  runLhptlAnalysis(sessionId, sheets, namaEntitas, jenisEntitas, periode).catch(err => {
-    console.error(`[LHPTL ${sessionId}] Background job error:`, err)
+  after(async () => {
+    await runLhptlAnalysis(sessionId, sheets, namaEntitas, jenisEntitas, periode).catch(err => {
+      console.error(`[LHPTL ${sessionId}] Background job error:`, err)
+    })
   })
 
   // Return sessionId segera (status: processing)
@@ -70,7 +66,7 @@ export async function POST(req: NextRequest) {
 
 async function runLhptlAnalysis(
   sessionId: string,
-  sheets: Array<{ name: string; text: string }>,
+  sheets: SheetText[],
   namaEntitas: string,
   jenisEntitas: 'pialang_asuransi' | 'pialang_reasuransi',
   periode: string

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import type { HasilPengawasan } from '@/lib/lhptl-rules'
 import Navbar from '@/components/oasis/Navbar'
+import { useSessionPolling } from '@/lib/useSessionPolling'
 
 type JenisEntitas = 'pialang_asuransi' | 'pialang_reasuransi'
 type Step = 1 | 2 | 3
@@ -38,6 +39,23 @@ export default function LhptlPage() {
   const [error, setError]                 = useState('')
   const [riwayat, setRiwayat] = useState<{id: string; nama_entitas: string; created_at: string}[]>([])
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [pollingId, setPollingId] = useState<string | null>(null)
+
+  useSessionPolling(pollingId, (data) => {
+    setPollingId(null)
+    setLoading(false)
+    if (data.status === 'selesai' && data.hasil) {
+      const h = data.hasil as unknown as HasilData
+      setHasil({ ...h, sessionId: pollingId! })
+      setSaveState('saved')
+      addLog(`Selesai: ${h.ringkasan?.total ?? 0} temuan`)
+      setStep(3)
+      fetch('/api/sessions?modul=lhptl').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
+    } else {
+      setError('Analisis gagal di server. Coba lagi.')
+      setStep(1)
+    }
+  })
 
   useEffect(() => {
     fetch('/api/sessions?modul=lhptl')
@@ -90,15 +108,11 @@ export default function LhptlPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Analisis gagal')
 
-      setHasil(data)
-      setSaveState('idle')
-      addLog(`Selesai: ${data.ringkasan.total} temuan`)
-      setStep(3)
-      fetch('/api/sessions?modul=lhptl').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
+      addLog('Analisis berjalan di server — aman untuk pindah halaman, hasil tersimpan di Riwayat.')
+      setPollingId(data.sessionId)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
       setStep(1)
-    } finally {
       setLoading(false)
     }
   }

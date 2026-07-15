@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { RisikoRating, RiskLevel } from '@/lib/kyic'
 import Navbar from '@/components/oasis/Navbar'
+import { useSessionPolling } from '@/lib/useSessionPolling'
 
 interface KyicResult {
   sessionId: string
@@ -60,6 +61,23 @@ export default function KyicPage() {
   const [activeComposit, setActiveComposit] = useState<string | null>(null)
   const [riwayat, setRiwayat] = useState<{id: string; nama_entitas: string; created_at: string}[]>([])
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [pollingId, setPollingId] = useState<string | null>(null)
+
+  useSessionPolling(pollingId, (data) => {
+    const id = pollingId
+    setPollingId(null)
+    if (data.status === 'selesai' && data.hasil) {
+      const h = data.hasil as unknown as KyicResult & { progress_log?: string[] }
+      setResult({ ...h, sessionId: id! })
+      setSaveState('saved')
+      if (h.progress_log) setProgressLog(h.progress_log)
+      setStep('hasil')
+      fetch('/api/sessions?modul=kyic').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
+    } else {
+      setError('Analisis gagal di server. Coba lagi.')
+      setStep('upload')
+    }
+  })
 
   useEffect(() => {
     fetch('/api/sessions?modul=kyic')
@@ -106,11 +124,8 @@ export default function KyicPage() {
       const res = await fetch('/api/kyic/analyze', { method: 'POST', body: fd })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Terjadi kesalahan')
-      setResult(data)
-      setSaveState('idle')
-      if (data.progress_log) setProgressLog(data.progress_log)
-      setStep('hasil')
-      fetch('/api/sessions?modul=kyic').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
+      setProgressLog(prev => [...prev, 'Analisis berjalan di server — aman untuk pindah halaman, hasil tersimpan di Riwayat.'])
+      setPollingId(data.sessionId)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gagal menganalisis')
       setStep('upload')

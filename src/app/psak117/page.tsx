@@ -35,7 +35,7 @@ export default function Psak117Page() {
   const [riwayat, setRiwayat] = useState<{id: string; nama_entitas: string; created_at: string}[]>([])
 
   // Polling status
-  const { data: pollData, loading: pollingLoading } = useSessionPolling(sessionId, (data) => {
+  useSessionPolling(sessionId, (data) => {
     if (data.status === 'selesai' && data.hasil) {
       setStatus('done')
       setHasil(data.hasil as Record<string, unknown>)

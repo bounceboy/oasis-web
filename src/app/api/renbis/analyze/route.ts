@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 
 export const maxDuration = 300 // 5 menit — AI analysis butuh waktu
 import { getUser } from '@/lib/auth'
@@ -35,11 +35,14 @@ export async function POST(req: NextRequest) {
   if (sessionErr || !session) return NextResponse.json({ error: 'Gagal membuat session' }, { status: 500 })
   const sessionId = session.id
 
-  // ─── Background job (fire-and-forget) ───────────────────────────────────────
+  // ─── Background job ──────────────────────────────────────────────────────────
+  // after() menjaga job tetap hidup setelah response terkirim (wajib di Vercel serverless).
   const buf = Buffer.from(await file.arrayBuffer())
 
-  runRenbisAnalysis(sessionId, buf, namaEntitas, tahun).catch(err => {
-    console.error(`[Renbis ${sessionId}] Background job error:`, err)
+  after(async () => {
+    await runRenbisAnalysis(sessionId, buf, namaEntitas, tahun).catch(err => {
+      console.error(`[Renbis ${sessionId}] Background job error:`, err)
+    })
   })
 
   // Return sessionId segera (status: processing)

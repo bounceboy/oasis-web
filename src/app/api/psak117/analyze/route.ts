@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 export const maxDuration = 300
 import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -49,10 +49,13 @@ export async function POST(req: NextRequest) {
 
   const sessionId = session.id
 
-  // ─── Background job (fire-and-forget) ───────────────────────────────────────
-  // Analisis jalan async tanpa blocking response. Client poll status via GET /psak117/session/{id}
-  runPsak117Analysis(sessionId, user.id, teksLapkeu, namaEntitas, jenisUsaha, periode).catch(err => {
-    console.error(`[PSAK117 ${sessionId}] Background job error:`, err)
+  // ─── Background job ──────────────────────────────────────────────────────────
+  // after() menjaga job tetap hidup setelah response terkirim (wajib di Vercel serverless).
+  // Client poll status via GET /api/sessions/{id}
+  after(async () => {
+    await runPsak117Analysis(sessionId, user.id, teksLapkeu, namaEntitas, jenisUsaha, periode).catch(err => {
+      console.error(`[PSAK117 ${sessionId}] Background job error:`, err)
+    })
   })
 
   // Return sessionId segera (status: processing)
