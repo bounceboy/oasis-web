@@ -35,9 +35,29 @@ export async function POST(req: NextRequest) {
   if (sessionErr || !session) return NextResponse.json({ error: 'Gagal membuat session' }, { status: 500 })
   const sessionId = session.id
 
+  // ─── Background job (fire-and-forget) ───────────────────────────────────────
+  const buf = Buffer.from(await file.arrayBuffer())
+
+  runRenbisAnalysis(sessionId, buf, namaEntitas, tahun).catch(err => {
+    console.error(`[Renbis ${sessionId}] Background job error:`, err)
+  })
+
+  // Return sessionId segera (status: processing)
+  return NextResponse.json({
+    sessionId,
+    status: 'processing',
+    message: 'Analisis dimulai. Polling untuk melihat progres.',
+  })
+}
+
+async function runRenbisAnalysis(
+  sessionId: string,
+  buf: Buffer,
+  namaEntitas: string,
+  tahun: string
+) {
   try {
     // 1. Ekstrak teks dari PDF
-    const buf = Buffer.from(await file.arrayBuffer())
     const pages = await extractPdfPages(buf)
     const teks = pages.map((p) => p.text).join('\n\n')
 
@@ -61,12 +81,9 @@ export async function POST(req: NextRequest) {
       .eq('id', sessionId)
 
     if (updateErr) console.error('[renbis] gagal update session:', updateErr.message)
-
-    return NextResponse.json({ ...hasilData, sessionId })
   } catch (err) {
     await db().from('offsite_sessions').update({ status: 'error' }).eq('id', sessionId)
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json({ error: msg }, { status: 500 })
+    throw err
   }
 }
 

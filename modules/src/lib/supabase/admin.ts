@@ -1,0 +1,11 @@
+import { createClient as createServerClient } from '@supabase/supabase-js'
+
+// Service role client untuk operasi admin (bypass RLS)
+// Hanya dipakai di server-side API routes
+export function createAdminClient() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}

@@ -59,8 +59,28 @@ export async function POST(req: NextRequest) {
   if (sessionErr || !session) return NextResponse.json({ error: 'Gagal membuat session' }, { status: 500 })
   const sessionId = session.id
 
+  // ─── Background job (fire-and-forget) ───────────────────────────────────────
+  const templateBuf = Buffer.from(await templateFile.arrayBuffer())
+
+  runKyicAnalysis(sessionId, templateBuf, dokumenFiles, catatanPengawas).catch(err => {
+    console.error(`[KYIC ${sessionId}] Background job error:`, err)
+  })
+
+  // Return sessionId segera (status: processing)
+  return NextResponse.json({
+    sessionId,
+    status: 'processing',
+    message: 'Analisis dimulai. Polling untuk melihat progres.',
+  })
+}
+
+async function runKyicAnalysis(
+  sessionId: string,
+  templateBuf: Buffer,
+  dokumenFiles: File[],
+  catatanPengawas: string
+) {
   try {
-    const templateBuf = Buffer.from(await templateFile.arrayBuffer())
     const progressLog: string[] = []
 
     const { docxBuf, hasil } = await prosesKyic(
@@ -81,13 +101,8 @@ export async function POST(req: NextRequest) {
       .from('offsite_sessions')
       .update({ status: 'selesai', hasil: hasilData })
       .eq('id', sessionId)
-
-    // Return tanpa docx_b64 (terlalu besar untuk JSON response)
-    const { docx_b64: _, ...hasilTanpaDocx } = hasilData
-    return NextResponse.json({ ...hasilTanpaDocx, sessionId })
   } catch (err) {
     await db().from('offsite_sessions').update({ status: 'error' }).eq('id', sessionId)
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json({ error: msg }, { status: 500 })
+    throw err
   }
 }

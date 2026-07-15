@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/oasis/Navbar'
+import { useSessionPolling } from '@/lib/useSessionPolling'
 type JenisUsaha = 'Jiwa' | 'Umum'
 
 type Status = 'idle' | 'loading' | 'done' | 'error'
@@ -28,10 +29,24 @@ export default function Psak117Page() {
   const [file, setFile] = useState<File | null>(null)
 
   // Hasil
-  const [sessionId, setSessionId] = useState('')
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const [hasil, setHasil] = useState<Record<string, unknown> | null>(null)
   const [activeTab, setActiveTab] = useState<'scorecard' | 'compliance' | 'risiko'>('scorecard')
   const [riwayat, setRiwayat] = useState<{id: string; nama_entitas: string; created_at: string}[]>([])
+
+  // Polling status
+  const { data: pollData, loading: pollingLoading } = useSessionPolling(sessionId, (data) => {
+    if (data.status === 'selesai' && data.hasil) {
+      setStatus('done')
+      setHasil(data.hasil as Record<string, unknown>)
+      setStep(3)
+      addLog('Analisis selesai. Hasil dimuat.')
+      fetch('/api/sessions?modul=psak117').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
+    } else if (data.status === 'error') {
+      setStatus('error')
+      addLog(`Error: ${data.error || 'Analisis gagal'}`)
+    }
+  })
 
   useEffect(() => {
     fetch('/api/sessions?modul=psak117')
@@ -104,12 +119,10 @@ export default function Psak117Page() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Analisis gagal')
 
-      addLog('Analisis selesai.')
+      addLog(`Analisis dimulai. Session ID: ${data.sessionId}`)
+      addLog('Polling status (setiap 2 detik)... Anda bisa pindah halaman atau menutup tab.')
       setSessionId(data.sessionId)
-      setHasil(data)
-      setStep(3)
-      fetch('/api/sessions?modul=psak117').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
-      setStatus('done')
+      setStatus('loading')
     } catch (err) {
       addLog(`Error: ${err instanceof Error ? err.message : String(err)}`)
       setStatus('error')

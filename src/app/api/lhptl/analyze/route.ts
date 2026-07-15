@@ -39,20 +39,47 @@ export async function POST(req: NextRequest) {
   if (sessionErr || !session) return NextResponse.json({ error: 'Gagal membuat session' }, { status: 500 })
   const sessionId = session.id
 
+  // ─── Background job (fire-and-forget) ───────────────────────────────────────
+  // Parse Excel & analisis jalan async. Simpan sheets ke session dulu, background job ambil
+  const buf = Buffer.from(await file.arrayBuffer())
+  const sheetsLapkeu = extractExcelSheets(buf)
+
+  const bufGcg = Buffer.from(await fileGcg.arrayBuffer())
+  const sheetsGcg = extractExcelSheets(bufGcg).map(s => ({ ...s, name: `GCG_${s.name}` }))
+
+  const sheets = [...sheetsLapkeu, ...sheetsGcg]
+
+  // Store sheets ke temp field di session sebelum background job jalankan
+  await db()
+    .from('offsite_sessions')
+    .update({ metadata: { sheets } })
+    .eq('id', sessionId)
+    .catch(() => {}) // Ignore error, background job tetap jalan
+
+  runLhptlAnalysis(sessionId, sheets, namaEntitas, jenisEntitas, periode).catch(err => {
+    console.error(`[LHPTL ${sessionId}] Background job error:`, err)
+  })
+
+  // Return sessionId segera (status: processing)
+  return NextResponse.json({
+    sessionId,
+    status: 'processing',
+    message: 'Analisis dimulai. Polling untuk melihat progres.',
+  })
+}
+
+async function runLhptlAnalysis(
+  sessionId: string,
+  sheets: Array<{ name: string; text: string }>,
+  namaEntitas: string,
+  jenisEntitas: 'pialang_asuransi' | 'pialang_reasuransi',
+  periode: string
+) {
   try {
-    // 1. Parse Excel — gabung sheets dari kedua file
-    const buf = Buffer.from(await file.arrayBuffer())
-    const sheetsLapkeu = extractExcelSheets(buf)
-
-    const bufGcg = Buffer.from(await fileGcg.arrayBuffer())
-    const sheetsGcg = extractExcelSheets(bufGcg).map(s => ({ ...s, name: `GCG_${s.name}` }))
-
-    const sheets = [...sheetsLapkeu, ...sheetsGcg]
-
-    // 2. AI extraction
+    // AI extraction
     const extracted = await ekstrakDataLhptl(sheets, namaEntitas, jenisEntitas, periode)
 
-    // 3. Rules + AI kesimpulan
+    // Rules + AI kesimpulan
     const { hasil, kesimpulan, tindak_lanjut } = await analisisLhptl(extracted)
 
     const ringkasan = {
@@ -77,11 +104,8 @@ export async function POST(req: NextRequest) {
       .from('offsite_sessions')
       .update({ status: 'selesai', hasil: hasilData })
       .eq('id', sessionId)
-
-    return NextResponse.json({ ...hasilData, sessionId })
   } catch (err) {
     await db().from('offsite_sessions').update({ status: 'error' }).eq('id', sessionId)
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json({ error: msg }, { status: 500 })
+    throw err
   }
 }
