@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { KkRow } from '@/lib/renbis'
 import Navbar from '@/components/oasis/Navbar'
+import StepIndicator from '@/components/oasis/StepIndicator'
+import ProgressLog from '@/components/oasis/ProgressLog'
 import { useSessionPolling } from '@/lib/useSessionPolling'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 
@@ -38,7 +40,7 @@ export default function RenbisPage() {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [pollingId, setPollingId] = useState<string | null>(null)
 
-  useSessionPolling(pollingId, (data) => {
+  const { data: pollingData } = useSessionPolling(pollingId, (data) => {
     const id = pollingId
     setPollingId(null)
     if (data.status === 'selesai' && data.hasil) {
@@ -51,6 +53,7 @@ export default function RenbisPage() {
       setStep('upload')
     }
   })
+  const serverLogs = (pollingData?.hasil as { logs?: string[] } | null)?.logs ?? []
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -150,17 +153,7 @@ export default function RenbisPage() {
         .container { max-width: 1200px; margin: 0 auto; padding: 20px 24px 64px; }
         .title { font-size: 26px; font-weight: 500; color: #eef2ef; margin-bottom: 0; }
         .title span { color: #45e661; }
-        .subtitle { color: #8a949c; font-size: 12.5px; margin: 8px 0 0; }
-
-        /* Steps */
-        .steps { display: flex; gap: 32px; margin-bottom: 32px; }
-        .step-item { display: flex; align-items: baseline; gap: 10px; }
-        .step-dot { font-size: 18px; font-weight: 300; color: #5a646c; }
-        .step-item.active .step-dot { color: #45e661; }
-        .step-item.done .step-dot { color: #45e661; }
-        .step-label { font-size: 12px; color: #5a646c; }
-        .step-item.active .step-label { color: #eef2ef; }
-        .step-item.done .step-label { color: #eef2ef; }
+        .subtitle { color: #aab4bc; font-size: 12.5px; margin: 8px 0 0; }
 
         /* Card */
         .card { background: rgba(8,12,18,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; padding: 32px; }
@@ -168,7 +161,7 @@ export default function RenbisPage() {
         /* Form */
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
         .form-full { grid-column: 1 / -1; }
-        label { display: block; font-size: 12px; color: #8a949c; margin-bottom: 6px; }
+        label { display: block; font-size: 12px; color: #aab4bc; margin-bottom: 6px; }
         input[type="text"], input[type="number"] {
           width: 100%; background: transparent; border: none;
           border-bottom: 1px solid rgba(255,255,255,0.15);
@@ -182,48 +175,41 @@ export default function RenbisPage() {
           text-align: center; cursor: pointer;
         }
         .upload-icon { font-size: 2rem; margin-bottom: 0.5rem; }
-        .upload-hint { color: #5a646c; font-size: 11.5px; margin-top: 5px; }
+        .upload-hint { color: #828d96; font-size: 11.5px; margin-top: 5px; }
         .file-name { color: #45e661; font-size: 13.5px; font-weight: 500; }
 
         .btn { padding: 12px 28px; border-radius: 999px; border: none; cursor: pointer; font-weight: 600; font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; font-family: inherit; }
         .btn-primary { background: #45e661; color: #04120a; }
         .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn-success { background: #45e661; color: #04120a; }
-        .btn-outline { background: transparent; color: #8a949c; border: 1px solid rgba(255,255,255,0.15); }
+        .btn-outline { background: transparent; color: #aab4bc; border: 1px solid rgba(255,255,255,0.15); }
 
         .error-box { background: rgba(255,111,97,0.08); border: 1px solid rgba(255,111,97,0.3); border-radius: 12px; padding: 12px 16px; color: #ff6f61; font-size: 12.5px; margin-bottom: 16px; }
-
-        /* Processing */
-        .processing-center { text-align: center; padding: 56px 16px; }
-        .spinner { width: 40px; height: 40px; border: 2px solid rgba(255,255,255,0.1); border-top-color: #45e661; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 20px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .processing-text { color: #eef2ef; font-size: 15px; font-weight: 500; }
-        .processing-hint { color: #8a949c; font-size: 12px; margin-top: 8px; }
 
         /* Hasil */
         .hasil-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
         .hasil-title { font-size: 17px; font-weight: 500; color: #eef2ef; }
-        .hasil-meta { color: #8a949c; font-size: 12px; margin-top: 4px; }
+        .hasil-meta { color: #aab4bc; font-size: 12px; margin-top: 4px; }
 
-        .section-label { font-size: 10.5px; font-weight: 500; color: #5a646c; text-transform: uppercase; letter-spacing: 0.12em; margin: 24px 0 12px; }
+        .section-label { font-size: 10.5px; font-weight: 500; color: #828d96; text-transform: uppercase; letter-spacing: 0.12em; margin: 24px 0 12px; }
 
         /* KK Table */
         .kk-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-        .kk-table th { background: rgba(8,12,18,0.8); color: #8a949c; font-weight: 500; padding: 10px 16px; text-align: left; border: 1px solid rgba(255,255,255,0.07); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+        .kk-table th { background: rgba(8,12,18,0.8); color: #aab4bc; font-weight: 500; padding: 10px 16px; text-align: left; border: 1px solid rgba(255,255,255,0.07); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; }
         .kk-table td { padding: 9px 16px; border: 1px solid rgba(255,255,255,0.05); vertical-align: top; color: #b7c0c6; }
         .kk-table tr:nth-child(even) td { background: rgba(255,255,255,0.01); }
         .kk-table .section-row td { background: rgba(69,230,97,0.06); color: #45e661; font-weight: 500; }
-        .kk-table .col-no { width: 48px; color: #5a646c; }
-        .kk-table .col-hal { width: 220px; color: #8a949c; }
-        .kk-table .col-ket { width: 200px; color: #5a646c; font-style: italic; }
+        .kk-table .col-no { width: 48px; color: #828d96; }
+        .kk-table .col-hal { width: 220px; color: #aab4bc; }
+        .kk-table .col-ket { width: 200px; color: #828d96; font-style: italic; }
         .kk-table .isian-ada { color: #45e661; }
         .kk-table .isian-tidak { color: #ff6f61; }
 
         .checklist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
         .checklist-item { background: rgba(8,12,18,0.6); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 10px 14px; display: flex; gap: 10px; align-items: flex-start; }
         .checklist-badge { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
-        .checklist-hal { font-size: 12px; color: #8a949c; font-weight: 500; }
-        .checklist-isian { font-size: 11.5px; color: #5a646c; margin-top: 3px; }
+        .checklist-hal { font-size: 12px; color: #aab4bc; font-weight: 500; }
+        .checklist-isian { font-size: 11.5px; color: #828d96; margin-top: 3px; }
 
         .narasi-box { background: rgba(8,12,18,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 20px 24px; color: #b7c0c6; font-size: 13.5px; line-height: 1.9; white-space: pre-wrap; }
       `}</style>
@@ -240,23 +226,14 @@ export default function RenbisPage() {
           )}
         </div>
 
-        {/* Step indicator */}
-        <div className="steps">
-          {[
-            { key: 'upload', label: 'Upload PDF' },
-            { key: 'processing', label: 'Analisis AI' },
-            { key: 'hasil', label: 'Hasil KK' },
-          ].map((s, i) => (
-            <div key={s.key} className={`step-item ${step === s.key ? 'active' : (step === 'hasil' && s.key !== 'hasil') || (step === 'processing' && s.key === 'upload') ? 'done' : ''}`}>
-              <div className="step-dot">{i + 1}</div>
-              <div className="step-label">{s.label}</div>
-            </div>
-          ))}
-        </div>
-
         {/* Two-column: main + riwayat sidebar */}
         <div style={{ display: 'flex', gap: 40, alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
+
+        <StepIndicator
+          steps={['Upload PDF', 'Analisis AI', 'Hasil KK']}
+          currentIndex={step === 'upload' ? 0 : step === 'processing' ? 1 : 2}
+        />
 
         {/* Upload step */}
         {step === 'upload' && (
@@ -311,13 +288,11 @@ export default function RenbisPage() {
 
         {/* Processing step */}
         {step === 'processing' && (
-          <div className="card">
-            <div className="processing-center">
-              <div className="spinner" />
-              <div className="processing-text">AI sedang membaca dan menganalisis Rencana Bisnis...</div>
-              <div className="processing-hint">Proses ini membutuhkan waktu 1–3 menit</div>
-            </div>
-          </div>
+          <ProgressLog
+            title="AI sedang membaca dan menganalisis Rencana Bisnis..."
+            hint="Proses ini membutuhkan waktu 1–3 menit"
+            logs={serverLogs}
+          />
         )}
 
         {/* Hasil step */}
@@ -417,26 +392,26 @@ export default function RenbisPage() {
 
         {/* Riwayat sidebar */}
         <div style={{ width: 280, flexShrink: 0 }}>
-          <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#5a646c', marginBottom: 16 }}>RIWAYAT ANALISIS</div>
+          <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#828d96', marginBottom: 16 }}>RIWAYAT ANALISIS</div>
           {riwayat.length === 0 ? (
-            <p style={{ fontSize: 12, color: '#5a646c' }}>Belum ada analisis tersimpan.</p>
+            <p style={{ fontSize: 12, color: '#828d96' }}>Belum ada analisis tersimpan.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {riwayat.map(item => (
                 <div key={item.id} style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nama_entitas}</div>
-                  <div style={{ fontSize: 11, color: '#8a949c', marginTop: 3 }}>
+                  <div style={{ fontSize: 11, color: '#aab4bc', marginTop: 3 }}>
                     {new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    {item.hasil?.tahun && <span style={{ marginLeft: 6, color: '#5a646c' }}>· {item.hasil.tahun}</span>}
+                    {item.hasil?.tahun && <span style={{ marginLeft: 6, color: '#828d96' }}>· {item.hasil.tahun}</span>}
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                    <button onClick={() => loadRiwayat(item)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, color: '#8a949c', cursor: 'pointer', fontFamily: 'inherit' }}>Lihat</button>
+                    <button onClick={() => loadRiwayat(item)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, color: '#aab4bc', cursor: 'pointer', fontFamily: 'inherit' }}>Lihat</button>
                     <button onClick={async () => {
                       if (!confirm(`Hapus analisis "${item.nama_entitas}"?`)) return
                       await fetch(`/api/sessions/${item.id}`, { method: 'DELETE' })
                       setRiwayat(prev => prev.filter(r => r.id !== item.id))
                       if (result?.sessionId === item.id) { setResult(null); setStep('upload') }
-                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 999, padding: '4px 8px', fontSize: 10.5, color: '#5a646c', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
+                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 999, padding: '4px 8px', fontSize: 10.5, color: '#828d96', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
                   </div>
                 </div>
               ))}

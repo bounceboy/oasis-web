@@ -75,7 +75,7 @@ export default function SessionPage() {
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p style={{ color: '#8a949c', fontSize: 13 }}>Memuat sesi...</p>
+      <p style={{ color: '#aab4bc', fontSize: 13 }}>Memuat sesi...</p>
     </div>
   )
   if (!session) return null
@@ -94,11 +94,11 @@ export default function SessionPage() {
           <div style={{ display: 'flex', gap: 20 }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 22, fontWeight: 400, color: '#ff6f61' }}>{stats.kritis}</div>
-              <div style={{ fontSize: 10.5, color: '#8a949c' }}>Kritis</div>
+              <div style={{ fontSize: 10.5, color: '#aab4bc' }}>Kritis</div>
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 22, fontWeight: 400, color: '#45e661' }}>{stats.dikonfirmasi}</div>
-              <div style={{ fontSize: 10.5, color: '#8a949c' }}>Dikonfirmasi</div>
+              <div style={{ fontSize: 10.5, color: '#aab4bc' }}>Dikonfirmasi</div>
             </div>
           </div>
         </div>
@@ -110,8 +110,8 @@ export default function SessionPage() {
             ['wawancara', 'Wawancara', stats.wawancara],
             ['temuan', 'Temuan', stats.temuan],
           ] as const).map(([key, label, count]) => (
-            <button key={key} onClick={() => setActiveTab(key)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 14px', fontSize: 13, fontWeight: 500, color: activeTab === key ? '#eef2ef' : '#5a646c', borderBottom: `1px solid ${activeTab === key ? '#45e661' : 'transparent'}`, fontFamily: 'inherit' }}>
-              {label} <span style={{ color: '#5a646c', marginLeft: 4 }}>({count})</span>
+            <button key={key} onClick={() => setActiveTab(key)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 14px', fontSize: 13, fontWeight: 500, color: activeTab === key ? '#eef2ef' : '#828d96', borderBottom: `1px solid ${activeTab === key ? '#45e661' : 'transparent'}`, fontFamily: 'inherit' }}>
+              {label} <span style={{ color: '#828d96', marginLeft: 4 }}>({count})</span>
             </button>
           ))}
         </div>
@@ -133,17 +133,17 @@ function StatChip({ label, value, color }: { label: string; value: number; color
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{ fontWeight: 500, fontSize: 13, color }}>{value}</span>
-      <span style={{ color: '#5a646c', fontSize: 11 }}>{label}</span>
+      <span style={{ color: '#828d96', fontSize: 11 }}>{label}</span>
     </div>
   )
 }
 
 function StatBar({ label, value, icon, onClick, active }: { label: string; value: number; icon: string; onClick: () => void; active: boolean }) {
   return (
-    <button onClick={onClick} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', color: active ? '#eef2ef' : '#5a646c', fontFamily: 'inherit', fontSize: 13 }}>
+    <button onClick={onClick} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', color: active ? '#eef2ef' : '#828d96', fontFamily: 'inherit', fontSize: 13 }}>
       <span>{icon}</span>
       <span style={{ fontWeight: 500 }}>{label}</span>
-      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: active ? '#45e661' : 'rgba(255,255,255,0.06)', color: active ? '#04120a' : '#5a646c' }}>{value}</span>
+      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: active ? '#45e661' : 'rgba(255,255,255,0.06)', color: active ? '#04120a' : '#828d96' }}>{value}</span>
     </button>
   )
 }
@@ -178,7 +178,7 @@ function TabDokumen({ kode, items, onRefresh }: { kode: string; items: Dokumen[]
   }
 
   const panelStyle: React.CSSProperties = { width: 300, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.08)', padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }
-  const labelStyle: React.CSSProperties = { fontSize: 11, color: '#8a949c', marginBottom: 6, display: 'block' }
+  const labelStyle: React.CSSProperties = { fontSize: 11, color: '#aab4bc', marginBottom: 6, display: 'block' }
   const selectStyle: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#eef2ef', padding: '8px 0', fontSize: 13, outline: 'none', fontFamily: 'inherit' }
   const textareaStyle: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#eef2ef', padding: '8px 0', fontSize: 13, outline: 'none', fontFamily: 'inherit', resize: 'none' }
 
@@ -200,10 +200,10 @@ function TabDokumen({ kode, items, onRefresh }: { kode: string; items: Dokumen[]
             {file ? (
               <div>
                 <p style={{ fontSize: 13, fontWeight: 500 }}>{file.name}</p>
-                <p style={{ fontSize: 11, color: '#8a949c', marginTop: 4 }}>{(file.size / 1024).toFixed(0)} KB</p>
+                <p style={{ fontSize: 11, color: '#aab4bc', marginTop: 4 }}>{(file.size / 1024).toFixed(0)} KB</p>
               </div>
             ) : (
-              <p style={{ fontSize: 13, color: '#5a646c' }}>Klik untuk pilih file<br/><span style={{ fontSize: 11 }}>PDF, DOCX, TXT — maks 20MB</span></p>
+              <p style={{ fontSize: 13, color: '#828d96' }}>Klik untuk pilih file<br/><span style={{ fontSize: 11 }}>PDF, DOCX, TXT — maks 20MB</span></p>
             )}
           </div>
           <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.txt" style={{ display: 'none' }}
@@ -211,7 +211,7 @@ function TabDokumen({ kode, items, onRefresh }: { kode: string; items: Dokumen[]
         </div>
 
         <div>
-          <label style={labelStyle}>Fokus Analisis <span style={{ color: '#5a646c' }}>opsional</span></label>
+          <label style={labelStyle}>Fokus Analisis <span style={{ color: '#828d96' }}>opsional</span></label>
           <textarea value={fokus} onChange={e => setFokus(e.target.value)} rows={3}
             placeholder="Contoh: fokus pada kesesuaian struktur organisasi..." style={textareaStyle} />
         </div>
@@ -219,14 +219,14 @@ function TabDokumen({ kode, items, onRefresh }: { kode: string; items: Dokumen[]
         {error && <p style={{ color: '#ff6f61', fontSize: 12 }}>{error}</p>}
 
         <button onClick={handleUpload} disabled={!file || uploading}
-          style={{ background: file && !uploading ? '#45e661' : 'rgba(255,255,255,0.06)', color: file && !uploading ? '#04120a' : '#5a646c', border: 'none', borderRadius: 999, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: file && !uploading ? 'pointer' : 'default', fontFamily: 'inherit', width: '100%' }}>
+          style={{ background: file && !uploading ? '#45e661' : 'rgba(255,255,255,0.06)', color: file && !uploading ? '#04120a' : '#828d96', border: 'none', borderRadius: 999, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: file && !uploading ? 'pointer' : 'default', fontFamily: 'inherit', width: '100%' }}>
           {uploading ? 'Menganalisis...' : 'Mulai Analisis'}
         </button>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
         {items.length === 0 ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#5a646c', fontSize: 13 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#828d96', fontSize: 13 }}>
             Belum ada dokumen. Upload dokumen untuk memulai analisis.
           </div>
         ) : (
@@ -236,11 +236,11 @@ function TabDokumen({ kode, items, onRefresh }: { kode: string; items: Dokumen[]
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#8a949c' }}>{dok.departemen}</span>
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#aab4bc' }}>{dok.departemen}</span>
                       <StatusBadge status={dok.status} />
                     </div>
                     <p style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dok.nama_file}</p>
-                    {dok.fokus && <p style={{ fontSize: 11, color: '#5a646c', marginTop: 2 }}>Fokus: {dok.fokus}</p>}
+                    {dok.fokus && <p style={{ fontSize: 11, color: '#828d96', marginTop: 2 }}>Fokus: {dok.fokus}</p>}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                     {dok.status === 'done' && (
@@ -253,15 +253,15 @@ function TabDokumen({ kode, items, onRefresh }: { kode: string; items: Dokumen[]
                       if (!confirm(`Hapus dokumen "${dok.nama_file}" dan semua temuannya?`)) return
                       await fetch(`/api/onsite/dokumen/${dok.id}`, { method: 'DELETE' })
                       await onRefresh()
-                    }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#5a646c', fontFamily: 'inherit' }} title="Hapus">✕</button>
+                    }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#828d96', fontFamily: 'inherit' }} title="Hapus">✕</button>
                   </div>
                 </div>
                 {expanded === dok.id && (
-                  <p style={{ fontSize: 12, color: '#8a949c', marginTop: 12, lineHeight: 1.7, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
-                    {dok.ringkasan || <span style={{ fontStyle: 'italic', color: '#5a646c' }}>Ringkasan tidak tersedia</span>}
+                  <p style={{ fontSize: 12, color: '#aab4bc', marginTop: 12, lineHeight: 1.7, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+                    {dok.ringkasan || <span style={{ fontStyle: 'italic', color: '#828d96' }}>Ringkasan tidak tersedia</span>}
                   </p>
                 )}
-                <p style={{ fontSize: 11, color: '#5a646c', marginTop: 8 }}>{new Date(dok.created_at).toLocaleString('id-ID')}</p>
+                <p style={{ fontSize: 11, color: '#828d96', marginTop: 8 }}>{new Date(dok.created_at).toLocaleString('id-ID')}</p>
               </div>
             ))}
           </div>
@@ -301,7 +301,7 @@ function TabWawancara({ kode, items, onRefresh }: { kode: string; items: Wawanca
   }
 
   const panelStyle: React.CSSProperties = { width: 300, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.08)', padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }
-  const labelStyle: React.CSSProperties = { fontSize: 11, color: '#8a949c', marginBottom: 6, display: 'block' }
+  const labelStyle: React.CSSProperties = { fontSize: 11, color: '#aab4bc', marginBottom: 6, display: 'block' }
   const selectStyle: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#eef2ef', padding: '8px 0', fontSize: 13, outline: 'none', fontFamily: 'inherit' }
   const textareaStyle: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#eef2ef', padding: '8px 0', fontSize: 13, outline: 'none', fontFamily: 'inherit', resize: 'none' }
 
@@ -323,10 +323,10 @@ function TabWawancara({ kode, items, onRefresh }: { kode: string; items: Wawanca
             {file ? (
               <div>
                 <p style={{ fontSize: 13, fontWeight: 500 }}>{file.name}</p>
-                <p style={{ fontSize: 11, color: '#8a949c', marginTop: 4 }}>{(file.size / 1024).toFixed(0)} KB</p>
+                <p style={{ fontSize: 11, color: '#aab4bc', marginTop: 4 }}>{(file.size / 1024).toFixed(0)} KB</p>
               </div>
             ) : (
-              <p style={{ fontSize: 13, color: '#5a646c' }}>Klik untuk pilih file<br/><span style={{ fontSize: 11 }}>PDF, DOCX, PPTX, TXT</span></p>
+              <p style={{ fontSize: 13, color: '#828d96' }}>Klik untuk pilih file<br/><span style={{ fontSize: 11 }}>PDF, DOCX, PPTX, TXT</span></p>
             )}
           </div>
           <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.pptx,.txt" style={{ display: 'none' }}
@@ -334,7 +334,7 @@ function TabWawancara({ kode, items, onRefresh }: { kode: string; items: Wawanca
         </div>
 
         <div>
-          <label style={labelStyle}>Fokus Analisis <span style={{ color: '#5a646c' }}>opsional</span></label>
+          <label style={labelStyle}>Fokus Analisis <span style={{ color: '#828d96' }}>opsional</span></label>
           <textarea value={fokus} onChange={e => setFokus(e.target.value)} rows={3}
             placeholder="Contoh: perhatikan konsistensi jawaban dengan laporan keuangan..." style={textareaStyle} />
         </div>
@@ -342,14 +342,14 @@ function TabWawancara({ kode, items, onRefresh }: { kode: string; items: Wawanca
         {error && <p style={{ color: '#ff6f61', fontSize: 12 }}>{error}</p>}
 
         <button onClick={handleUpload} disabled={!file || uploading}
-          style={{ background: file && !uploading ? '#45e661' : 'rgba(255,255,255,0.06)', color: file && !uploading ? '#04120a' : '#5a646c', border: 'none', borderRadius: 999, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: file && !uploading ? 'pointer' : 'default', fontFamily: 'inherit', width: '100%' }}>
+          style={{ background: file && !uploading ? '#45e661' : 'rgba(255,255,255,0.06)', color: file && !uploading ? '#04120a' : '#828d96', border: 'none', borderRadius: 999, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: file && !uploading ? 'pointer' : 'default', fontFamily: 'inherit', width: '100%' }}>
           {uploading ? 'Menganalisis...' : 'Mulai Analisis Wawancara'}
         </button>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
         {items.length === 0 ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#5a646c', fontSize: 13 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#828d96', fontSize: 13 }}>
             Belum ada wawancara. Upload catatan atau bahan tayang untuk dianalisis.
           </div>
         ) : (
@@ -359,11 +359,11 @@ function TabWawancara({ kode, items, onRefresh }: { kode: string; items: Wawanca
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#8a949c' }}>{w.departemen}</span>
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#aab4bc' }}>{w.departemen}</span>
                       <StatusBadge status={w.status} />
                     </div>
                     <p style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.nama_file}</p>
-                    {w.fokus && <p style={{ fontSize: 11, color: '#5a646c', marginTop: 2 }}>Fokus: {w.fokus}</p>}
+                    {w.fokus && <p style={{ fontSize: 11, color: '#828d96', marginTop: 2 }}>Fokus: {w.fokus}</p>}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                     {w.status === 'done' && (
@@ -376,15 +376,15 @@ function TabWawancara({ kode, items, onRefresh }: { kode: string; items: Wawanca
                       if (!confirm(`Hapus wawancara "${w.nama_file}" dan semua temuannya?`)) return
                       await fetch(`/api/onsite/wawancara/${w.id}`, { method: 'DELETE' })
                       await onRefresh()
-                    }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#5a646c', fontFamily: 'inherit' }} title="Hapus">✕</button>
+                    }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#828d96', fontFamily: 'inherit' }} title="Hapus">✕</button>
                   </div>
                 </div>
                 {expanded === w.id && (
-                  <p style={{ fontSize: 12, color: '#8a949c', marginTop: 12, lineHeight: 1.7, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
-                    {w.ringkasan || <span style={{ fontStyle: 'italic', color: '#5a646c' }}>Ringkasan tidak tersedia — coba upload ulang file</span>}
+                  <p style={{ fontSize: 12, color: '#aab4bc', marginTop: 12, lineHeight: 1.7, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+                    {w.ringkasan || <span style={{ fontStyle: 'italic', color: '#828d96' }}>Ringkasan tidak tersedia — coba upload ulang file</span>}
                   </p>
                 )}
-                <p style={{ fontSize: 11, color: '#5a646c', marginTop: 8 }}>{new Date(w.created_at).toLocaleString('id-ID')}</p>
+                <p style={{ fontSize: 11, color: '#828d96', marginTop: 8 }}>{new Date(w.created_at).toLocaleString('id-ID')}</p>
               </div>
             ))}
           </div>
@@ -436,7 +436,7 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
   }
 
   const filterBtnStyle = (active: boolean): React.CSSProperties => ({
-    width: '100%', textAlign: 'left', fontSize: 11, padding: '6px 10px', borderRadius: 8, marginBottom: 4, background: active ? 'rgba(69,230,97,0.12)' : 'none', color: active ? '#45e661' : '#8a949c', border: 'none', cursor: 'pointer', fontFamily: 'inherit'
+    width: '100%', textAlign: 'left', fontSize: 11, padding: '6px 10px', borderRadius: 8, marginBottom: 4, background: active ? 'rgba(69,230,97,0.12)' : 'none', color: active ? '#45e661' : '#aab4bc', border: 'none', cursor: 'pointer', fontFamily: 'inherit'
   })
 
   return (
@@ -448,8 +448,8 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
           ['compliance', 'Compliance', items.filter(t => t.tipe_analisis === 'compliance').length],
         ] as const).map(([key, label, count]) => (
           <button key={key} onClick={() => { setTipeTab(key); setFilterUrgensi('semua'); setFilterKluster('semua'); setFilterSifat('semua'); setFilterStatus('semua') }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', paddingBottom: 12, fontSize: 13, fontWeight: 500, color: tipeTab === key ? '#eef2ef' : '#5a646c', borderBottom: `1px solid ${tipeTab === key ? '#45e661' : 'transparent'}`, fontFamily: 'inherit' }}>
-            {label} <span style={{ color: '#5a646c', marginLeft: 4 }}>({count})</span>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', paddingBottom: 12, fontSize: 13, fontWeight: 500, color: tipeTab === key ? '#eef2ef' : '#828d96', borderBottom: `1px solid ${tipeTab === key ? '#45e661' : 'transparent'}`, fontFamily: 'inherit' }}>
+            {label} <span style={{ color: '#828d96', marginLeft: 4 }}>({count})</span>
           </button>
         ))}
       </div>
@@ -458,17 +458,17 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
       {/* Filter sidebar */}
       <div style={{ width: 220, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.08)', padding: 16, overflowY: 'auto' }}>
         <div style={{ marginBottom: 20 }}>
-          <p style={{ fontSize: 10, color: '#5a646c', letterSpacing: '0.12em', marginBottom: 8 }}>URGENSI</p>
+          <p style={{ fontSize: 10, color: '#828d96', letterSpacing: '0.12em', marginBottom: 8 }}>URGENSI</p>
           {['semua', 'kritis', 'signifikan', 'perlu_perhatian'].map(v => (
             <button key={v} onClick={() => setFilterUrgensi(v)} style={filterBtnStyle(filterUrgensi === v)}>
               {v === 'semua' ? 'Semua' : URGENSI_LABEL[v]}
-              <span style={{ float: 'right', color: '#5a646c' }}>{v === 'semua' ? byTipe.length : byTipe.filter(t => t.urgensi === v).length}</span>
+              <span style={{ float: 'right', color: '#828d96' }}>{v === 'semua' ? byTipe.length : byTipe.filter(t => t.urgensi === v).length}</span>
             </button>
           ))}
         </div>
 
         <div style={{ marginBottom: 20 }}>
-          <p style={{ fontSize: 10, color: '#5a646c', letterSpacing: '0.12em', marginBottom: 8 }}>SIFAT</p>
+          <p style={{ fontSize: 10, color: '#828d96', letterSpacing: '0.12em', marginBottom: 8 }}>SIFAT</p>
           {['semua', 'pelanggaran_ketentuan', 'potensi_pelanggaran', 'perlu_perbaikan'].map(v => (
             <button key={v} onClick={() => setFilterSifat(v)} style={filterBtnStyle(filterSifat === v)}>
               {v === 'semua' ? 'Semua' : v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
@@ -477,21 +477,21 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
         </div>
 
         <div style={{ marginBottom: 20 }}>
-          <p style={{ fontSize: 10, color: '#5a646c', letterSpacing: '0.12em', marginBottom: 8 }}>KLUSTER</p>
+          <p style={{ fontSize: 10, color: '#828d96', letterSpacing: '0.12em', marginBottom: 8 }}>KLUSTER</p>
           {['semua', ...KLUSTER_LIST.map(k => k.kode)].map(v => (
             <button key={v} onClick={() => setFilterKluster(v)} style={filterBtnStyle(filterKluster === v)}>
               {v === 'semua' ? 'Semua' : `${v} — ${KLUSTER_LIST.find(k => k.kode === v)?.nama}`}
-              {v !== 'semua' && <span style={{ float: 'right', color: '#5a646c' }}>{byTipe.filter(t => t.kluster === v).length}</span>}
+              {v !== 'semua' && <span style={{ float: 'right', color: '#828d96' }}>{byTipe.filter(t => t.kluster === v).length}</span>}
             </button>
           ))}
         </div>
 
         <div>
-          <p style={{ fontSize: 10, color: '#5a646c', letterSpacing: '0.12em', marginBottom: 8 }}>STATUS</p>
+          <p style={{ fontSize: 10, color: '#828d96', letterSpacing: '0.12em', marginBottom: 8 }}>STATUS</p>
           {['semua', 'draft', 'dikonfirmasi', 'di_drop'].map(v => (
             <button key={v} onClick={() => setFilterStatus(v)} style={filterBtnStyle(filterStatus === v)}>
               {v === 'semua' ? 'Semua' : v.charAt(0).toUpperCase() + v.slice(1).replace('_', ' ')}
-              <span style={{ float: 'right', color: '#5a646c' }}>{v === 'semua' ? byTipe.length : byTipe.filter(t => t.status === v).length}</span>
+              <span style={{ float: 'right', color: '#828d96' }}>{v === 'semua' ? byTipe.length : byTipe.filter(t => t.status === v).length}</span>
             </button>
           ))}
         </div>
@@ -500,12 +500,12 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
       {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <p style={{ fontSize: 12, color: '#8a949c' }}>{filtered.length} temuan ditampilkan</p>
+          <p style={{ fontSize: 12, color: '#aab4bc' }}>{filtered.length} temuan ditampilkan</p>
           <p style={{ fontSize: 12, color: '#45e661' }}>{dikonfirmasi} dikonfirmasi</p>
         </div>
 
         {filtered.length === 0 ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: '#5a646c', fontSize: 13 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: '#828d96', fontSize: 13 }}>
             Tidak ada temuan sesuai filter.
           </div>
         ) : (
@@ -515,21 +515,21 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, border: `1px solid ${t.urgensi === 'kritis' ? 'rgba(255,111,97,0.5)' : t.urgensi === 'signifikan' ? 'rgba(255,190,80,0.4)' : 'rgba(255,255,255,0.15)'}`, color: t.urgensi === 'kritis' ? '#ff6f61' : t.urgensi === 'signifikan' ? '#ffbe50' : '#8a949c' }}>
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, border: `1px solid ${t.urgensi === 'kritis' ? 'rgba(255,111,97,0.5)' : t.urgensi === 'signifikan' ? 'rgba(255,190,80,0.4)' : 'rgba(255,255,255,0.15)'}`, color: t.urgensi === 'kritis' ? '#ff6f61' : t.urgensi === 'signifikan' ? '#ffbe50' : '#aab4bc' }}>
                         {URGENSI_LABEL[t.urgensi]}
                       </span>
                       {t.kluster && (
-                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#8a949c' }}>
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#aab4bc' }}>
                           {t.kluster} · {t.kluster_nama}
                         </span>
                       )}
                       {t.sumber_tipe && (
-                        <span style={{ fontSize: 11, color: '#5a646c' }}>dari {t.sumber_tipe}</span>
+                        <span style={{ fontSize: 11, color: '#828d96' }}>dari {t.sumber_tipe}</span>
                       )}
                     </div>
                     <p style={{ fontSize: 13, fontWeight: 500 }}>{t.judul}</p>
                     {expanded === t.id && (
-                      <div style={{ marginTop: 12, fontSize: 12, color: '#8a949c', lineHeight: 1.7 }}>
+                      <div style={{ marginTop: 12, fontSize: 12, color: '#aab4bc', lineHeight: 1.7 }}>
                         {t.uraian && <p style={{ marginBottom: 8 }}>{t.uraian}</p>}
                         {t.pasal_terkait?.length > 0 && (
                           <p style={{ color: '#45e661', marginBottom: 8 }}>Pasal: {t.pasal_terkait.join(', ')}</p>
@@ -542,7 +542,7 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
 
                     {t.status === 'dikonfirmasi' && (
                       <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
-                        <p style={{ fontSize: 11, color: '#8a949c', marginBottom: 8 }}>Catatan Pengawas <span style={{ color: '#5a646c' }}>(setelah konfirmasi ke perusahaan)</span></p>
+                        <p style={{ fontSize: 11, color: '#aab4bc', marginBottom: 8 }}>Catatan Pengawas <span style={{ color: '#828d96' }}>(setelah konfirmasi ke perusahaan)</span></p>
                         <textarea
                           rows={3}
                           value={catatan[t.id] ?? (t.catatan_pengawas || '')}
@@ -562,7 +562,7 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
 
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
                     <button onClick={() => setExpanded(expanded === t.id ? null : t.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#5a646c', fontFamily: 'inherit' }}>
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#828d96', fontFamily: 'inherit' }}>
                       {expanded === t.id ? '▲' : '▼'}
                     </button>
                     {t.status === 'draft' && (
@@ -570,7 +570,7 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
                         <button onClick={() => updateStatus(t.id, 'dikonfirmasi')}
                           style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, background: 'rgba(69,230,97,0.12)', color: '#45e661', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>✓</button>
                         <button onClick={() => updateStatus(t.id, 'di_drop')}
-                          style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#8a949c', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
+                          style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#aab4bc', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
                       </div>
                     )}
                     {t.status === 'dikonfirmasi' && (
@@ -578,7 +578,7 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
                     )}
                     {t.status === 'di_drop' && (
                       <button onClick={() => updateStatus(t.id, 'draft')}
-                        style={{ fontSize: 11, color: '#5a646c', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Batalkan drop</button>
+                        style={{ fontSize: 11, color: '#828d96', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Batalkan drop</button>
                     )}
                   </div>
                 </div>
@@ -594,7 +594,7 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, { bg: string; color: string }> = {
-    uploaded: { bg: 'rgba(255,255,255,0.06)', color: '#8a949c' },
+    uploaded: { bg: 'rgba(255,255,255,0.06)', color: '#aab4bc' },
     analyzing: { bg: 'rgba(255,190,80,0.12)', color: '#ffbe50' },
     done: { bg: 'rgba(69,230,97,0.12)', color: '#45e661' },
     error: { bg: 'rgba(255,111,97,0.12)', color: '#ff6f61' },

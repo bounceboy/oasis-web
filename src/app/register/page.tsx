@@ -97,7 +97,7 @@ export default function RegisterPage() {
         <div style={{ width: '100%', maxWidth: 400, textAlign: 'center', background: 'rgba(6,10,15,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: '48px 40px' }}>
           <div style={{ width: 56, height: 56, borderRadius: '50%', border: '1px solid #45e661', color: '#45e661', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', fontSize: 22 }}>✓</div>
           <h2 style={{ fontSize: 19, fontWeight: 500, margin: '0 0 10px' }}>Akun berhasil dibuat</h2>
-          <p style={{ fontSize: 13, color: '#8a949c', margin: '0 0 28px', lineHeight: 1.7 }}>Silakan login dengan username dan password yang telah dibuat.</p>
+          <p style={{ fontSize: 13, color: '#aab4bc', margin: '0 0 28px', lineHeight: 1.7 }}>Silakan login dengan username dan password yang telah dibuat.</p>
           <Link href="/login" style={{ fontSize: 12, letterSpacing: '0.1em', textTransform: 'uppercase' }}>← Login ke OASIS</Link>
         </div>
       </div>
@@ -113,43 +113,43 @@ export default function RegisterPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28, justifyContent: 'center' }}>
           <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#45e661', boxShadow: '0 0 14px rgba(69,230,97,0.8)' }} />
           <span style={{ fontSize: 18, fontWeight: 500 }}>oasis</span>
-          <span style={{ fontSize: 12, color: '#8a949c', marginLeft: 8 }}>/ buat akun baru</span>
+          <span style={{ fontSize: 12, color: '#aab4bc', marginLeft: 8 }}>/ buat akun baru</span>
         </div>
 
         <form onSubmit={handleRegister} style={{ background: 'rgba(6,10,15,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 36, display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <p style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#5a646c', margin: 0 }}>Informasi akun</p>
+          <p style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#828d96', margin: 0 }}>Informasi akun</p>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Username*</label>
+              <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 6 }}>Username*</label>
               <input value={form.username} onChange={e => set('username', e.target.value.replace(/\s/g, ''))} required minLength={3} placeholder="tanpa spasi" style={inputStyle} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>NIP</label>
+              <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 6 }}>NIP</label>
               <input value={form.nip} onChange={e => set('nip', e.target.value)} placeholder="19XXXXXXXXXX" style={inputStyle} />
             </div>
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Nama lengkap*</label>
+            <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 6 }}>Nama lengkap*</label>
             <input value={form.nama_lengkap} onChange={e => set('nama_lengkap', e.target.value)} required placeholder="Nama sesuai kepegawaian" style={inputStyle} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Password*</label>
+              <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 6 }}>Password*</label>
               <input type="password" value={form.password} onChange={e => set('password', e.target.value)} required minLength={8} placeholder="min. 8 karakter" style={inputStyle} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Konfirmasi</label>
+              <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 6 }}>Konfirmasi</label>
               <input type="password" value={form.konfirmasi_password} onChange={e => set('konfirmasi_password', e.target.value)} required placeholder="ulangi password" style={inputStyle} />
             </div>
           </div>
 
-          <p style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#5a646c', margin: '8px 0 0' }}>Unit kerja</p>
+          <p style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#828d96', margin: '8px 0 0' }}>Unit kerja</p>
 
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Departemen</label>
+            <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 6 }}>Departemen</label>
             <select value={form.departemen_id} onChange={e => set('departemen_id', e.target.value)} style={selectStyle}>
               <option value="">Pilih departemen</option>
               {departemenList.map(d => <option key={d.id} value={d.id}>{d.kode} — {d.nama}</option>)}
@@ -158,8 +158,8 @@ export default function RegisterPage() {
 
           {form.departemen_id && (
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>
-                Direktorat {!hasChildDir && <span style={{ color: '#5a646c' }}>({selectedDep?.kode} tidak memiliki direktorat)</span>}
+              <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 6 }}>
+                Direktorat {!hasChildDir && <span style={{ color: '#828d96' }}>({selectedDep?.kode} tidak memiliki direktorat)</span>}
               </label>
               {hasChildDir ? (
                 <select value={form.direktorat_id} onChange={e => set('direktorat_id', e.target.value)} style={selectStyle}>
@@ -167,7 +167,7 @@ export default function RegisterPage() {
                   {filteredDir.map(d => <option key={d.id} value={d.id}>{d.kode} — {d.nama}</option>)}
                 </select>
               ) : (
-                <div style={{ fontSize: 13.5, color: '#5a646c', padding: '8px 0' }}>{selectedDep?.nama}</div>
+                <div style={{ fontSize: 13.5, color: '#828d96', padding: '8px 0' }}>{selectedDep?.nama}</div>
               )}
             </div>
           )}
@@ -177,10 +177,10 @@ export default function RegisterPage() {
           <button type="submit" disabled={loading} className="btn-filled" style={{ alignSelf: 'flex-start', marginTop: 10 }}>
             {loading ? 'Membuat akun...' : 'Buat akun ↗'}
           </button>
-          <p style={{ fontSize: 11, color: '#5a646c', margin: 0 }}>Akun Anda langsung aktif setelah registrasi</p>
+          <p style={{ fontSize: 11, color: '#828d96', margin: 0 }}>Akun Anda langsung aktif setelah registrasi</p>
         </form>
 
-        <p style={{ textAlign: 'center', fontSize: 12.5, color: '#8a949c', marginTop: 18 }}>
+        <p style={{ textAlign: 'center', fontSize: 12.5, color: '#aab4bc', marginTop: 18 }}>
           Sudah punya akun? <Link href="/login">Masuk</Link>
         </p>
       </div>

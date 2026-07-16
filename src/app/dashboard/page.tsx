@@ -21,7 +21,7 @@ export default async function DashboardPage() {
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px 64px' }}>
         {/* Top bar: user info + logout */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16, marginBottom: 48 }}>
-          <span style={{ fontSize: 12, color: '#8a949c' }}>{user.nama_lengkap || user.username} · <span style={{ color: '#5a646c' }}>{user.role}</span></span>
+          <span style={{ fontSize: 12, color: '#aab4bc' }}>{user.nama_lengkap || user.username} · <span style={{ color: '#828d96' }}>{user.role}</span></span>
           <Link href="/api/auth/signout" style={{ fontSize: 11.5, color: '#eef2ef', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '6px 16px', textDecoration: 'none', letterSpacing: '0.05em' }}>Keluar</Link>
         </div>
 
@@ -31,22 +31,22 @@ export default async function DashboardPage() {
             Selamat datang, {firstName}.<br />
             <span style={{ color: '#45e661' }}>Pantau pengawasan</span> Anda di sini.
           </h1>
-          <p style={{ fontSize: 13, color: '#8a949c', margin: '12px 0 0' }}>Onsite &amp; offsite, dalam satu tempat — didukung AI.</p>
+          <p style={{ fontSize: 13, color: '#aab4bc', margin: '12px 0 0' }}>Onsite &amp; offsite, dalam satu tempat — didukung AI.</p>
         </div>
 
         {/* Onsite card */}
         <div style={{ marginBottom: 44 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#5a646c', marginBottom: 14 }}>Pemeriksaan Onsite</div>
+          <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#828d96', marginBottom: 14 }}>Pemeriksaan Onsite</div>
           <HoverCard href="/pemeriksaan">
             <div style={{ fontSize: 16, fontWeight: 500, color: '#eef2ef' }}>Pemeriksaan Onsite</div>
-            <div style={{ fontSize: 12.5, color: '#8a949c', marginTop: 4 }}>Pemeriksaan lapangan berbasis kode sesi — dokumen, wawancara, dan temuan</div>
+            <div style={{ fontSize: 12.5, color: '#aab4bc', marginTop: 4 }}>Pemeriksaan lapangan berbasis kode sesi — dokumen, wawancara, dan temuan</div>
             <div style={{ marginTop: 16, color: '#45e661', fontSize: 18 }}>↗</div>
           </HoverCard>
         </div>
 
         {/* Offsite modules */}
         <div style={{ marginBottom: 44 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#5a646c', marginBottom: 14 }}>Pengawasan Offsite</div>
+          <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#828d96', marginBottom: 14 }}>Pengawasan Offsite</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             {offsiteModules.map(m => (
               <HoverCard key={m.href} href={m.href}>
@@ -54,7 +54,7 @@ export default async function DashboardPage() {
                   <span style={{ color: '#45e661' }}>{m.label.split(' ')[0]}</span>
                   {m.label.includes(' ') ? ' ' + m.label.split(' ').slice(1).join(' ') : ''}
                 </div>
-                <div style={{ fontSize: 11.5, color: '#8a949c', lineHeight: 1.6 }}>{m.sub}</div>
+                <div style={{ fontSize: 11.5, color: '#aab4bc', lineHeight: 1.6 }}>{m.sub}</div>
                 <div style={{ marginTop: 16, color: '#45e661', fontSize: 13 }}>↗</div>
               </HoverCard>
             ))}
@@ -64,10 +64,10 @@ export default async function DashboardPage() {
         {/* Admin */}
         {isAdmin && (
           <div>
-            <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#5a646c', marginBottom: 14 }}>Administrasi</div>
+            <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#828d96', marginBottom: 14 }}>Administrasi</div>
             <HoverCard href="/admin">
               <div style={{ fontSize: 16, fontWeight: 500, color: '#eef2ef' }}>Panel Admin</div>
-              <div style={{ fontSize: 12.5, color: '#8a949c', marginTop: 4 }}>Kelola user, sesi pemeriksaan, dan konfigurasi sistem</div>
+              <div style={{ fontSize: 12.5, color: '#aab4bc', marginTop: 4 }}>Kelola user, sesi pemeriksaan, dan konfigurasi sistem</div>
               <div style={{ marginTop: 16, color: '#45e661', fontSize: 18 }}>↗</div>
             </HoverCard>
           </div>

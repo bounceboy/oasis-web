@@ -55,7 +55,7 @@ export default function PemeriksaanPage() {
           <h1 style={{ fontSize: 30, fontWeight: 500, margin: 0 }}>
             <span style={{ color: '#45e661' }}>Pemeriksaan</span> onsite
           </h1>
-          <p style={{ fontSize: 13, color: '#8a949c', margin: '8px 0 0' }}>Masukkan kode sesi dari admin untuk memulai atau melanjutkan.</p>
+          <p style={{ fontSize: 13, color: '#aab4bc', margin: '8px 0 0' }}>Masukkan kode sesi dari admin untuk memulai atau melanjutkan.</p>
         </div>
 
         {/* Two column: form + riwayat */}
@@ -64,7 +64,7 @@ export default function PemeriksaanPage() {
           {/* Form */}
           <div style={{ flex: 1, background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 32 }}>
             <div style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', fontSize: 10.5, letterSpacing: '0.12em', color: '#5a646c', marginBottom: 16 }}>KODE PEMERIKSAAN</label>
+              <label style={{ display: 'block', fontSize: 10.5, letterSpacing: '0.12em', color: '#828d96', marginBottom: 16 }}>KODE PEMERIKSAAN</label>
               <input
                 value={kode}
                 onChange={e => { setKode(e.target.value.toUpperCase()); setError('') }}
@@ -85,7 +85,7 @@ export default function PemeriksaanPage() {
               disabled={loading || !kode.trim()}
               style={{
                 width: '100%', background: kode.trim() && !loading ? '#45e661' : 'rgba(255,255,255,0.06)',
-                color: kode.trim() && !loading ? '#04120a' : '#5a646c',
+                color: kode.trim() && !loading ? '#04120a' : '#828d96',
                 border: 'none', borderRadius: 999, padding: '14px 0', fontSize: 11.5,
                 fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
                 cursor: kode.trim() && !loading ? 'pointer' : 'default', fontFamily: 'inherit',
@@ -97,9 +97,9 @@ export default function PemeriksaanPage() {
 
           {/* Riwayat sesi */}
           <div style={{ width: 320, flexShrink: 0 }}>
-            <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#5a646c', marginBottom: 16 }}>SESI PEMERIKSAAN ANDA</div>
+            <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#828d96', marginBottom: 16 }}>SESI PEMERIKSAAN ANDA</div>
             {riwayat.length === 0 ? (
-              <p style={{ fontSize: 12, color: '#5a646c' }}>Belum ada sesi aktif.</p>
+              <p style={{ fontSize: 12, color: '#828d96' }}>Belum ada sesi aktif.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {riwayat.map(s => (
@@ -111,7 +111,7 @@ export default function PemeriksaanPage() {
                     <div>
                       <div style={{ fontSize: 11, color: '#45e661', letterSpacing: '0.15em', marginBottom: 4 }}>{s.kode}</div>
                       <div style={{ fontSize: 13, fontWeight: 500, color: '#eef2ef' }}>{s.nama_entitas}</div>
-                      <div style={{ fontSize: 11, color: '#8a949c', marginTop: 2 }}>
+                      <div style={{ fontSize: 11, color: '#aab4bc', marginTop: 2 }}>
                         {new Date(s.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })} · {s.jenis_usaha}
                       </div>
                     </div>

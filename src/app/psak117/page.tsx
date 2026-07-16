@@ -3,17 +3,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/oasis/Navbar'
+import StepIndicator from '@/components/oasis/StepIndicator'
+import ProgressLog from '@/components/oasis/ProgressLog'
 import { useSessionPolling } from '@/lib/useSessionPolling'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 type JenisUsaha = 'Jiwa' | 'Umum'
 
 type Status = 'idle' | 'loading' | 'done' | 'error'
 
-const STEPS = [
-  { n: 1, label: 'Upload Lapkeu' },
-  { n: 2, label: 'Analisis AI' },
-  { n: 3, label: 'Hasil' },
-]
+const STEPS = ['Upload Lapkeu', 'Analisis AI', 'Hasil']
 
 export default function Psak117Page() {
   const router = useRouter()
@@ -178,7 +176,7 @@ export default function Psak117Page() {
       skor.rating === 'Cukup' ? '#f5c842' :
       skor.rating === 'Kurang' ? '#f5a142' : '#ff6f61'
 
-    const thStyle: React.CSSProperties = { textAlign: 'left', padding: '14px 24px', fontSize: 10.5, color: '#8a949c', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }
+    const thStyle: React.CSSProperties = { textAlign: 'left', padding: '14px 24px', fontSize: 10.5, color: '#aab4bc', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }
     const tdStyle: React.CSSProperties = { padding: '13px 24px', fontSize: 13 }
 
     return (
@@ -191,7 +189,7 @@ export default function Psak117Page() {
             { label: 'Periode', val: dk.periode as string || '-', color: '#eef2ef' },
           ].map((item, i) => (
             <div key={i} style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 14 }}>
-              <div style={{ fontSize: 11, color: '#8a949c' }}>{item.label}</div>
+              <div style={{ fontSize: 11, color: '#aab4bc' }}>{item.label}</div>
               <div style={{ fontSize: 40, fontWeight: 300, marginTop: 8, color: item.color }}>{item.val}</div>
             </div>
           ))}
@@ -213,9 +211,9 @@ export default function Psak117Page() {
                   <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 300 }}>
                     {s.nilai != null ? (s.nilai < 10 ? (s.nilai * 100).toFixed(2) + '%' : s.nilai.toFixed(2) + 'x') : 'N/A'}
                   </td>
-                  <td style={{ ...tdStyle, color: '#8a949c' }}>{s.threshold}</td>
+                  <td style={{ ...tdStyle, color: '#aab4bc' }}>{s.threshold}</td>
                   <td style={{ ...tdStyle, textAlign: 'center' }}>
-                    {s.pass === null ? <span style={{ color: '#5a646c' }}>–</span>
+                    {s.pass === null ? <span style={{ color: '#828d96' }}>–</span>
                       : s.pass ? <span style={{ background: 'rgba(69,230,97,0.15)', color: '#45e661', padding: '4px 12px', borderRadius: 999, fontSize: 10.5, fontWeight: 500 }}>✓ Lulus</span>
                       : <span style={{ background: 'rgba(255,111,97,0.15)', color: '#ff6f61', padding: '4px 12px', borderRadius: 999, fontSize: 10.5, fontWeight: 500 }}>✗ Tidak Lulus</span>
                     }
@@ -236,7 +234,7 @@ export default function Psak117Page() {
               <div className="section-label" style={{ marginBottom: 14 }}>{section.title}</div>
               {section.rows.map(([label, val]) => (
                 <div key={label as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '7px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  <span style={{ color: '#8a949c' }}>{label as string}</span>
+                  <span style={{ color: '#aab4bc' }}>{label as string}</span>
                   <span style={{ color: Number(val) < 0 ? '#ff6f61' : '#eef2ef' }}>{val != null ? Number(val).toLocaleString('id-ID') : '–'}</span>
                 </div>
               ))}
@@ -259,9 +257,9 @@ export default function Psak117Page() {
 
   const riwayatPanel = (
     <div style={{ width: 280, flexShrink: 0 }}>
-      <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#5a646c', marginBottom: 16 }}>RIWAYAT ANALISIS</div>
+      <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#828d96', marginBottom: 16 }}>RIWAYAT ANALISIS</div>
       {riwayat.length === 0 ? (
-        <p style={{ fontSize: 12, color: '#5a646c' }}>Belum ada analisis tersimpan.</p>
+        <p style={{ fontSize: 12, color: '#828d96' }}>Belum ada analisis tersimpan.</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {riwayat.map(item => (
@@ -269,7 +267,7 @@ export default function Psak117Page() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nama_entitas}</div>
-                  <div style={{ fontSize: 11, color: '#8a949c', marginTop: 3 }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                  <div style={{ fontSize: 11, color: '#aab4bc', marginTop: 3 }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
                   {(item as { hasil?: { scorecard?: { predikat?: string } } }).hasil?.scorecard?.predikat && (
                     <div style={{ marginTop: 6, display: 'inline-block', fontSize: 10.5, padding: '2px 10px', borderRadius: 999, background: 'rgba(69,230,97,0.1)', color: '#45e661', border: '1px solid rgba(69,230,97,0.25)' }}>
                       {(item as { hasil?: { scorecard?: { predikat?: string } } }).hasil!.scorecard!.predikat}
@@ -277,8 +275,8 @@ export default function Psak117Page() {
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => router.push(`/psak117/${item.id}`)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, color: '#8a949c', cursor: 'pointer', fontFamily: 'inherit' }}>Lihat</button>
-                  <button onClick={async () => { if (!confirm(`Hapus analisis "${item.nama_entitas}"?`)) return; await fetch(`/api/sessions/${item.id}`, { method: 'DELETE' }); setRiwayat(prev => prev.filter(r => r.id !== item.id)) }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 999, padding: '4px 8px', fontSize: 10.5, color: '#5a646c', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
+                  <button onClick={() => router.push(`/psak117/${item.id}`)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, color: '#aab4bc', cursor: 'pointer', fontFamily: 'inherit' }}>Lihat</button>
+                  <button onClick={async () => { if (!confirm(`Hapus analisis "${item.nama_entitas}"?`)) return; await fetch(`/api/sessions/${item.id}`, { method: 'DELETE' }); setRiwayat(prev => prev.filter(r => r.id !== item.id)) }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 999, padding: '4px 8px', fontSize: 10.5, color: '#828d96', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
                 </div>
               </div>
             </div>
@@ -296,41 +294,25 @@ export default function Psak117Page() {
         {/* Header */}
         <div style={{ marginBottom: 26 }}>
           <h1 style={{ fontSize: 26, fontWeight: 500, margin: 0 }}><span style={{ color: '#45e661' }}>PSAK 117</span> — analisis kepatuhan asuransi</h1>
-          <p style={{ fontSize: 12.5, color: '#8a949c', margin: '8px 0 0' }}>Upload laporan keuangan audited — AI mengekstrak rasio, kepatuhan, dan pemetaan risiko.</p>
+          <p style={{ fontSize: 12.5, color: '#aab4bc', margin: '8px 0 0' }}>Upload laporan keuangan audited — AI mengekstrak rasio, kepatuhan, dan pemetaan risiko.</p>
         </div>
-
-        {/* Steps */}
-        <div style={{ display: 'flex', gap: 32, marginBottom: 32 }}>
-          {STEPS.map(s => (
-            <div key={s.n} style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <span style={{ fontSize: 18, fontWeight: 300, color: step >= s.n ? '#45e661' : '#5a646c' }}>{s.n}</span>
-              <span style={{ fontSize: 12, color: step >= s.n ? '#eef2ef' : '#5a646c' }}>{s.label}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Log panel */}
-        {log.length > 0 && (
-          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 16, marginBottom: 20, maxHeight: 140, overflowY: 'auto' }}>
-            {log.map((l, i) => <p key={i} style={{ fontSize: 11, fontFamily: 'monospace', color: '#8a949c', margin: '2px 0' }}>{l}</p>)}
-            {status === 'loading' && <p style={{ fontSize: 11, fontFamily: 'monospace', color: '#45e661', margin: '4px 0' }}>Memproses...</p>}
-          </div>
-        )}
 
         {/* Two-column layout: main content + riwayat */}
         <div style={{ display: 'flex', gap: 40, alignItems: 'flex-start' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
+
+            <StepIndicator steps={STEPS} currentIndex={step - 1} />
 
             {/* Step 1: Form upload */}
             {step === 1 && (
               <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 32, display: 'flex', flexDirection: 'column', gap: 20 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Nama perusahaan</label>
+                    <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 6 }}>Nama perusahaan</label>
                     <input value={namaEntitas} onChange={e => setNamaEntitas(e.target.value)} placeholder="PT Asuransi Jiwa Cahaya Abadi Tbk" className="input-underline" />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Jenis usaha</label>
+                    <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 6 }}>Jenis usaha</label>
                     <select value={jenisUsaha} onChange={e => setJenisUsaha(e.target.value as JenisUsaha)} className="input-underline">
                       <option value="Jiwa">Asuransi Jiwa</option>
                       <option value="Umum">Asuransi Umum</option>
@@ -339,12 +321,12 @@ export default function Psak117Page() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Periode laporan</label>
+                  <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 6 }}>Periode laporan</label>
                   <input value={periode} onChange={e => setPeriode(e.target.value)} placeholder="31 Desember 2025" className="input-underline" />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 8 }}>Laporan keuangan audited</label>
+                  <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 8 }}>Laporan keuangan audited</label>
                   <label style={{ display: 'block', border: '1px dashed rgba(69,230,97,0.45)', borderRadius: 18, padding: 30, textAlign: 'center', cursor: 'pointer' }}>
                     <input ref={fileRef} type="file" accept=".pdf,.txt" style={{ display: 'none' }} onChange={e => setFile(e.target.files?.[0] || null)} />
                     {file ? (
@@ -352,7 +334,7 @@ export default function Psak117Page() {
                     ) : (
                       <>
                         <div style={{ fontWeight: 500, fontSize: 13.5, color: '#b7c0c6' }}>Klik untuk upload lapkeu (PDF)</div>
-                        <div style={{ fontSize: 11.5, color: '#5a646c', marginTop: 5 }}>Maks 50 MB · dengan CALK lengkap</div>
+                        <div style={{ fontSize: 11.5, color: '#828d96', marginTop: 5 }}>Maks 50 MB · dengan CALK lengkap</div>
                       </>
                     )}
                   </label>
@@ -366,19 +348,24 @@ export default function Psak117Page() {
 
             {/* Step 2: Processing */}
             {step === 2 && status === 'loading' && (
-              <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 56, textAlign: 'center' }}>
-                <div style={{ width: 40, height: 40, border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#45e661', borderRadius: '50%', margin: '0 auto 20px', animation: 'spin 0.8s linear infinite' }} />
-                <div style={{ fontWeight: 500, fontSize: 15 }}>Menganalisis laporan keuangan…</div>
-                <div style={{ fontSize: 12, color: '#8a949c', marginTop: 8 }}>Menghitung rasio, kepatuhan POJK, dan pemetaan risiko.</div>
-              </div>
+              <ProgressLog
+                title="Menganalisis laporan keuangan…"
+                hint="Menghitung rasio, kepatuhan POJK, dan pemetaan risiko."
+                logs={log}
+              />
             )}
 
             {/* Step 2: Error */}
             {step === 2 && status === 'error' && (
               <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,100,97,0.3)', borderRadius: 24, padding: 32, textAlign: 'center' }}>
                 <p style={{ color: '#ff6f61', fontWeight: 500, margin: '0 0 8px' }}>Analisis Gagal</p>
-                <p style={{ color: '#8a949c', fontSize: 13, margin: '0 0 16px' }}>Lihat log di atas untuk detail error.</p>
-                <button onClick={() => { setStep(1); setStatus('idle') }} style={{ background: 'transparent', border: 'none', color: '#45e661', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>← Kembali</button>
+                <p style={{ color: '#aab4bc', fontSize: 13, margin: '0 0 16px' }}>Lihat log di bawah untuk detail error.</p>
+                <button onClick={() => { setStep(1); setStatus('idle') }} style={{ background: 'transparent', border: 'none', color: '#45e661', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 16 }}>← Kembali</button>
+                {log.length > 0 && (
+                  <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 12, maxHeight: 200, overflowY: 'auto', textAlign: 'left' }}>
+                    {log.map((l, i) => <p key={i} style={{ fontSize: 11, fontFamily: 'monospace', color: '#aab4bc', margin: '2px 0' }}>{l}</p>)}
+                  </div>
+                )}
               </div>
             )}
 
@@ -388,9 +375,9 @@ export default function Psak117Page() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 22 }}>
                   <div>
                     <div style={{ fontSize: 17, fontWeight: 500 }}>{(hasil.metadata as Record<string, string>).namaEntitas}</div>
-                    <div style={{ fontSize: 12, color: '#8a949c', marginTop: 3 }}>{(hasil.metadata as Record<string, string>).jenisUsaha} · {(hasil.metadata as Record<string, string>).periode}</div>
+                    <div style={{ fontSize: 12, color: '#aab4bc', marginTop: 3 }}>{(hasil.metadata as Record<string, string>).jenisUsaha} · {(hasil.metadata as Record<string, string>).periode}</div>
                   </div>
-                  <button onClick={() => { setStep(1); setStatus('idle') }} style={{ background: 'transparent', color: '#8a949c', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 999, padding: '9px 18px', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit' }}>+ Analisis baru</button>
+                  <button onClick={() => { setStep(1); setStatus('idle') }} style={{ background: 'transparent', color: '#aab4bc', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 999, padding: '9px 18px', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit' }}>+ Analisis baru</button>
                 </div>
 
                 {/* Tab bar */}
@@ -400,7 +387,7 @@ export default function Psak117Page() {
                     { key: 'compliance', label: 'Compliance POJK' },
                     { key: 'risiko', label: 'Pemetaan Risiko' },
                   ] as const).map(tab => (
-                    <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{ flex: 1, padding: 9, border: 'none', borderRadius: 999, fontSize: 11.5, fontWeight: 500, cursor: 'pointer', background: activeTab === tab.key ? '#45e661' : 'transparent', color: activeTab === tab.key ? '#04120a' : '#8a949c', fontFamily: 'inherit' }}>{tab.label}</button>
+                    <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{ flex: 1, padding: 9, border: 'none', borderRadius: 999, fontSize: 11.5, fontWeight: 500, cursor: 'pointer', background: activeTab === tab.key ? '#45e661' : 'transparent', color: activeTab === tab.key ? '#04120a' : '#aab4bc', fontFamily: 'inherit' }}>{tab.label}</button>
                   ))}
                 </div>
 

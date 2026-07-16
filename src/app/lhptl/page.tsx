@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import type { HasilPengawasan } from '@/lib/lhptl-rules'
 import Navbar from '@/components/oasis/Navbar'
+import StepIndicator from '@/components/oasis/StepIndicator'
+import ProgressLog from '@/components/oasis/ProgressLog'
 import { useSessionPolling } from '@/lib/useSessionPolling'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 
@@ -159,11 +161,7 @@ export default function LhptlPage() {
     return true
   }) ?? []
 
-  const STEPS = [
-    { n: 1, label: 'Upload Excel' },
-    { n: 2, label: 'Analisis AI' },
-    { n: 3, label: 'Hasil' },
-  ]
+  const STEPS = ['Upload Excel', 'Analisis AI', 'Hasil']
 
   return (
     <div style={{ minHeight: '100vh', color: '#eef2ef' }}>
@@ -173,28 +171,20 @@ export default function LhptlPage() {
         {/* Header */}
         <div style={{ marginBottom: 26 }}>
           <h1 style={{ fontSize: 26, fontWeight: 500, margin: 0 }}><span style={{ color: '#45e661' }}>LHPTL</span> — pengawasan tidak langsung pialang</h1>
-          <p style={{ fontSize: 12.5, color: '#8a949c', margin: '8px 0 0' }}>Upload form laporan keuangan pialang (Excel) — AI &amp; rules deterministik menyusun temuan.</p>
-        </div>
-
-        {/* Steps */}
-        <div style={{ display: 'flex', gap: 32, marginBottom: 32 }}>
-          {STEPS.map(s => (
-            <div key={s.n} style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <span style={{ fontSize: 18, fontWeight: 300, color: step >= s.n ? '#45e661' : '#5a646c' }}>{s.n}</span>
-              <span style={{ fontSize: 12, color: step >= s.n ? '#eef2ef' : '#5a646c' }}>{s.label}</span>
-            </div>
-          ))}
+          <p style={{ fontSize: 12.5, color: '#aab4bc', margin: '8px 0 0' }}>Upload form laporan keuangan pialang (Excel) — AI &amp; rules deterministik menyusun temuan.</p>
         </div>
 
         {/* Two-column layout */}
         <div style={{ display: 'flex', gap: 40, alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
 
+        <StepIndicator steps={STEPS} currentIndex={step - 1} />
+
         {/* Step 1: Form */}
         {step === 1 && (
           <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 32, display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Nama entitas</label>
+              <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 6 }}>Nama entitas</label>
               <input value={namaEntitas} onChange={e => setNamaEntitas(e.target.value)}
                 placeholder="PT Pialang Asuransi Mitra Utama"
                 className="input-underline" />
@@ -202,7 +192,7 @@ export default function LhptlPage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Jenis entitas</label>
+                <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 6 }}>Jenis entitas</label>
                 <select value={jenisEntitas} onChange={e => setJenisEntitas(e.target.value as JenisEntitas)}
                   className="input-underline">
                   <option value="pialang_asuransi">Pialang Asuransi</option>
@@ -210,7 +200,7 @@ export default function LhptlPage() {
                 </select>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 6 }}>Periode</label>
+                <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 6 }}>Periode</label>
                 <input value={periode} onChange={e => setPeriode(e.target.value)}
                   placeholder="31 Desember 2025"
                   className="input-underline" />
@@ -218,7 +208,7 @@ export default function LhptlPage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 8 }}>File Excel — Form Laporan Keuangan Pialang <span style={{ color: '#ff6f61' }}>*wajib</span></label>
+              <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 8 }}>File Excel — Form Laporan Keuangan Pialang <span style={{ color: '#ff6f61' }}>*wajib</span></label>
               <label style={{ display: 'block', border: '1px dashed rgba(69,230,97,0.45)', borderRadius: 18, padding: 28, textAlign: 'center', cursor: 'pointer' }}>
                 <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.xls" style={{ display: 'none' }} onChange={e => setFile(e.target.files?.[0] ?? null)} />
                 {file ? <div style={{ fontWeight: 500, fontSize: 13.5, color: '#45e661' }}>📊 {file.name}</div>
@@ -227,7 +217,7 @@ export default function LhptlPage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 8 }}>File Excel — Form Laporan Keuangan Pialang Tahun Sebelumnya <span style={{ color: '#ff6f61' }}>*wajib</span></label>
+              <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 8 }}>File Excel — Form Laporan Keuangan Pialang Tahun Sebelumnya <span style={{ color: '#ff6f61' }}>*wajib</span></label>
               <label style={{ display: 'block', border: '1px dashed rgba(69,230,97,0.45)', borderRadius: 18, padding: 28, textAlign: 'center', cursor: 'pointer' }}>
                 <input ref={fileLapkeuPrevRef} type="file" accept=".xlsx,.xlsm,.xls" style={{ display: 'none' }} onChange={e => setFileLapkeuPrev(e.target.files?.[0] ?? null)} />
                 {fileLapkeuPrev ? <div style={{ fontWeight: 500, fontSize: 13.5, color: '#45e661' }}>📊 {fileLapkeuPrev.name}</div>
@@ -236,7 +226,7 @@ export default function LhptlPage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 8 }}>File Excel — Laporan GCG <span style={{ color: '#ff6f61' }}>*wajib</span></label>
+              <label style={{ display: 'block', fontSize: 12, color: '#aab4bc', marginBottom: 8 }}>File Excel — Laporan GCG <span style={{ color: '#ff6f61' }}>*wajib</span></label>
               <label style={{ display: 'block', border: '1px dashed rgba(69,230,97,0.45)', borderRadius: 18, padding: 28, textAlign: 'center', cursor: 'pointer' }}>
                 <input ref={fileGcgRef} type="file" accept=".xlsx,.xlsm,.xls" style={{ display: 'none' }} onChange={e => setFileGcg(e.target.files?.[0] ?? null)} />
                 {fileGcg ? <div style={{ fontWeight: 500, fontSize: 13.5, color: '#45e661' }}>📊 {fileGcg.name}</div>
@@ -256,14 +246,11 @@ export default function LhptlPage() {
 
         {/* Step 2: Loading */}
         {step === 2 && (
-          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, padding: 56, textAlign: 'center' }}>
-            <div style={{ width: 40, height: 40, border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#45e661', borderRadius: '50%', margin: '0 auto 20px', animation: 'spin 0.8s linear infinite' }} />
-            <div style={{ fontWeight: 500, fontSize: 15 }}>Membaca sheet &amp; menjalankan rules pengawasan…</div>
-            <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 12, marginTop: 16, maxHeight: 140, overflowY: 'auto', textAlign: 'left' }}>
-              {log.map((l, i) => <p key={i} style={{ fontSize: 11, fontFamily: 'monospace', color: '#8a949c', margin: '2px 0' }}>{l}</p>)}
-              {loading && <p style={{ fontSize: 11, fontFamily: 'monospace', color: '#45e661', margin: '4px 0' }}>▋</p>}
-            </div>
-          </div>
+          <ProgressLog
+            title="Membaca sheet & menjalankan rules pengawasan…"
+            logs={log}
+            active={loading}
+          />
         )}
 
         {/* Step 3: Hasil */}
@@ -278,7 +265,7 @@ export default function LhptlPage() {
                 { label: 'Informasional',   value: hasil.ringkasan.informasional,   color: '#45e661' },
               ].map((s, i) => (
                 <div key={s.label} style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 14 }}>
-                  <div style={{ fontSize: 11, color: '#8a949c' }}>{s.label} <span style={{ float: 'right' }}>({String(i+1).padStart(2,'0')})</span></div>
+                  <div style={{ fontSize: 11, color: '#aab4bc' }}>{s.label} <span style={{ float: 'right' }}>({String(i+1).padStart(2,'0')})</span></div>
                   <div style={{ fontSize: 44, fontWeight: 300, marginTop: 8, color: s.color }}>{s.value}</div>
                 </div>
               ))}
@@ -287,7 +274,7 @@ export default function LhptlPage() {
             {/* Actions */}
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               {saveState !== 'saved'
-                ? <button onClick={handleSimpan} disabled={saveState === 'saving'} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 999, padding: '9px 18px', fontSize: 11, color: '#8a949c', cursor: 'pointer', fontFamily: 'inherit', opacity: saveState === 'saving' ? 0.5 : 1 }}>
+                ? <button onClick={handleSimpan} disabled={saveState === 'saving'} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 999, padding: '9px 18px', fontSize: 11, color: '#aab4bc', cursor: 'pointer', fontFamily: 'inherit', opacity: saveState === 'saving' ? 0.5 : 1 }}>
                     {saveState === 'saving' ? 'Menyimpan...' : saveState === 'error' ? '⚠ Coba Lagi Simpan' : 'Simpan Analisis'}
                   </button>
                 : <span style={{ fontSize: 12, color: '#45e661' }}>✓ Tersimpan</span>
@@ -305,7 +292,7 @@ export default function LhptlPage() {
                 ['perhatian',    `Perlu Perhatian (${hasil.ringkasan.perlu_perhatian})`],
                 ['informasional',`Informasional (${hasil.ringkasan.informasional})`],
               ] as const).map(([key, label]) => (
-                <button key={key} onClick={() => setActiveTab(key)} style={{ flexShrink: 0, padding: '9px 16px', border: 'none', borderRadius: 999, fontSize: 11.5, fontWeight: 500, cursor: 'pointer', background: activeTab === key ? '#45e661' : 'transparent', color: activeTab === key ? '#04120a' : '#8a949c', fontFamily: 'inherit' }}>{label}</button>
+                <button key={key} onClick={() => setActiveTab(key)} style={{ flexShrink: 0, padding: '9px 16px', border: 'none', borderRadius: 999, fontSize: 11.5, fontWeight: 500, cursor: 'pointer', background: activeTab === key ? '#45e661' : 'transparent', color: activeTab === key ? '#04120a' : '#aab4bc', fontFamily: 'inherit' }}>{label}</button>
               ))}
             </div>
 
@@ -353,26 +340,26 @@ export default function LhptlPage() {
 
         {/* Riwayat sidebar */}
         <div style={{ width: 280, flexShrink: 0 }}>
-          <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#5a646c', marginBottom: 16 }}>RIWAYAT ANALISIS</div>
+          <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#828d96', marginBottom: 16 }}>RIWAYAT ANALISIS</div>
           {riwayat.length === 0 ? (
-            <p style={{ fontSize: 12, color: '#5a646c' }}>Belum ada analisis tersimpan.</p>
+            <p style={{ fontSize: 12, color: '#828d96' }}>Belum ada analisis tersimpan.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {riwayat.map(item => (
                 <div key={item.id} style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nama_entitas}</div>
-                  <div style={{ fontSize: 11, color: '#8a949c', marginTop: 3 }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                  <div style={{ fontSize: 11, color: '#aab4bc', marginTop: 3 }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
                   <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
                     <button onClick={async () => {
                       const r = await fetch(`/api/sessions?modul=lhptl`).then(x => x.json())
                       const found = Array.isArray(r) ? r.find((s: {id: string; hasil: HasilData}) => s.id === item.id) : null
                       if (found?.hasil) { setHasil({ ...found.hasil, sessionId: found.id }); setSaveState('saved'); setStep(3) }
-                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, color: '#8a949c', cursor: 'pointer', fontFamily: 'inherit' }}>Lihat</button>
+                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, color: '#aab4bc', cursor: 'pointer', fontFamily: 'inherit' }}>Lihat</button>
                     <button onClick={async () => {
                       if (!confirm(`Hapus analisis "${item.nama_entitas}"?`)) return
                       await fetch(`/api/sessions/${item.id}`, { method: 'DELETE' })
                       setRiwayat(prev => prev.filter(r => r.id !== item.id))
-                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 999, padding: '4px 8px', fontSize: 10.5, color: '#5a646c', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
+                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 999, padding: '4px 8px', fontSize: 10.5, color: '#828d96', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
                   </div>
                 </div>
               ))}

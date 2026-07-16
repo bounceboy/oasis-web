@@ -31,7 +31,7 @@ export default function Psak117DetailPage() {
   if (!data) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eef2ef' }}>
       <div style={{ textAlign: 'center' }}>
-        <p style={{ color: '#8a949c' }}>Sesi tidak ditemukan</p>
+        <p style={{ color: '#aab4bc' }}>Sesi tidak ditemukan</p>
         <button onClick={() => router.push('/dashboard')} style={{ color: '#45e661', background: 'none', border: 'none', cursor: 'pointer', marginTop: 12, fontFamily: 'inherit' }}>← Dashboard</button>
       </div>
     </div>
@@ -71,7 +71,7 @@ export default function Psak117DetailPage() {
               </span>
             )}
             {meta && (
-              <span style={{ fontSize: 11.5, color: '#8a949c', background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: '5px 12px' }}>
+              <span style={{ fontSize: 11.5, color: '#aab4bc', background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: '5px 12px' }}>
                 {meta.jenisUsaha} · {meta.periode}
               </span>
             )}
@@ -82,7 +82,7 @@ export default function Psak117DetailPage() {
         <div style={{ display: 'flex', gap: 6, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: 5, marginBottom: 24 }}>
           {TABS.map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-              style={{ flex: 1, padding: '9px 12px', border: 'none', borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: 'pointer', background: activeTab === tab.key ? '#45e661' : 'transparent', color: activeTab === tab.key ? '#04120a' : '#8a949c', fontFamily: 'inherit' }}>
+              style={{ flex: 1, padding: '9px 12px', border: 'none', borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: 'pointer', background: activeTab === tab.key ? '#45e661' : 'transparent', color: activeTab === tab.key ? '#04120a' : '#aab4bc', fontFamily: 'inherit' }}>
               {tab.label}
             </button>
           ))}
@@ -96,16 +96,16 @@ export default function Psak117DetailPage() {
               {skor && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
                   <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '20px 24px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 38, fontWeight: 300 }}>{skor.nilai}<span style={{ fontSize: 20, color: '#5a646c' }}>/{skor.total}</span></div>
-                    <div style={{ fontSize: 11, color: '#8a949c', marginTop: 6 }}>Metrik Lulus</div>
+                    <div style={{ fontSize: 38, fontWeight: 300 }}>{skor.nilai}<span style={{ fontSize: 20, color: '#828d96' }}>/{skor.total}</span></div>
+                    <div style={{ fontSize: 11, color: '#aab4bc', marginTop: 6 }}>Metrik Lulus</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '20px 24px', textAlign: 'center' }}>
                     <div style={{ fontSize: 38, fontWeight: 300, color: ratingColor }}>{skor.rating}</div>
-                    <div style={{ fontSize: 11, color: '#8a949c', marginTop: 6 }}>Rating Keseluruhan</div>
+                    <div style={{ fontSize: 11, color: '#aab4bc', marginTop: 6 }}>Rating Keseluruhan</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '20px 24px', textAlign: 'center' }}>
                     <div style={{ fontSize: 24, fontWeight: 300 }}>{meta?.periode || '–'}</div>
-                    <div style={{ fontSize: 11, color: '#8a949c', marginTop: 6 }}>Periode</div>
+                    <div style={{ fontSize: 11, color: '#aab4bc', marginTop: 6 }}>Periode</div>
                   </div>
                 </div>
               )}
@@ -116,7 +116,7 @@ export default function Psak117DetailPage() {
                     <thead>
                       <tr>
                         {['Metrik', 'Nilai', 'Threshold', 'Status', 'Keterangan'].map(h => (
-                          <th key={h} style={{ textAlign: h === 'Nilai' ? 'right' : h === 'Status' ? 'center' : 'left', padding: '10px 16px', color: '#8a949c', fontWeight: 500, fontSize: 11, letterSpacing: '0.08em', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>{h}</th>
+                          <th key={h} style={{ textAlign: h === 'Nilai' ? 'right' : h === 'Status' ? 'center' : 'left', padding: '10px 16px', color: '#aab4bc', fontWeight: 500, fontSize: 11, letterSpacing: '0.08em', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -127,17 +127,17 @@ export default function Psak117DetailPage() {
                           <td style={{ padding: '11px 16px', textAlign: 'right', fontFamily: 'monospace', color: '#b7c0c6' }}>
                             {s.nilai != null ? (s.nilai < 10 ? (s.nilai * 100).toFixed(2) + '%' : s.nilai.toFixed(2) + 'x') : 'N/A'}
                           </td>
-                          <td style={{ padding: '11px 16px', color: '#5a646c', fontSize: 12 }}>{s.threshold}</td>
+                          <td style={{ padding: '11px 16px', color: '#828d96', fontSize: 12 }}>{s.threshold}</td>
                           <td style={{ padding: '11px 16px', textAlign: 'center' }}>
                             {s.pass === null ? (
-                              <span style={{ color: '#5a646c', fontSize: 11 }}>–</span>
+                              <span style={{ color: '#828d96', fontSize: 11 }}>–</span>
                             ) : s.pass ? (
                               <span style={{ background: 'rgba(69,230,97,0.12)', color: '#45e661', fontSize: 11, padding: '3px 10px', borderRadius: 999 }}>✓ Lulus</span>
                             ) : (
                               <span style={{ background: 'rgba(255,111,97,0.12)', color: '#ff6f61', fontSize: 11, padding: '3px 10px', borderRadius: 999 }}>✗ Tidak Lulus</span>
                             )}
                           </td>
-                          <td style={{ padding: '11px 16px', color: '#8a949c', fontSize: 12 }}>{s.keterangan}</td>
+                          <td style={{ padding: '11px 16px', color: '#aab4bc', fontSize: 12 }}>{s.keterangan}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -171,13 +171,13 @@ export default function Psak117DetailPage() {
                 { title: 'IFRS 9 — ECL & Klasifikasi', fields: ['ecl_total', 'ecl_base', 'stage2_3_exposure', 'stage_total_exposure'] },
               ].map(section => (
                 <div key={section.title} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '18px 20px' }}>
-                  <p style={{ fontSize: 10.5, color: '#5a646c', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 14 }}>
+                  <p style={{ fontSize: 10.5, color: '#828d96', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 14 }}>
                     {section.title} ({dk.unit as string})
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {section.fields.map(field => (
                       <div key={field} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
-                        <span style={{ color: '#8a949c' }}>{field.replace(/_/g, ' ')}</span>
+                        <span style={{ color: '#aab4bc' }}>{field.replace(/_/g, ' ')}</span>
                         <span style={{ color: '#eef2ef', fontFamily: 'monospace' }}>
                           {dk[field] != null ? Number(dk[field]).toLocaleString('id-ID') : '–'}
                         </span>

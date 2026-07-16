@@ -51,31 +51,31 @@ export default async function AdminPage() {
           {stats.map(s => (
             <Link key={s.label} href={s.href} style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '24px 28px', textDecoration: 'none', color: 'inherit', display: 'block' }}>
               <div style={{ fontSize: 42, fontWeight: 300, lineHeight: 1 }}>{s.value}</div>
-              <div style={{ fontSize: 12, color: '#8a949c', marginTop: 8 }}>{s.label}</div>
+              <div style={{ fontSize: 12, color: '#aab4bc', marginTop: 8 }}>{s.label}</div>
             </Link>
           ))}
         </div>
 
         {/* Menu */}
-        <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#5a646c', marginBottom: 14 }}>MENU</div>
+        <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#828d96', marginBottom: 14 }}>MENU</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 40 }}>
           {adminMenus.map(m => (
             <Link key={m.href} href={m.href} style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 18, padding: '20px 22px', textDecoration: 'none', color: 'inherit', display: 'block' }}>
               <div style={{ fontSize: 14, fontWeight: 500, color: '#eef2ef', marginBottom: 6 }}>{m.label}</div>
-              <div style={{ fontSize: 11.5, color: '#5a646c', lineHeight: 1.6 }}>{m.sub}</div>
+              <div style={{ fontSize: 11.5, color: '#828d96', lineHeight: 1.6 }}>{m.sub}</div>
               <div style={{ marginTop: 16, color: '#45e661', fontSize: 13 }}>↗</div>
             </Link>
           ))}
         </div>
 
         {/* Recent Users */}
-        <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#5a646c', marginBottom: 14 }}>USER TERBARU</div>
+        <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#828d96', marginBottom: 14 }}>USER TERBARU</div>
         <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '6px 24px' }}>
           {recentUsers?.map((u) => (
             <div key={u.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 500 }}>{u.nama_lengkap || u.username}</div>
-                <div style={{ fontSize: 11, color: '#8a949c', marginTop: 2 }}>{u.username}</div>
+                <div style={{ fontSize: 11, color: '#aab4bc', marginTop: 2 }}>{u.username}</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <RoleBadge role={u.role} />
@@ -93,7 +93,7 @@ function RoleBadge({ role }: { role: string }) {
   const colors: Record<string, { bg: string; color: string }> = {
     admin:      { bg: 'rgba(168,85,247,0.12)', color: '#c084fc' },
     supervisor: { bg: 'rgba(69,230,97,0.10)',  color: '#45e661' },
-    pemeriksa:  { bg: 'rgba(255,255,255,0.06)', color: '#8a949c' },
+    pemeriksa:  { bg: 'rgba(255,255,255,0.06)', color: '#aab4bc' },
   }
   const c = colors[role] ?? colors.pemeriksa
   return <span style={{ fontSize: 11, padding: '2px 10px', borderRadius: 999, background: c.bg, color: c.color }}>{role}</span>

@@ -50,11 +50,11 @@ export default function LoginPage() {
         {/* Right — form */}
         <div style={{ flex: 1, padding: '24px 0', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <h2 style={{ fontSize: 22, fontWeight: 500, margin: 0 }}>Selamat datang</h2>
-          <p style={{ fontSize: 13, color: '#8a949c', margin: '8px 0 32px' }}>Masuk untuk melanjutkan ke sistem</p>
+          <p style={{ fontSize: 13, color: '#aab4bc', margin: '8px 0 32px' }}>Masuk untuk melanjutkan ke sistem</p>
 
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8a949c', marginBottom: 8 }}>Username</label>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#aab4bc', marginBottom: 8 }}>Username</label>
               <input
                 type="text"
                 value={username}
@@ -67,7 +67,7 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8a949c', marginBottom: 8 }}>Password</label>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#aab4bc', marginBottom: 8 }}>Password</label>
               <input
                 type="password"
                 value={password}
@@ -96,11 +96,11 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p style={{ fontSize: 12.5, color: '#5a646c', marginTop: 40 }}>
+          <p style={{ fontSize: 12.5, color: '#828d96', marginTop: 40 }}>
             Belum punya akun?{' '}
             <Link href="/register">Hubungi administrator</Link>
           </p>
-          <p style={{ fontSize: 11, color: '#414a52', marginTop: 24 }}>OJK Internal System · Akses terbatas</p>
+          <p style={{ fontSize: 11, color: '#6b7680', marginTop: 24 }}>OJK Internal System · Akses terbatas</p>
         </div>
       </div>
     </div>

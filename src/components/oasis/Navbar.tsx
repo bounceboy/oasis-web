@@ -29,7 +29,7 @@ export default function Navbar({ userName, userRole, showAdmin, simple }: Navbar
     borderRadius: 999,
     fontSize: 12.5,
     fontWeight: 400,
-    color: active ? '#eef2ef' : '#8a949c',
+    color: active ? '#eef2ef' : '#aab4bc',
     fontFamily: 'inherit',
   } as React.CSSProperties)
 
@@ -50,16 +50,16 @@ export default function Navbar({ userName, userRole, showAdmin, simple }: Navbar
   if (simple) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 36 }}>
-        <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: '#8a949c', fontSize: 13 }}>
+        <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: '#aab4bc', fontSize: 13 }}>
           ← Dashboard
         </Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           {userName && (
-            <span style={{ fontSize: 12, color: '#8a949c' }}>
+            <span style={{ fontSize: 12, color: '#aab4bc' }}>
               {userName} · {userRole === 'supervisor' ? 'Supervisor' : userRole === 'admin' ? 'Admin' : 'Pemeriksa'}
             </span>
           )}
-          <button onClick={handleLogout} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '7px 16px', fontSize: 11, color: '#8a949c', cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button onClick={handleLogout} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '7px 16px', fontSize: 11, color: '#aab4bc', cursor: 'pointer', fontFamily: 'inherit' }}>
             Keluar
           </button>
         </div>
@@ -103,7 +103,7 @@ export default function Navbar({ userName, userRole, showAdmin, simple }: Navbar
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         {userName && (
-          <span style={{ fontSize: 12, color: '#8a949c' }}>
+          <span style={{ fontSize: 12, color: '#aab4bc' }}>
             {userName} · {userRole === 'supervisor' ? 'Supervisor' : userRole === 'admin' ? 'Admin' : 'Pemeriksa'}
           </span>
         )}
