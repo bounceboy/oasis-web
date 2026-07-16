@@ -14,25 +14,8 @@ function noStore(res: NextResponse): NextResponse {
   return res
 }
 
-// TEMPORARY DIAGNOSTIC — remove after use.
-async function hashPrefix(secret: string): Promise<string> {
-  const data = new TextEncoder().encode(secret)
-  const digest = await crypto.subtle.digest('SHA-256', data)
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 12)
-}
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-
-  // TEMPORARY DIAGNOSTIC — remove after use.
-  if (pathname === '/api/debug-secret') {
-    const res = NextResponse.next()
-    res.headers.set('x-mw-hash', await hashPrefix(process.env.SESSION_SECRET ?? 'FALLBACK_USED'))
-    res.headers.set('x-mw-region', process.env.VERCEL_REGION ?? 'unknown')
-    res.headers.set('x-mw-cookie-count', String(request.cookies.getAll().filter((c) => c.name === COOKIE).length))
-    res.headers.set('x-mw-cookie-raw', request.headers.get('cookie') ?? '(none)')
-    return noStore(res)
-  }
 
   // Route publik — tidak perlu auth
   if (
