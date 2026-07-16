@@ -116,6 +116,24 @@ export interface ExtractedLhptlData {
   // PP07
   pihak_afiliasi: string[]
   nama_di_pk_sheets: string[]
+
+  // ── Section A: Informasi Umum (identitas & profil) ──────────────────────
+  alamat: string | null
+  izin_usaha: string | null
+  kantor_cabang: string | null
+  jumlah_pegawai: number | null
+  kap_nama: string | null
+  akuntan_publik_nama: string | null
+  nomor_izin_akuntan: string | null
+  nomor_registrasi_akuntan: string | null
+  opini_audit: string | null
+  tka: string | null
+  polis_indemnitas: Array<{ nomor_polis: string; penanggung: string; nilai_pertanggungan: number; masa_berlaku: string }> | null
+  sanksi: Array<{ nomor_tanggal: string; jenis: string; penyebab: string }> | null
+
+  // ── Section B: Financial Highlight (neraca + laba rugi + rasio, 2 tahun) ─
+  neraca_laba_rugi: Array<{ label: string; nilai_ini: number | null; nilai_lalu: number | null }> | null
+  rasio_keuangan_tabel: Array<{ label: string; nilai_ini: number | null; nilai_lalu: number | null }> | null
 }
 
 function fmt(n: number | null | undefined): string {

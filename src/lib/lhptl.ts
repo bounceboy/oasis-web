@@ -140,7 +140,21 @@ Ekstrak ke JSON berikut (isi semua field, null jika tidak ada):
   "rangkap_jabatan": [{"nama":string,"posisi":string,"perusahaan_lain":string,"bidang_usaha":string}]|null,
   "rups": [{"tanggal":string,"keputusan":string}]|null,
   "pihak_afiliasi": [string],
-  "nama_di_pk_sheets": [string]
+  "nama_di_pk_sheets": [string],
+  "alamat": string|null,
+  "izin_usaha": string|null,
+  "kantor_cabang": string|null,
+  "jumlah_pegawai": number|null,
+  "kap_nama": string|null,
+  "akuntan_publik_nama": string|null,
+  "nomor_izin_akuntan": string|null,
+  "nomor_registrasi_akuntan": string|null,
+  "opini_audit": string|null,
+  "tka": string|null,
+  "polis_indemnitas": [{"nomor_polis":string,"penanggung":string,"nilai_pertanggungan":number,"masa_berlaku":string}]|null,
+  "sanksi": [{"nomor_tanggal":string,"jenis":string,"penyebab":string}]|null,
+  "neraca_laba_rugi": [{"label":string,"nilai_ini":number|null,"nilai_lalu":number|null}]|null,
+  "rasio_keuangan_tabel": [{"label":string,"nilai_ini":number|null,"nilai_lalu":number|null}]|null
 }
 
 Catatan ekstraksi:
@@ -151,7 +165,10 @@ Catatan ekstraksi:
 - klaim_terlambat_*: OP02, hitung selisih hari kerja (Senin-Jumat) — >1 hari kerja untuk penerusan/dokumen, >3 hari kerja untuk tanggapan tertanggung
 - rasio_kecukupan_dana_premi_ditahan & rasio_biaya_diklat: bisa ada di sheet OP06 atau Data Umum atau dihitung dari sheet lain
 - pihak_afiliasi: daftar nama dari PP07
-- nama_di_pk_sheets: semua nama/entitas yang muncul di sheet PK01, PK03, PK09, PK10 (kolom nama_penanggung)`
+- nama_di_pk_sheets: semua nama/entitas yang muncul di sheet PK01, PK03, PK09, PK10 (kolom nama_penanggung)
+- alamat, izin_usaha, kantor_cabang, jumlah_pegawai, kap_nama, akuntan_publik_nama, nomor_izin_akuntan, nomor_registrasi_akuntan, opini_audit, tka, polis_indemnitas, sanksi: cari di sheet profil/identitas perusahaan atau sheet GCG (prefix GCG_) jika ada. Jika benar-benar tidak ada, null.
+- neraca_laba_rugi: ekstrak SEMUA baris neraca (Aset, Liabilitas, Ekuitas) dan laba rugi (Pendapatan, Beban, Laba/Rugi) dari sheet LK01/LK02, sebagai list {label, nilai_ini (tahun berjalan/periode saat ini), nilai_lalu (tahun sebelumnya, dari kolom komparatif di laporan audited yang sama)}
+- rasio_keuangan_tabel: ekstrak SEMUA rasio keuangan yang ada di sheet OP06 sebagai persentase, {label, nilai_ini, nilai_lalu}`
 
   const raw = await callOpenRouter(system, user, 8000)
   // Coba ambil JSON lengkap (sampai } terakhir), fallback ke repair jika terpotong
@@ -216,13 +233,19 @@ Pedoman:
 
 // ─── Step 4: Generate .docx ───────────────────────────────────────────────────
 
+function fmtRupiah(n: number | null | undefined): string {
+  if (n == null) return '-'
+  return new Intl.NumberFormat('id-ID').format(n)
+}
+
 export async function generateLhptlDocx(
   namaEntitas: string,
   jenisEntitas: string,
   periode: string,
   hasil: HasilPengawasan[],
   kesimpulan: string,
-  tindak_lanjut: string
+  tindak_lanjut: string,
+  raw?: ExtractedLhptlData | null
 ): Promise<Buffer> {
   const {
     Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
@@ -232,9 +255,11 @@ export async function generateLhptlDocx(
   const pelanggaran = hasil.filter((h) => h.tipe === 'pelanggaran')
   const perhatian = hasil.filter((h) => h.tipe === 'perlu_perhatian')
 
+  const NA = '[HARAP DIISI PENGAWAS]'
+
   // ─ Helpers ─────────────────────────────────────────────────────────────
   const heading = (text: string, level: (typeof HeadingLevel)[keyof typeof HeadingLevel] = HeadingLevel.HEADING_2) =>
-    new Paragraph({ text, heading: level, spacing: { before: 200, after: 100 } })
+    new Paragraph({ text, heading: level, spacing: { before: 240, after: 100 } })
 
   const body = (text: string) =>
     new Paragraph({ children: [new TextRun({ text, size: 24 })], spacing: { after: 100 } })
@@ -242,62 +267,242 @@ export async function generateLhptlDocx(
   const bold = (text: string) =>
     new Paragraph({ children: [new TextRun({ text, bold: true, size: 24 })], spacing: { after: 60 } })
 
-  // ─ Tabel Hasil Pengawasan ──────────────────────────────────────────────
-  const tipeLabel = (t: HasilPengawasan['tipe']) => {
-    if (t === 'pelanggaran') return 'Indikasi Pelanggaran'
-    if (t === 'perlu_perhatian') return 'Perlu Perhatian'
-    return ''
-  }
+  const italicNote = (text: string) =>
+    new Paragraph({ children: [new TextRun({ text, italics: true, color: '888888', size: 20 })], spacing: { after: 120 } })
+
+  const kv = (label: string, value: string) =>
+    new Paragraph({
+      children: [
+        new TextRun({ text: `${label}\t: `, bold: true, size: 22 }),
+        new TextRun({ text: value || NA, size: 22 }),
+      ],
+      spacing: { after: 40 },
+    })
 
   const borderNone = { style: BorderStyle.SINGLE, size: 1, color: 'AAAAAA' }
   const cellBorder = { top: borderNone, bottom: borderNone, left: borderNone, right: borderNone }
 
-  const hasilRows = [
+  const headerRow = (labels: string[], widths: number[]) =>
     new TableRow({
-      children: [
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'No', bold: true })] })], width: { size: 5, type: WidthType.PERCENTAGE }, borders: cellBorder }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Hasil Pengawasan', bold: true })] })], width: { size: 75, type: WidthType.PERCENTAGE }, borders: cellBorder }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Indikasi Pelanggaran', bold: true })] })], width: { size: 20, type: WidthType.PERCENTAGE }, borders: cellBorder }),
-      ],
-      tableHeader: true,
-    }),
-    ...hasil.map(
-      (h) =>
-        new TableRow({
-          children: [
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(h.nomor) })] })], borders: cellBorder }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h.catatan })] })], borders: cellBorder }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: tipeLabel(h.tipe) })] })], borders: cellBorder }),
-          ],
+      children: labels.map((label, i) =>
+        new TableCell({
+          children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, size: 20 })] })],
+          width: { size: widths[i], type: WidthType.PERCENTAGE },
+          borders: cellBorder,
         })
+      ),
+      tableHeader: true,
+    })
+
+  const dataRow = (values: string[], widths: number[]) =>
+    new TableRow({
+      children: values.map((v, i) =>
+        new TableCell({
+          children: [new Paragraph({ children: [new TextRun({ text: v || '-', size: 20 })] })],
+          width: { size: widths[i], type: WidthType.PERCENTAGE },
+          borders: cellBorder,
+        })
+      ),
+    })
+
+  const simpleTable = (headers: string[], widths: number[], rows: string[][], emptyLabel = 'Tidak ada data') =>
+    new Table({
+      rows: [
+        headerRow(headers, widths),
+        ...(rows.length > 0
+          ? rows.map((r) => dataRow(r, widths))
+          : [dataRow([emptyLabel, ...Array(headers.length - 1).fill('')], widths)]),
+      ],
+      width: { size: 100, type: WidthType.PERCENTAGE },
+    })
+
+  // ═══ SECTION A: INFORMASI UMUM ═══════════════════════════════════════
+  const rekananTotal = (raw?.jumlah_rekanan_perorangan ?? 0) + (raw?.jumlah_rekanan_badan_hukum ?? 0)
+
+  const sectionA = [
+    heading('A. INFORMASI UMUM'),
+    kv('Nama Perusahaan', namaEntitas),
+    kv('Alamat lengkap', raw?.alamat || NA),
+    kv('Izin Usaha', raw?.izin_usaha || NA),
+    kv('Kantor di Luar KP', raw?.kantor_cabang || 'Tidak ada'),
+    kv('Perusahaan Afiliasi', raw?.pihak_afiliasi?.length ? raw.pihak_afiliasi.join(', ') : 'Tidak ada'),
+    kv('Jumlah Pegawai', raw?.jumlah_pegawai != null ? `${raw.jumlah_pegawai}, termasuk pengurus dan pegawai` : NA),
+    kv('Jumlah Rekanan PB', rekananTotal > 0
+      ? `${rekananTotal} (terdiri dari ${raw?.jumlah_rekanan_perorangan ?? 0} perorangan dan ${raw?.jumlah_rekanan_badan_hukum ?? 0} badan hukum)`
+      : NA),
+
+    new Paragraph({ text: '', spacing: { after: 80 } }),
+    bold(`Penyampaian Laporan Keuangan yang telah diaudit oleh Akuntan Publik Periode ${periode}`),
+    kv('Kantor Akuntan Publik', raw?.kap_nama || NA),
+    kv('Akuntan Publik', raw?.akuntan_publik_nama || NA),
+    kv('Nomor Izin Akuntan', raw?.nomor_izin_akuntan || NA),
+    kv('Nomor Registrasi Akuntan', raw?.nomor_registrasi_akuntan || NA),
+    kv('Periode Laporan', periode),
+    kv('Opini', raw?.opini_audit || NA),
+
+    new Paragraph({ text: '', spacing: { after: 100 } }),
+    bold('Pemegang Saham'),
+    simpleTable(
+      ['Nama', 'Nilai (Rp)', 'Persentase (%)'],
+      [50, 30, 20],
+      (raw?.pemegang_saham ?? []).map((p) => [p.nama, fmtRupiah(p.nilai_rp), p.persentase != null ? p.persentase.toFixed(2) : '-'])
     ),
+
+    new Paragraph({ text: '', spacing: { after: 100 } }),
+    bold('Direksi dan Anggota Dewan Komisaris'),
+    simpleTable(
+      ['Jabatan', 'Nama', 'Pengadministrasian OJK'],
+      [25, 35, 40],
+      (raw?.direksi_komisaris ?? []).map((d) => [d.jabatan, d.nama, d.surat_persetujuan_ojk || '-'])
+    ),
+
+    new Paragraph({ text: '', spacing: { after: 100 } }),
+    bold('Tenaga Ahli dan Pialang'),
+    simpleTable(
+      ['Jabatan', 'Nama', 'Pengadministrasian OJK'],
+      [25, 35, 40],
+      (raw?.tenaga_ahli_pialang ?? []).map((t) => [t.jabatan, t.nama, `${t.nomor_registrasi || '-'} ${t.surat_pengadministrasian_ojk ? '(' + t.surat_pengadministrasian_ojk + ')' : ''}`.trim()])
+    ),
+
+    new Paragraph({ text: '', spacing: { after: 80 } }),
+    kv('Tenaga Kerja Asing', raw?.tka || 'Tidak ada'),
+
+    new Paragraph({ text: '', spacing: { after: 100 } }),
+    bold('Polis Profesional Indemnitas'),
+    simpleTable(
+      ['Nomor Polis', 'Penanggung', 'Nilai Pertanggungan', 'Masa Berlaku'],
+      [25, 30, 20, 25],
+      (raw?.polis_indemnitas ?? []).map((p) => [p.nomor_polis, p.penanggung, fmtRupiah(p.nilai_pertanggungan), p.masa_berlaku])
+    ),
+
+    new Paragraph({ text: '', spacing: { after: 100 } }),
+    bold('Sanksi, Teguran dan Pembinaan'),
+    simpleTable(
+      ['Nomor dan Tanggal Surat', 'Jenis Sanksi/Teguran/Pembinaan', 'Penyebab'],
+      [35, 30, 35],
+      (raw?.sanksi ?? []).map((s) => [s.nomor_tanggal, s.jenis, s.penyebab]),
+      'Tidak ada'
+    ),
+    new Paragraph({ text: '', spacing: { after: 300 } }),
   ]
 
-  // ─ Tindak Lanjut — parse poin bernomor ────────────────────────────────
+  // ═══ SECTION B: FINANCIAL HIGHLIGHT ══════════════════════════════════
+  const sectionB = [
+    heading('B. FINANCIAL HIGHLIGHT TAHUNAN (AUDITED)'),
+    body('Laporan Posisi Keuangan dan Laporan Laba Rugi Komprehensif periode berjalan dan periode sebelumnya sebagai berikut:'),
+    simpleTable(
+      ['Nama Akun', 'Periode Berjalan (Rp)', 'Periode Sebelumnya (Rp)'],
+      [50, 25, 25],
+      (raw?.neraca_laba_rugi ?? []).map((r) => [r.label, fmtRupiah(r.nilai_ini), fmtRupiah(r.nilai_lalu)]),
+      'Data neraca/laba-rugi tidak tersedia dari dokumen yang diupload'
+    ),
+
+    new Paragraph({ text: '', spacing: { after: 200 } }),
+    body('Rasio keuangan Perusahaan untuk periode berjalan dan periode sebelumnya adalah sebagai berikut:'),
+    simpleTable(
+      ['Rasio', 'Periode Berjalan', 'Periode Sebelumnya'],
+      [50, 25, 25],
+      (raw?.rasio_keuangan_tabel ?? []).map((r) => [r.label, r.nilai_ini != null ? `${r.nilai_ini.toFixed(2)}%` : '-', r.nilai_lalu != null ? `${r.nilai_lalu.toFixed(2)}%` : '-']),
+      'Data rasio keuangan tidak tersedia dari dokumen yang diupload'
+    ),
+    new Paragraph({ text: '', spacing: { after: 300 } }),
+  ]
+
+  // ═══ SECTION C: RUANG LINGKUP ═════════════════════════════════════════
+  const sectionC = [
+    heading('C. RUANG LINGKUP PENGAWASAN TIDAK LANGSUNG'),
+    body('Ruang lingkup pelaksanaan pengawasan tidak langsung mencakup hal-hal sebagai berikut:'),
+    bold('Aspek Operasional'),
+    bold('Aspek Kepatuhan'),
+    new Paragraph({ text: '', spacing: { after: 300 } }),
+  ]
+
+  // ═══ SECTION D: TIM PENGAWAS ══════════════════════════════════════════
+  const sectionD = [
+    heading(`D. DAFTAR TIM PENGAWAS ${NA}`),
+    body('Susunan tim pengawas adalah sebagai berikut:'),
+    simpleTable(['No.', 'Nama', 'NIP', 'Susunan Tim'], [10, 35, 25, 30], []),
+    new Paragraph({ text: '', spacing: { after: 300 } }),
+  ]
+
+  // ═══ SECTION E: PERIODE PENGAWASAN ════════════════════════════════════
+  const periodeText = /^\d{4}$/.test(periode.trim())
+    ? `Periode 1 Januari ${periode} s.d 31 Desember ${periode}.`
+    : `Periode pengawasan: ${periode}.`
+  const sectionE = [
+    heading('E. PERIODE PENGAWASAN TIDAK LANGSUNG'),
+    body(periodeText),
+    new Paragraph({ text: '', spacing: { after: 300 } }),
+  ]
+
+  // ═══ SECTION F: HASIL PENGAWASAN ══════════════════════════════════════
+  const tipeLabel = (t: HasilPengawasan['tipe']) => {
+    if (t === 'pelanggaran') return 'Pelanggaran'
+    if (t === 'perlu_perhatian') return 'Perlu Perhatian'
+    return ''
+  }
+
+  const sectionF = [
+    heading('F. HASIL PENGAWASAN TIDAK LANGSUNG'),
+    bold(`Ringkasan: ${hasil.length} item (${pelanggaran.length} pelanggaran, ${perhatian.length} perlu perhatian)`),
+    new Paragraph({ text: '', spacing: { after: 100 } }),
+    simpleTable(
+      ['No', 'Hasil Pengawasan', 'Indikasi Pelanggaran'],
+      [5, 75, 20],
+      hasil.map((h) => [String(h.nomor), h.catatan, tipeLabel(h.tipe)])
+    ),
+    new Paragraph({ text: '', spacing: { after: 300 } }),
+  ]
+
+  // ═══ SECTION G: KESIMPULAN (AI draft, wajib direview) ═════════════════
+  const sectionG = [
+    heading(`G. KESIMPULAN PENGAWASAN TIDAK LANGSUNG ${NA}`),
+    italicNote('── DRAFT AI — WAJIB DITINJAU DAN DIREVISI OLEH PENGAWAS SEBELUM FINAL ──'),
+    body('Berdasarkan hasil pengawasan tidak langsung, diperoleh kesimpulan sebagai berikut:'),
+    ...kesimpulan.split('\n').filter(Boolean).map((p) => body(p)),
+    new Paragraph({ text: '', spacing: { after: 300 } }),
+  ]
+
+  // ═══ SECTION H: TINDAK LANJUT (AI draft, wajib direview) ══════════════
   const tindakPoin = tindak_lanjut
     .split(/\d+\.\s+/)
     .map((s) => s.trim())
     .filter(Boolean)
 
-  const tindakRows = [
-    new TableRow({
-      children: [
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'No', bold: true })] })], width: { size: 5, type: WidthType.PERCENTAGE }, borders: cellBorder }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Tindakan Pengawasan', bold: true })] })], width: { size: 75, type: WidthType.PERCENTAGE }, borders: cellBorder }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Target Penyelesaian', bold: true })] })], width: { size: 20, type: WidthType.PERCENTAGE }, borders: cellBorder }),
-      ],
-      tableHeader: true,
-    }),
-    ...tindakPoin.map(
-      (poin, i) =>
-        new TableRow({
-          children: [
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(i + 1) })] })], borders: cellBorder }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: poin })] })], borders: cellBorder }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: '' })] })], borders: cellBorder }),
-          ],
-        })
+  const sectionH = [
+    heading(`H. TINDAK LANJUT HASIL PENGAWASAN TIDAK LANGSUNG ${NA}`),
+    italicNote('── DRAFT AI — WAJIB DITINJAU DAN DIREVISI OLEH PENGAWAS SEBELUM FINAL ──'),
+    body('Berdasarkan kesimpulan dari hasil analisis pengawasan tidak langsung, tindakan pengawasan yang akan dilakukan terhadap Perusahaan adalah sebagai berikut:'),
+    simpleTable(
+      ['No', 'Tindakan Pengawasan', 'Target Penyelesaian'],
+      [5, 75, 20],
+      tindakPoin.map((poin, i) => [String(i + 1), poin, ''])
     ),
+    new Paragraph({ text: '', spacing: { after: 400 } }),
+  ]
+
+  // ═══ TANDA TANGAN ══════════════════════════════════════════════════════
+  const sectionTtd = [
+    heading('TANDA TANGAN', HeadingLevel.HEADING_3),
+    new Table({
+      rows: [
+        new TableRow({
+          children: ['Disiapkan oleh (drafter)', 'Direviu oleh (reviewer)', 'Direviu oleh (reviewer)', 'Disetujui oleh (approval)'].map(
+            (label) =>
+              new TableCell({
+                children: [
+                  new Paragraph({ children: [new TextRun({ text: label, size: 20 })], alignment: AlignmentType.CENTER }),
+                  new Paragraph({ text: '', spacing: { after: 600 } }),
+                  new Paragraph({ children: [new TextRun({ text: 'Nama', size: 20 })], alignment: AlignmentType.CENTER }),
+                  new Paragraph({ children: [new TextRun({ text: 'Jabatan', size: 20 })], alignment: AlignmentType.CENTER }),
+                ],
+                borders: cellBorder,
+              })
+          ),
+        }),
+      ],
+      width: { size: 100, type: WidthType.PERCENTAGE },
+    }),
   ]
 
   const doc = new Document({
@@ -305,7 +510,6 @@ export async function generateLhptlDocx(
       {
         properties: {},
         children: [
-          // Judul
           new Paragraph({
             children: [new TextRun({ text: 'LAPORAN HASIL PENGAWASAN TIDAK LANGSUNG', bold: true, size: 28 })],
             alignment: AlignmentType.CENTER,
@@ -314,52 +518,23 @@ export async function generateLhptlDocx(
           new Paragraph({
             children: [new TextRun({ text: namaEntitas, bold: true, size: 26 })],
             alignment: AlignmentType.CENTER,
-            spacing: { after: 200 },
+            spacing: { after: 40 },
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: `Jenis Entitas: ${jenisEntitas}`, size: 20, color: '888888' })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 300 },
           }),
 
-          // Ringkasan
-          bold(`Periode: ${periode}`),
-          bold(`Jenis Entitas: ${jenisEntitas}`),
-          new Paragraph({ text: '', spacing: { after: 100 } }),
-          bold(`Ringkasan Temuan: ${hasil.length} item (${pelanggaran.length} pelanggaran, ${perhatian.length} perlu perhatian)`),
-          new Paragraph({ text: '', spacing: { after: 200 } }),
-
-          // Hasil Pengawasan
-          heading('HASIL PENGAWASAN TIDAK LANGSUNG'),
-          new Table({ rows: hasilRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
-          new Paragraph({ text: '', spacing: { after: 300 } }),
-
-          // Kesimpulan
-          heading('KESIMPULAN PENGAWASAN TIDAK LANGSUNG'),
-          ...kesimpulan.split('\n').filter(Boolean).map((p) => body(p)),
-          new Paragraph({ text: '', spacing: { after: 300 } }),
-
-          // Tindak Lanjut
-          heading('TINDAK LANJUT HASIL PENGAWASAN TIDAK LANGSUNG'),
-          new Table({ rows: tindakRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
-          new Paragraph({ text: '', spacing: { after: 400 } }),
-
-          // TTD
-          heading('TANDA TANGAN', HeadingLevel.HEADING_3),
-          new Table({
-            rows: [
-              new TableRow({
-                children: ['Disiapkan oleh (drafter)', 'Direviu oleh (reviewer)', 'Direviu oleh (reviewer)', 'Disetujui oleh (approval)'].map(
-                  (label) =>
-                    new TableCell({
-                      children: [
-                        new Paragraph({ children: [new TextRun({ text: label, size: 20 })], alignment: AlignmentType.CENTER }),
-                        new Paragraph({ text: '', spacing: { after: 600 } }),
-                        new Paragraph({ children: [new TextRun({ text: 'Nama', size: 20 })], alignment: AlignmentType.CENTER }),
-                        new Paragraph({ children: [new TextRun({ text: 'Jabatan', size: 20 })], alignment: AlignmentType.CENTER }),
-                      ],
-                      borders: cellBorder,
-                    })
-                ),
-              }),
-            ],
-            width: { size: 100, type: WidthType.PERCENTAGE },
-          }),
+          ...sectionA,
+          ...sectionB,
+          ...sectionC,
+          ...sectionD,
+          ...sectionE,
+          ...sectionF,
+          ...sectionG,
+          ...sectionH,
+          ...sectionTtd,
         ],
       },
     ],

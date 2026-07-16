@@ -28,6 +28,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     hasil_pengawasan: Parameters<typeof generateLhptlDocx>[3]
     kesimpulan: string
     tindak_lanjut: string
+    raw?: Parameters<typeof generateLhptlDocx>[6]
   }
 
   const buf = await generateLhptlDocx(
@@ -36,7 +37,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     hasil.periode,
     hasil.hasil_pengawasan,
     hasil.kesimpulan,
-    hasil.tindak_lanjut
+    hasil.tindak_lanjut,
+    hasil.raw
   )
 
   const filename = `LHPTL_${(data.nama_entitas ?? 'Entitas').replace(/\s+/g, '_')}_${hasil.periode ?? ''}.docx`

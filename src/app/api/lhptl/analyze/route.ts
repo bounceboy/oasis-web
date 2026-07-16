@@ -93,6 +93,7 @@ async function runLhptlAnalysis(
       kesimpulan,
       tindak_lanjut,
       ringkasan,
+      raw: extracted,
     }
 
     // Simpan ke session
