@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { RisikoRating, RiskLevel } from '@/lib/kyic'
 import Navbar from '@/components/oasis/Navbar'
 import { useSessionPolling } from '@/lib/useSessionPolling'
+import { supabaseBrowser } from '@/lib/supabase-browser'
 
 interface KyicResult {
   sessionId: string
@@ -34,6 +35,10 @@ const RATING_COLORS: Record<number, string> = {
 const RATING_LABELS: Record<number, string> = {
   1: 'Sangat Rendah', 2: 'Rendah', 3: 'Moderat', 4: 'Tinggi', 5: 'Sangat Tinggi',
 }
+
+const MAX_TEMPLATE = 20_971_520  // 20 MB
+const MAX_DOC      = 52_428_800  // 50 MB per file
+const ALLOWED_DOC_EXT = ['pdf','docx','doc','xlsx','xls','xlsm','png','jpg','jpeg']
 
 function RatingBadge({ value }: { value: number }) {
   return (
@@ -103,25 +108,86 @@ export default function KyicPage() {
     setDokFiles((prev) => prev.filter((f) => f.name !== name))
   }
 
+  async function uploadFileToStorage(f: File): Promise<string> {
+    const urlRes = await fetch('/api/kyic/upload-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName: f.name }),
+    })
+    const urlData = await urlRes.json()
+    if (!urlRes.ok) throw new Error(urlData.error || `Gagal menyiapkan upload untuk ${f.name}`)
+
+    const { error } = await supabaseBrowser()
+      .storage
+      .from('kyic-uploads')
+      .uploadToSignedUrl(urlData.path, urlData.token, f)
+
+    if (error) throw new Error(`Gagal upload ${f.name}: ${error.message}`)
+    return urlData.path as string
+  }
+
   async function handleAnalyze() {
     if (!templateFile || !namaEntitas.trim() || !periode.trim()) {
       setError('Lengkapi nama perusahaan, periode, dan upload template KYIC.')
       return
     }
+    if (templateFile.size > MAX_TEMPLATE) {
+      setError('Template melebihi 20 MB.')
+      return
+    }
+    if (!templateFile.name.toLowerCase().endsWith('.docx')) {
+      setError('Template harus berformat .docx.')
+      return
+    }
+    for (const f of dokFiles) {
+      const ext = f.name.toLowerCase().split('.').pop() ?? ''
+      if (f.size > MAX_DOC) {
+        setError(`File ${f.name} melebihi 50 MB.`)
+        return
+      }
+      if (!ALLOWED_DOC_EXT.includes(ext)) {
+        setError(`Format file ${f.name} tidak didukung.`)
+        return
+      }
+    }
+
     setError(null)
     setStep('processing')
     setProgressLog(['Memulai proses...'])
 
-    const fd = new FormData()
-    fd.append('template', templateFile)
-    fd.append('namaEntitas', namaEntitas.trim())
-    fd.append('periode', periode.trim())
-    dokFiles.forEach((f) => fd.append('docs[]', f))
-    if (zipFile) fd.append('zip', zipFile)
-    if (catatanPengawas.trim()) fd.append('catatanPengawas', catatanPengawas.trim())
-
     try {
-      const res = await fetch('/api/kyic/analyze', { method: 'POST', body: fd })
+      setProgressLog(prev => [...prev, `Mengupload template: ${templateFile.name}`])
+      const templatePath = await uploadFileToStorage(templateFile)
+
+      const docPaths: Array<{ path: string; name: string }> = []
+      for (const f of dokFiles) {
+        setProgressLog(prev => [...prev, `Mengupload dokumen: ${f.name}`])
+        const path = await uploadFileToStorage(f)
+        docPaths.push({ path, name: f.name })
+      }
+
+      let zipPath: string | undefined
+      if (zipFile) {
+        setProgressLog(prev => [...prev, `Mengupload ZIP: ${zipFile.name}`])
+        zipPath = await uploadFileToStorage(zipFile)
+      }
+
+      setProgressLog(prev => [...prev, 'Menganalisis dokumen di server...'])
+
+      const res = await fetch('/api/kyic/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templatePath,
+          templateName: templateFile.name,
+          docPaths,
+          zipPath,
+          zipName: zipFile?.name,
+          namaEntitas: namaEntitas.trim(),
+          periode: periode.trim(),
+          catatanPengawas: catatanPengawas.trim(),
+        }),
+      })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Terjadi kesalahan')
       setProgressLog(prev => [...prev, 'Analisis berjalan di server — aman untuk pindah halaman, hasil tersimpan di Riwayat.'])

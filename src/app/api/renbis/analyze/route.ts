@@ -7,22 +7,22 @@ import { searchRelevantPojk } from '@/lib/pojk-search'
 import { isiKkRenbis } from '@/lib/renbis'
 import { extractPdfPages } from '@/lib/pdf-chunker'
 
-const MAX_FILE_SIZE = 52_428_800 // 50 MB
+const BUCKET = 'renbis-uploads'
 
 export async function POST(req: NextRequest) {
   const user = await getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const formData = await req.formData()
-  const file = formData.get('file') as File | null
-  const namaEntitas = (formData.get('namaEntitas') as string | null)?.trim()
-  const tahun = (formData.get('tahun') as string | null)?.trim()
+  const body = await req.json()
+  const { path, fileName, namaEntitas: namaEntitasRaw, tahun: tahunRaw } = body
 
-  if (!file) return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 400 })
+  const namaEntitas = (namaEntitasRaw as string | undefined)?.trim()
+  const tahun = (tahunRaw as string | undefined)?.trim()
+
+  if (!path || !fileName) return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 400 })
   if (!namaEntitas || !tahun)
     return NextResponse.json({ error: 'namaEntitas dan tahun wajib diisi' }, { status: 400 })
-  if (file.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'File melebihi 50 MB' }, { status: 413 })
-  if (!file.name.toLowerCase().endsWith('.pdf'))
+  if (!(fileName as string).toLowerCase().endsWith('.pdf'))
     return NextResponse.json({ error: 'Hanya file PDF yang diterima' }, { status: 400 })
 
   // Buat session
@@ -37,10 +37,8 @@ export async function POST(req: NextRequest) {
 
   // ─── Background job ──────────────────────────────────────────────────────────
   // after() menjaga job tetap hidup setelah response terkirim (wajib di Vercel serverless).
-  const buf = Buffer.from(await file.arrayBuffer())
-
   after(async () => {
-    await runRenbisAnalysis(sessionId, buf, namaEntitas, tahun).catch(err => {
+    await runRenbisAnalysis(sessionId, path, namaEntitas, tahun).catch(err => {
       console.error(`[Renbis ${sessionId}] Background job error:`, err)
     })
   })
@@ -55,11 +53,16 @@ export async function POST(req: NextRequest) {
 
 async function runRenbisAnalysis(
   sessionId: string,
-  buf: Buffer,
+  path: string,
   namaEntitas: string,
   tahun: string
 ) {
   try {
+    // 0. Download file dari storage
+    const { data, error: downloadErr } = await db().storage.from(BUCKET).download(path)
+    if (downloadErr || !data) throw new Error(`Gagal mengunduh file dari storage (${path}): ${downloadErr?.message ?? 'unknown'}`)
+    const buf = Buffer.from(await data.arrayBuffer())
+
     // 1. Ekstrak teks dari PDF
     const pages = await extractPdfPages(buf)
     const teks = pages.map((p) => p.text).join('\n\n')
@@ -87,6 +90,9 @@ async function runRenbisAnalysis(
   } catch (err) {
     await db().from('offsite_sessions').update({ status: 'error' }).eq('id', sessionId)
     throw err
+  } finally {
+    // Bersihkan file upload sementara di storage (best-effort)
+    await db().storage.from(BUCKET).remove([path]).catch(() => {})
   }
 }
 

@@ -4,50 +4,56 @@ import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { prosesKyic } from '@/lib/kyic'
 
-const MAX_TEMPLATE = 20_971_520  // 20 MB
-const MAX_DOC      = 52_428_800  // 50 MB per file
+const BUCKET = 'kyic-uploads'
+const ALLOWED_EXT = ['pdf','docx','doc','xlsx','xls','xlsm','png','jpg','jpeg']
+
+type DocPathEntry = { path: string; name: string }
 
 export async function POST(req: NextRequest) {
   const user = await getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const formData = await req.formData()
-  const templateFile     = formData.get('template') as File | null
-  const namaEntitas      = (formData.get('namaEntitas') as string | null)?.trim()
-  const periode          = (formData.get('periode') as string | null)?.trim()
-  const catatanPengawas  = (formData.get('catatanPengawas') as string | null)?.trim() ?? ''
+  const body = await req.json()
+  const {
+    templatePath,
+    templateName,
+    docPaths,
+    zipPath,
+    zipName,
+    namaEntitas: namaEntitasRaw,
+    periode: periodeRaw,
+    catatanPengawas: catatanPengawasRaw,
+  } = body as {
+    templatePath?: string
+    templateName?: string
+    docPaths?: DocPathEntry[]
+    zipPath?: string
+    zipName?: string
+    namaEntitas?: string
+    periode?: string
+    catatanPengawas?: string
+  }
 
-  if (!templateFile || !namaEntitas || !periode)
+  const namaEntitas = namaEntitasRaw?.trim()
+  const periode = periodeRaw?.trim()
+  const catatanPengawas = catatanPengawasRaw?.trim() ?? ''
+
+  if (!templatePath || !templateName || !namaEntitas || !periode)
     return NextResponse.json({ error: 'template, namaEntitas, dan periode wajib diisi' }, { status: 400 })
-  if (templateFile.size > MAX_TEMPLATE)
-    return NextResponse.json({ error: 'Template melebihi 20 MB' }, { status: 413 })
-  if (!templateFile.name.toLowerCase().endsWith('.docx'))
+  if (!templateName.toLowerCase().endsWith('.docx'))
     return NextResponse.json({ error: 'Template harus berformat .docx' }, { status: 400 })
 
-  // Kumpulkan dokumen pendukung (bisa banyak field 'docs[]' atau satu ZIP)
-  const dokumenFiles: Array<{ name: string; buf: Buffer; type: string }> = []
-  const rawDocs = formData.getAll('docs[]')
+  const validDocPaths: DocPathEntry[] = Array.isArray(docPaths)
+    ? docPaths.filter((d): d is DocPathEntry => {
+        if (!d || typeof d.path !== 'string' || typeof d.name !== 'string') return false
+        const ext = d.name.toLowerCase().split('.').pop() ?? ''
+        return ALLOWED_EXT.includes(ext)
+      })
+    : []
 
-  for (const raw of rawDocs) {
-    if (!(raw instanceof File)) continue
-    if (raw.size > MAX_DOC) continue  // skip file terlalu besar
-    const ext = raw.name.toLowerCase().split('.').pop() ?? ''
-    if (!['pdf','docx','doc','xlsx','xls','xlsm','png','jpg','jpeg'].includes(ext)) continue
-    dokumenFiles.push({ name: raw.name, buf: Buffer.from(await raw.arrayBuffer()), type: raw.type })
-  }
-
-  // Kalau ada ZIP, extract
-  const zipFile = formData.get('zip') as File | null
-  if (zipFile) {
-    const { default: AdmZip } = await import('adm-zip')
-    const zip = new AdmZip(Buffer.from(await zipFile.arrayBuffer()))
-    for (const entry of zip.getEntries()) {
-      if (entry.isDirectory) continue
-      const ext = entry.name.toLowerCase().split('.').pop() ?? ''
-      if (!['pdf','docx','doc','xlsx','xls','xlsm','png','jpg','jpeg'].includes(ext)) continue
-      dokumenFiles.push({ name: entry.name, buf: entry.getData(), type: '' })
-    }
-  }
+  // Kumpulkan semua path yang perlu dibersihkan dari storage setelah selesai
+  const allPaths = [templatePath, ...validDocPaths.map(d => d.path)]
+  if (zipPath) allPaths.push(zipPath)
 
   // Buat session
   const { data: session, error: sessionErr } = await db()
@@ -59,12 +65,8 @@ export async function POST(req: NextRequest) {
   if (sessionErr || !session) return NextResponse.json({ error: 'Gagal membuat session' }, { status: 500 })
   const sessionId = session.id
 
-  // ─── Background job ──────────────────────────────────────────────────────────
-  // after() menjaga job tetap hidup setelah response terkirim (wajib di Vercel serverless).
-  const templateBuf = Buffer.from(await templateFile.arrayBuffer())
-
   after(async () => {
-    await runKyicAnalysis(sessionId, templateBuf, dokumenFiles, catatanPengawas).catch(err => {
+    await runKyicAnalysis(sessionId, templatePath, validDocPaths, zipPath, catatanPengawas, allPaths).catch(err => {
       console.error(`[KYIC ${sessionId}] Background job error:`, err)
     })
   })
@@ -79,11 +81,45 @@ export async function POST(req: NextRequest) {
 
 async function runKyicAnalysis(
   sessionId: string,
-  templateBuf: Buffer,
-  dokumenFiles: Array<{ name: string; buf: Buffer; type: string }>,
-  catatanPengawas: string
+  templatePath: string,
+  docPaths: DocPathEntry[],
+  zipPath: string | undefined,
+  catatanPengawas: string,
+  allPaths: string[]
 ) {
   try {
+    const { data: templateData, error: templateErr } = await db().storage.from(BUCKET).download(templatePath)
+    if (templateErr || !templateData) throw new Error(`Gagal mengunduh template dari storage: ${templateErr?.message ?? 'unknown'}`)
+    const templateBuf = Buffer.from(await templateData.arrayBuffer())
+
+    const dokumenFiles: Array<{ name: string; buf: Buffer; type: string }> = []
+
+    for (const doc of docPaths) {
+      const { data, error } = await db().storage.from(BUCKET).download(doc.path)
+      if (error || !data) {
+        console.error(`[KYIC ${sessionId}] Gagal mengunduh dokumen ${doc.path}:`, error?.message)
+        continue
+      }
+      dokumenFiles.push({ name: doc.name, buf: Buffer.from(await data.arrayBuffer()), type: '' })
+    }
+
+    if (zipPath) {
+      const { data, error } = await db().storage.from(BUCKET).download(zipPath)
+      if (error || !data) {
+        console.error(`[KYIC ${sessionId}] Gagal mengunduh zip ${zipPath}:`, error?.message)
+      } else {
+        const zipBuf = Buffer.from(await data.arrayBuffer())
+        const { default: AdmZip } = await import('adm-zip')
+        const zip = new AdmZip(zipBuf)
+        for (const entry of zip.getEntries()) {
+          if (entry.isDirectory) continue
+          const ext = entry.name.toLowerCase().split('.').pop() ?? ''
+          if (!ALLOWED_EXT.includes(ext)) continue
+          dokumenFiles.push({ name: entry.name, buf: entry.getData(), type: '' })
+        }
+      }
+    }
+
     const progressLog: string[] = []
 
     const { docxBuf, hasil } = await prosesKyic(
@@ -107,5 +143,8 @@ async function runKyicAnalysis(
   } catch (err) {
     await db().from('offsite_sessions').update({ status: 'error' }).eq('id', sessionId)
     throw err
+  } finally {
+    // Bersihkan semua file upload sementara di storage (best-effort)
+    await db().storage.from(BUCKET).remove(allPaths).catch(() => {})
   }
 }

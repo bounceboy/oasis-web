@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { KkRow } from '@/lib/renbis'
 import Navbar from '@/components/oasis/Navbar'
 import { useSessionPolling } from '@/lib/useSessionPolling'
+import { supabaseBrowser } from '@/lib/supabase-browser'
+
+const MAX_FILE_SIZE = 52_428_800 // 50 MB
 
 interface RenbisResult {
   sessionId: string
@@ -85,16 +88,42 @@ export default function RenbisPage() {
       setError('Lengkapi semua field dan pilih file PDF.')
       return
     }
+    if (file.size > MAX_FILE_SIZE) {
+      setError('File melebihi 50 MB')
+      return
+    }
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      setError('Hanya file PDF yang diterima')
+      return
+    }
     setError(null)
     setStep('processing')
 
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('namaEntitas', namaEntitas.trim())
-    fd.append('tahun', tahun.trim())
-
     try {
-      const res = await fetch('/api/renbis/analyze', { method: 'POST', body: fd })
+      const urlRes = await fetch('/api/renbis/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name }),
+      })
+      const urlData = await urlRes.json()
+      if (!urlRes.ok) throw new Error(urlData.error || 'Gagal menyiapkan upload')
+
+      const { error: uploadErr } = await supabaseBrowser()
+        .storage
+        .from('renbis-uploads')
+        .uploadToSignedUrl(urlData.path, urlData.token, file)
+      if (uploadErr) throw new Error(`Gagal upload ${file.name}: ${uploadErr.message}`)
+
+      const res = await fetch('/api/renbis/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: urlData.path,
+          fileName: file.name,
+          namaEntitas: namaEntitas.trim(),
+          tahun: tahun.trim(),
+        }),
+      })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Terjadi kesalahan')
       // Analisis berjalan di server — polling sampai selesai

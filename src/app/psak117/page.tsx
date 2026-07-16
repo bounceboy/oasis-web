@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/oasis/Navbar'
 import { useSessionPolling } from '@/lib/useSessionPolling'
+import { supabaseBrowser } from '@/lib/supabase-browser'
 type JenisUsaha = 'Jiwa' | 'Umum'
 
 type Status = 'idle' | 'loading' | 'done' | 'error'
@@ -59,9 +60,35 @@ export default function Psak117Page() {
     setLog((prev) => [...prev, `[${new Date().toLocaleTimeString('id-ID')}] ${msg}`])
   }
 
+  async function uploadFileToStorage(f: File): Promise<string> {
+    const urlRes = await fetch('/api/psak117/upload-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName: f.name }),
+    })
+    const urlData = await urlRes.json()
+    if (!urlRes.ok) throw new Error(urlData.error || `Gagal menyiapkan upload untuk ${f.name}`)
+
+    const { error } = await supabaseBrowser()
+      .storage
+      .from('psak117-uploads')
+      .uploadToSignedUrl(urlData.path, urlData.token, f)
+
+    if (error) throw new Error(`Gagal upload ${f.name}: ${error.message}`)
+    return urlData.path as string
+  }
+
   async function handleAnalisis() {
     if (!file || !namaEntitas.trim() || !jenisUsaha || !periode.trim()) {
       alert('Lengkapi semua field dan upload file lapkeu')
+      return
+    }
+    if (file.size > 52_428_800) {
+      alert('File melebihi 50 MB')
+      return
+    }
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Hanya file PDF yang diterima')
       return
     }
 
@@ -71,12 +98,11 @@ export default function Psak117Page() {
 
     try {
       addLog(`Mengupload file: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`)
+      const path = await uploadFileToStorage(file)
       addLog('Server mengekstrak teks per halaman...')
 
-      // Step 1: Upload PDF ke server, ekstrak + seleksi halaman relevan
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('config', JSON.stringify({
+      // Step 1: Upload PDF ke storage, lalu minta server ekstrak + seleksi halaman relevan
+      const config = {
         includeKeywords: [
           'total aset', 'total liabilitas', 'ekuitas', 'laba', 'pendapatan',
           'beban jasa asuransi', 'klaim', 'investasi', 'arus kas',
@@ -90,9 +116,13 @@ export default function Psak117Page() {
         highPriorityKeywords: ['stage 1', 'stage 2', 'stage 3', 'margin jasa kontraktual', 'csm'],
         minChars: 150,
         maxTotalChars: 160000,
-      }))
+      }
 
-      const uploadRes = await fetch('/api/upload/pdf', { method: 'POST', body: formData })
+      const uploadRes = await fetch('/api/upload/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path, config }),
+      })
       const uploadData = await uploadRes.json()
       if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload gagal')
 
