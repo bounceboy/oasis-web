@@ -35,8 +35,8 @@ export default function Navbar({ userName, userRole, showAdmin, simple }: Navbar
 
   async function handleLogout() {
     await fetch('/api/auth/signout', { method: 'POST' })
-    router.push('/login')
-    router.refresh()
+    // Full page load — reset seluruh router cache client saat session berubah
+    window.location.assign('/login')
   }
 
   const offsiteItems = [

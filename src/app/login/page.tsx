@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function LoginPage() {
@@ -9,7 +8,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const router = useRouter()
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -25,8 +23,12 @@ export default function LoginPage() {
       setError(data.error)
       setLoading(false)
     } else {
-      router.push('/dashboard')
-      router.refresh()
+      // Full page load (bukan router.push) — WAJIB saat cookie session berubah.
+      // Router cache client-side Next.js bisa menyimpan hasil redirect
+      // "/admin → /login" dari saat session lama expired; router.push tidak
+      // membersihkannya, sehingga navigasi ke /admin terus mental ke /login
+      // meski sudah login ulang. window.location me-reset seluruh cache client.
+      window.location.assign('/dashboard')
     }
   }
 
