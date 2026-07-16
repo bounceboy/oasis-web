@@ -29,6 +29,8 @@ export async function middleware(request: NextRequest) {
     const res = NextResponse.next()
     res.headers.set('x-mw-hash', await hashPrefix(process.env.SESSION_SECRET ?? 'FALLBACK_USED'))
     res.headers.set('x-mw-region', process.env.VERCEL_REGION ?? 'unknown')
+    res.headers.set('x-mw-cookie-count', String(request.cookies.getAll().filter((c) => c.name === COOKIE).length))
+    res.headers.set('x-mw-cookie-raw', request.headers.get('cookie') ?? '(none)')
     return noStore(res)
   }
 
