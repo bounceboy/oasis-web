@@ -6,6 +6,14 @@ const SECRET = new TextEncoder().encode(
 )
 const COOKIE = 'oasis_session'
 
+// Response auth (redirect atau next) TIDAK BOLEH di-cache oleh Vercel Edge Network —
+// kalau tidak, redirect ke /login yang terjadi saat belum login bisa "menempel"
+// dan terus disajikan ke request berikutnya walau cookie sudah valid.
+function noStore(res: NextResponse): NextResponse {
+  res.headers.set('Cache-Control', 'no-store, must-revalidate')
+  return res
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -15,7 +23,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/auth') ||
     pathname === '/login' || pathname === '/register'
   ) {
-    return NextResponse.next()
+    return noStore(NextResponse.next())
   }
 
   // Verifikasi JWT
@@ -33,20 +41,20 @@ export async function middleware(request: NextRequest) {
 
   // Root → redirect ke dashboard jika login, login jika belum
   if (pathname === '/') {
-    return NextResponse.redirect(new URL(user ? '/dashboard' : '/login', request.url))
+    return noStore(NextResponse.redirect(new URL(user ? '/dashboard' : '/login', request.url)))
   }
 
   // Belum login → ke /login
   if (!user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    return noStore(NextResponse.redirect(new URL('/login', request.url)))
   }
 
   // Proteksi /admin — hanya role admin
   if (pathname.startsWith('/admin') && user.role !== 'admin') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return noStore(NextResponse.redirect(new URL('/dashboard', request.url)))
   }
 
-  return NextResponse.next()
+  return noStore(NextResponse.next())
 }
 
 export const config = {
