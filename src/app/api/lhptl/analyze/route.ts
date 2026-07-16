@@ -5,33 +5,28 @@ import { db } from '@/lib/db'
 import { extractExcelSheets, type SheetText } from '@/lib/xlsx-extractor'
 import { ekstrakDataLhptl, analisisLhptl } from '@/lib/lhptl'
 
-const MAX_FILE_SIZE = 20_971_520 // 20 MB
+const BUCKET = 'lhptl-uploads'
 
 export async function POST(req: NextRequest) {
   const user = await getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const formData = await req.formData()
-  const file = formData.get('file') as File | null
-  const fileGcg = formData.get('fileGcg') as File | null
-  const fileLapkeuPrev = formData.get('fileLapkeuPrev') as File | null
-  const namaEntitas = (formData.get('namaEntitas') as string | null)?.trim()
-  const jenisEntitas = (formData.get('jenisEntitas') as string | null) as 'pialang_asuransi' | 'pialang_reasuransi' | null
-  const periode = (formData.get('periode') as string | null)?.trim()
+  const body = await req.json()
+  const { pathLapkeu, fileName, pathGcg, fileNameGcg, pathLapkeuPrev, fileNameLapkeuPrev, namaEntitas: namaEntitasRaw, jenisEntitas, periode: periodeRaw } = body
 
-  if (!file) return NextResponse.json({ error: 'File laporan keuangan tidak ditemukan' }, { status: 400 })
-  if (!fileGcg) return NextResponse.json({ error: 'File laporan GCG tidak ditemukan' }, { status: 400 })
-  if (!fileLapkeuPrev) return NextResponse.json({ error: 'File laporan keuangan tahun sebelumnya tidak ditemukan' }, { status: 400 })
+  const namaEntitas = (namaEntitasRaw as string | undefined)?.trim()
+  const periode = (periodeRaw as string | undefined)?.trim()
+
+  if (!pathLapkeu || !fileName) return NextResponse.json({ error: 'File laporan keuangan tidak ditemukan' }, { status: 400 })
+  if (!pathGcg || !fileNameGcg) return NextResponse.json({ error: 'File laporan GCG tidak ditemukan' }, { status: 400 })
+  if (!pathLapkeuPrev || !fileNameLapkeuPrev) return NextResponse.json({ error: 'File laporan keuangan tahun sebelumnya tidak ditemukan' }, { status: 400 })
   if (!namaEntitas || !jenisEntitas || !periode)
     return NextResponse.json({ error: 'namaEntitas, jenisEntitas, dan periode wajib diisi' }, { status: 400 })
-  if (file.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'File laporan keuangan melebihi 20 MB' }, { status: 413 })
-  if (fileGcg.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'File laporan GCG melebihi 20 MB' }, { status: 413 })
-  if (fileLapkeuPrev.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'File laporan keuangan tahun sebelumnya melebihi 20 MB' }, { status: 413 })
-  if (!file.name.toLowerCase().match(/\.(xlsx|xlsm|xls)$/))
+  if (!(fileName as string).toLowerCase().match(/\.(xlsx|xlsm|xls)$/))
     return NextResponse.json({ error: 'File laporan keuangan harus berformat Excel (.xlsx/.xlsm/.xls)' }, { status: 400 })
-  if (!fileGcg.name.toLowerCase().match(/\.(xlsx|xlsm|xls)$/))
+  if (!(fileNameGcg as string).toLowerCase().match(/\.(xlsx|xlsm|xls)$/))
     return NextResponse.json({ error: 'File laporan GCG harus berformat Excel (.xlsx/.xlsm/.xls)' }, { status: 400 })
-  if (!fileLapkeuPrev.name.toLowerCase().match(/\.(xlsx|xlsm|xls)$/))
+  if (!(fileNameLapkeuPrev as string).toLowerCase().match(/\.(xlsx|xlsm|xls)$/))
     return NextResponse.json({ error: 'File laporan keuangan tahun sebelumnya harus berformat Excel (.xlsx/.xlsm/.xls)' }, { status: 400 })
 
   // Buat session dulu
@@ -44,22 +39,8 @@ export async function POST(req: NextRequest) {
   if (sessionErr || !session) return NextResponse.json({ error: 'Gagal membuat session' }, { status: 500 })
   const sessionId = session.id
 
-  // ─── Background job ──────────────────────────────────────────────────────────
-  // Parse Excel dulu (cepat), lalu analisis AI jalan via after() agar tetap hidup
-  // setelah response terkirim (wajib di Vercel serverless).
-  const buf = Buffer.from(await file.arrayBuffer())
-  const sheetsLapkeu = extractExcelSheets(buf)
-
-  const bufGcg = Buffer.from(await fileGcg.arrayBuffer())
-  const sheetsGcg = extractExcelSheets(bufGcg).map(s => ({ ...s, name: `GCG_${s.name}` }))
-
-  const bufLapkeuPrev = Buffer.from(await fileLapkeuPrev.arrayBuffer())
-  const sheetsLapkeuPrev = extractExcelSheets(bufLapkeuPrev).map(s => ({ ...s, name: `PREV_${s.name}` }))
-
-  const sheets = [...sheetsLapkeu, ...sheetsGcg, ...sheetsLapkeuPrev]
-
   after(async () => {
-    await runLhptlAnalysis(sessionId, sheets, namaEntitas, jenisEntitas, periode).catch(err => {
+    await runLhptlAnalysis(sessionId, pathLapkeu, pathGcg, pathLapkeuPrev, namaEntitas, jenisEntitas, periode).catch(err => {
       console.error(`[LHPTL ${sessionId}] Background job error:`, err)
     })
   })
@@ -72,14 +53,30 @@ export async function POST(req: NextRequest) {
   })
 }
 
+async function downloadSheets(path: string, prefix: string): Promise<SheetText[]> {
+  const { data, error } = await db().storage.from(BUCKET).download(path)
+  if (error || !data) throw new Error(`Gagal mengunduh file dari storage (${path}): ${error?.message ?? 'unknown'}`)
+  const buf = Buffer.from(await data.arrayBuffer())
+  return extractExcelSheets(buf).map(s => ({ ...s, name: prefix ? `${prefix}${s.name}` : s.name }))
+}
+
 async function runLhptlAnalysis(
   sessionId: string,
-  sheets: SheetText[],
+  pathLapkeu: string,
+  pathGcg: string,
+  pathLapkeuPrev: string,
   namaEntitas: string,
   jenisEntitas: 'pialang_asuransi' | 'pialang_reasuransi',
   periode: string
 ) {
+  const paths = [pathLapkeu, pathGcg, pathLapkeuPrev]
+
   try {
+    const sheetsLapkeu = await downloadSheets(pathLapkeu, '')
+    const sheetsGcg = await downloadSheets(pathGcg, 'GCG_')
+    const sheetsLapkeuPrev = await downloadSheets(pathLapkeuPrev, 'PREV_')
+    const sheets = [...sheetsLapkeu, ...sheetsGcg, ...sheetsLapkeuPrev]
+
     // AI extraction
     const extracted = await ekstrakDataLhptl(sheets, namaEntitas, jenisEntitas, periode)
 
@@ -112,5 +109,8 @@ async function runLhptlAnalysis(
   } catch (err) {
     await db().from('offsite_sessions').update({ status: 'error' }).eq('id', sessionId)
     throw err
+  } finally {
+    // Bersihkan file upload sementara di storage
+    await db().storage.from(BUCKET).remove(paths).catch(() => {})
   }
 }

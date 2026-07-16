@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { HasilPengawasan } from '@/lib/lhptl-rules'
 import Navbar from '@/components/oasis/Navbar'
 import { useSessionPolling } from '@/lib/useSessionPolling'
+import { supabaseBrowser } from '@/lib/supabase-browser'
 
 type JenisEntitas = 'pialang_asuransi' | 'pialang_reasuransi'
 type Step = 1 | 2 | 3
@@ -87,28 +88,58 @@ export default function LhptlPage() {
     setLog(prev => [...prev, `[${new Date().toLocaleTimeString('id-ID')}] ${msg}`])
   }
 
+  async function uploadFileToStorage(f: File): Promise<string> {
+    const urlRes = await fetch('/api/lhptl/upload-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName: f.name }),
+    })
+    const urlData = await urlRes.json()
+    if (!urlRes.ok) throw new Error(urlData.error || `Gagal menyiapkan upload untuk ${f.name}`)
+
+    const { error } = await supabaseBrowser()
+      .storage
+      .from('lhptl-uploads')
+      .uploadToSignedUrl(urlData.path, urlData.token, f)
+
+    if (error) throw new Error(`Gagal upload ${f.name}: ${error.message}`)
+    return urlData.path as string
+  }
+
   async function handleAnalisis() {
     if (!file || !fileGcg || !fileLapkeuPrev || !namaEntitas.trim() || !periode.trim()) return
     setLoading(true); setError(''); setLog([]); setStep(2)
 
     try {
       addLog(`Mengupload file laporan keuangan: ${file.name}`)
-      addLog(`Mengupload file laporan keuangan tahun sebelumnya: ${fileLapkeuPrev.name}`)
-      addLog(`Mengupload file laporan GCG: ${fileGcg.name}`)
-      addLog('Membaca sheet Excel...')
-      const fd = new FormData()
-      fd.append('file', file)
-      fd.append('fileGcg', fileGcg)
-      fd.append('fileLapkeuPrev', fileLapkeuPrev)
-      fd.append('namaEntitas', namaEntitas)
-      fd.append('jenisEntitas', jenisEntitas)
-      fd.append('periode', periode)
+      const pathLapkeu = await uploadFileToStorage(file)
 
+      addLog(`Mengupload file laporan keuangan tahun sebelumnya: ${fileLapkeuPrev.name}`)
+      const pathLapkeuPrev = await uploadFileToStorage(fileLapkeuPrev)
+
+      addLog(`Mengupload file laporan GCG: ${fileGcg.name}`)
+      const pathGcg = await uploadFileToStorage(fileGcg)
+
+      addLog('Membaca sheet Excel...')
       addLog('AI mengekstrak data dari semua sheet...')
       addLog('Menjalankan rules deterministik...')
       addLog('Menyusun Kesimpulan dan Tindak Lanjut...')
 
-      const res = await fetch('/api/lhptl/analyze', { method: 'POST', body: fd })
+      const res = await fetch('/api/lhptl/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pathLapkeu,
+          fileName: file.name,
+          pathGcg,
+          fileNameGcg: fileGcg.name,
+          pathLapkeuPrev,
+          fileNameLapkeuPrev: fileLapkeuPrev.name,
+          namaEntitas,
+          jenisEntitas,
+          periode,
+        }),
+      })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Analisis gagal')
 
