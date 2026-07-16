@@ -22,7 +22,7 @@ export default async function DashboardPage() {
         {/* Top bar: user info + logout */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16, marginBottom: 48 }}>
           <span style={{ fontSize: 12, color: '#8a949c' }}>{user.nama_lengkap || user.username} · <span style={{ color: '#5a646c' }}>{user.role}</span></span>
-          <Link href="/api/auth/logout" style={{ fontSize: 11.5, color: '#eef2ef', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '6px 16px', textDecoration: 'none', letterSpacing: '0.05em' }}>Keluar</Link>
+          <Link href="/api/auth/signout" style={{ fontSize: 11.5, color: '#eef2ef', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '6px 16px', textDecoration: 'none', letterSpacing: '0.05em' }}>Keluar</Link>
         </div>
 
         {/* Welcome */}
