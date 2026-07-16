@@ -23,6 +23,7 @@ type HasilData = {
 export default function LhptlPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const fileGcgRef = useRef<HTMLInputElement>(null)
+  const fileLapkeuPrevRef = useRef<HTMLInputElement>(null)
 
   const [step, setStep] = useState<Step>(1)
   const [loading, setLoading] = useState(false)
@@ -33,6 +34,7 @@ export default function LhptlPage() {
   const [periode, setPeriode]             = useState('')
   const [file, setFile]                   = useState<File | null>(null)
   const [fileGcg, setFileGcg]             = useState<File | null>(null)
+  const [fileLapkeuPrev, setFileLapkeuPrev] = useState<File | null>(null)
 
   const [hasil, setHasil]                 = useState<HasilData | null>(null)
   const [activeTab, setActiveTab]         = useState<'semua' | 'pelanggaran' | 'perhatian' | 'informasional'>('semua')
@@ -86,16 +88,18 @@ export default function LhptlPage() {
   }
 
   async function handleAnalisis() {
-    if (!file || !fileGcg || !namaEntitas.trim() || !periode.trim()) return
+    if (!file || !fileGcg || !fileLapkeuPrev || !namaEntitas.trim() || !periode.trim()) return
     setLoading(true); setError(''); setLog([]); setStep(2)
 
     try {
       addLog(`Mengupload file laporan keuangan: ${file.name}`)
+      addLog(`Mengupload file laporan keuangan tahun sebelumnya: ${fileLapkeuPrev.name}`)
       addLog(`Mengupload file laporan GCG: ${fileGcg.name}`)
       addLog('Membaca sheet Excel...')
       const fd = new FormData()
       fd.append('file', file)
       fd.append('fileGcg', fileGcg)
+      fd.append('fileLapkeuPrev', fileLapkeuPrev)
       fd.append('namaEntitas', namaEntitas)
       fd.append('jenisEntitas', jenisEntitas)
       fd.append('periode', periode)
@@ -192,6 +196,15 @@ export default function LhptlPage() {
             </div>
 
             <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 8 }}>File Excel — Form Laporan Keuangan Pialang Tahun Sebelumnya <span style={{ color: '#ff6f61' }}>*wajib</span></label>
+              <label style={{ display: 'block', border: '1px dashed rgba(69,230,97,0.45)', borderRadius: 18, padding: 28, textAlign: 'center', cursor: 'pointer' }}>
+                <input ref={fileLapkeuPrevRef} type="file" accept=".xlsx,.xlsm,.xls" style={{ display: 'none' }} onChange={e => setFileLapkeuPrev(e.target.files?.[0] ?? null)} />
+                {fileLapkeuPrev ? <div style={{ fontWeight: 500, fontSize: 13.5, color: '#45e661' }}>📊 {fileLapkeuPrev.name}</div>
+                  : <div style={{ fontSize: 13.5, color: '#b7c0c6' }}>Klik untuk pilih file Excel tahun sebelumnya (.xlsx / .xlsm)</div>}
+              </label>
+            </div>
+
+            <div>
               <label style={{ display: 'block', fontSize: 12, color: '#8a949c', marginBottom: 8 }}>File Excel — Laporan GCG <span style={{ color: '#ff6f61' }}>*wajib</span></label>
               <label style={{ display: 'block', border: '1px dashed rgba(69,230,97,0.45)', borderRadius: 18, padding: 28, textAlign: 'center', cursor: 'pointer' }}>
                 <input ref={fileGcgRef} type="file" accept=".xlsx,.xlsm,.xls" style={{ display: 'none' }} onChange={e => setFileGcg(e.target.files?.[0] ?? null)} />
@@ -203,7 +216,7 @@ export default function LhptlPage() {
             {error && <p style={{ fontSize: 12.5, color: '#ff6f61', margin: 0 }}>{error}</p>}
 
             <button onClick={handleAnalisis}
-              disabled={!file || !fileGcg || !namaEntitas.trim() || !periode.trim() || loading}
+              disabled={!file || !fileGcg || !fileLapkeuPrev || !namaEntitas.trim() || !periode.trim() || loading}
               className="btn-filled" style={{ alignSelf: 'flex-start' }}>
               Mulai Analisis LHPTL ↗
             </button>

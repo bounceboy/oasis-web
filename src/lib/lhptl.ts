@@ -167,8 +167,9 @@ Catatan ekstraksi:
 - pihak_afiliasi: daftar nama dari PP07
 - nama_di_pk_sheets: semua nama/entitas yang muncul di sheet PK01, PK03, PK09, PK10 (kolom nama_penanggung)
 - alamat, izin_usaha, kantor_cabang, jumlah_pegawai, kap_nama, akuntan_publik_nama, nomor_izin_akuntan, nomor_registrasi_akuntan, opini_audit, tka, polis_indemnitas, sanksi: cari di sheet profil/identitas perusahaan atau sheet GCG (prefix GCG_) jika ada. Jika benar-benar tidak ada, null.
-- neraca_laba_rugi: ekstrak SEMUA baris neraca (Aset, Liabilitas, Ekuitas) dan laba rugi (Pendapatan, Beban, Laba/Rugi) dari sheet LK01/LK02, sebagai list {label, nilai_ini (tahun berjalan/periode saat ini), nilai_lalu (tahun sebelumnya, dari kolom komparatif di laporan audited yang sama)}
-- rasio_keuangan_tabel: ekstrak SEMUA rasio keuangan yang ada di sheet OP06 sebagai persentase, {label, nilai_ini, nilai_lalu}`
+- PENTING: sheet dengan prefix "PREV_" (contoh: PREV_LK01, PREV_LK02) berasal dari laporan keuangan audited TAHUN SEBELUMNYA — dokumen terpisah yang khusus diupload untuk data komparatif. Cocokkan sheet PREV_XXX dengan sheet XXX yang sesuai (tanpa prefix) untuk mengisi SEMUA field *_prev (pemegang_saham_prev, direksi_komisaris_prev, tenaga_ahli_pialang_prev, beban_komisi_prev) dan kolom nilai_lalu pada neraca_laba_rugi/rasio_keuangan_tabel. Jangan campur data PREV_ dengan data tahun berjalan.
+- neraca_laba_rugi: ekstrak SEMUA baris neraca (Aset, Liabilitas, Ekuitas) dan laba rugi (Pendapatan, Beban, Laba/Rugi), sebagai list {label, nilai_ini (dari sheet LK01/LK02 tahun berjalan), nilai_lalu (dari sheet PREV_LK01/PREV_LK02 tahun sebelumnya)}
+- rasio_keuangan_tabel: ekstrak SEMUA rasio keuangan sebagai persentase, {label, nilai_ini (dari sheet OP06 tahun berjalan), nilai_lalu (dari sheet PREV_OP06 tahun sebelumnya jika ada)}`
 
   const raw = await callOpenRouter(system, user, 8000)
   // Coba ambil JSON lengkap (sampai } terakhir), fallback ke repair jika terpotong

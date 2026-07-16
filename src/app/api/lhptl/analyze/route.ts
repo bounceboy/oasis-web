@@ -14,20 +14,25 @@ export async function POST(req: NextRequest) {
   const formData = await req.formData()
   const file = formData.get('file') as File | null
   const fileGcg = formData.get('fileGcg') as File | null
+  const fileLapkeuPrev = formData.get('fileLapkeuPrev') as File | null
   const namaEntitas = (formData.get('namaEntitas') as string | null)?.trim()
   const jenisEntitas = (formData.get('jenisEntitas') as string | null) as 'pialang_asuransi' | 'pialang_reasuransi' | null
   const periode = (formData.get('periode') as string | null)?.trim()
 
   if (!file) return NextResponse.json({ error: 'File laporan keuangan tidak ditemukan' }, { status: 400 })
   if (!fileGcg) return NextResponse.json({ error: 'File laporan GCG tidak ditemukan' }, { status: 400 })
+  if (!fileLapkeuPrev) return NextResponse.json({ error: 'File laporan keuangan tahun sebelumnya tidak ditemukan' }, { status: 400 })
   if (!namaEntitas || !jenisEntitas || !periode)
     return NextResponse.json({ error: 'namaEntitas, jenisEntitas, dan periode wajib diisi' }, { status: 400 })
   if (file.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'File laporan keuangan melebihi 20 MB' }, { status: 413 })
   if (fileGcg.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'File laporan GCG melebihi 20 MB' }, { status: 413 })
+  if (fileLapkeuPrev.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'File laporan keuangan tahun sebelumnya melebihi 20 MB' }, { status: 413 })
   if (!file.name.toLowerCase().match(/\.(xlsx|xlsm|xls)$/))
     return NextResponse.json({ error: 'File laporan keuangan harus berformat Excel (.xlsx/.xlsm/.xls)' }, { status: 400 })
   if (!fileGcg.name.toLowerCase().match(/\.(xlsx|xlsm|xls)$/))
     return NextResponse.json({ error: 'File laporan GCG harus berformat Excel (.xlsx/.xlsm/.xls)' }, { status: 400 })
+  if (!fileLapkeuPrev.name.toLowerCase().match(/\.(xlsx|xlsm|xls)$/))
+    return NextResponse.json({ error: 'File laporan keuangan tahun sebelumnya harus berformat Excel (.xlsx/.xlsm/.xls)' }, { status: 400 })
 
   // Buat session dulu
   const { data: session, error: sessionErr } = await db()
@@ -48,7 +53,10 @@ export async function POST(req: NextRequest) {
   const bufGcg = Buffer.from(await fileGcg.arrayBuffer())
   const sheetsGcg = extractExcelSheets(bufGcg).map(s => ({ ...s, name: `GCG_${s.name}` }))
 
-  const sheets = [...sheetsLapkeu, ...sheetsGcg]
+  const bufLapkeuPrev = Buffer.from(await fileLapkeuPrev.arrayBuffer())
+  const sheetsLapkeuPrev = extractExcelSheets(bufLapkeuPrev).map(s => ({ ...s, name: `PREV_${s.name}` }))
+
+  const sheets = [...sheetsLapkeu, ...sheetsGcg, ...sheetsLapkeuPrev]
 
   after(async () => {
     await runLhptlAnalysis(sessionId, sheets, namaEntitas, jenisEntitas, periode).catch(err => {
