@@ -61,6 +61,16 @@ export default async function DashboardPage() {
           </div>
         </div>
 
+        {/* Tools */}
+        <div style={{ marginBottom: 44 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#828d96', marginBottom: 14 }}>Utilities</div>
+          <HoverCard href="/tools">
+            <div style={{ fontSize: 15, fontWeight: 500, color: '#eef2ef', marginBottom: 6 }}>PDF Tools</div>
+            <div style={{ fontSize: 11.5, color: '#aab4bc', lineHeight: 1.6 }}>Konversi gambar ke PDF, gabung, pisah, hapus, atau susun ulang halaman</div>
+            <div style={{ marginTop: 16, color: '#45e661', fontSize: 13 }}>↗</div>
+          </HoverCard>
+        </div>
+
         {/* Admin */}
         {isAdmin && (
           <div>
