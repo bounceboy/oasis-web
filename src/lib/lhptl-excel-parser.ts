@@ -111,28 +111,28 @@ function parsePP01(wb: XLSX.WorkBook) {
   const ws = getSheet(wb, 'PP01')
   return {
     alamat: (() => {
-      const gedung = toStr(findRowValue(ws, 'Nama Gedung', 2, 4))
-      const jalan = toStr(findRowValue(ws, 'Nama Jalan', 2, 4))
-      const kel = toStr(findRowValue(ws, 'Kelurahan', 2, 4))
-      const kec = toStr(findRowValue(ws, 'Kecamatan', 2, 4))
-      const kota = toStr(findRowValue(ws, 'Kabupaten/Kota', 2, 4))
-      const prov = toStr(findRowValue(ws, 'Provinsi', 2, 4))
-      const pos = toStr(findRowValue(ws, 'Kode Pos', 2, 4))
+      const gedung = toStr(findRowValue(ws, 'Nama Gedung', 1, 3))
+      const jalan = toStr(findRowValue(ws, 'Nama Jalan', 1, 3))
+      const kel = toStr(findRowValue(ws, 'Kelurahan', 1, 3))
+      const kec = toStr(findRowValue(ws, 'Kecamatan', 1, 3))
+      const kota = toStr(findRowValue(ws, 'Kabupaten/Kota', 1, 3))
+      const prov = toStr(findRowValue(ws, 'Provinsi', 1, 3))
+      const pos = toStr(findRowValue(ws, 'Kode Pos', 1, 3))
       return [gedung, jalan, kel ? `Kel. ${kel.trim()}` : '', kec ? `Kec. ${kec.trim()}` : '', kota ? `${kota.trim()}, ${prov.trim()} ${pos}` : ''].filter(Boolean).join(', ')
     })(),
     izin_usaha: (() => {
-      const nomor = toStr(findRowValue(ws, 'Nomor Izin Usaha', 2, 4))
-      const tgl = toStr(findRowValue(ws, 'Tanggal Izin usaha', 2, 4))
+      const nomor = toStr(findRowValue(ws, 'Nomor Izin Usaha', 1, 3))
+      const tgl = toStr(findRowValue(ws, 'Tanggal Izin usaha', 1, 3))
       return nomor ? `${nomor} tanggal ${tgl}` : null
     })(),
-    jumlah_kantor_cabang: toNum(findRowValue(ws, 'Jumlah Kantor Selain Kantor Pusat', 2, 4)),
-    jumlah_pegawai: toNum(findRowValue(ws, 'termasuk pengurus', 2, 4)),
-    jumlah_rekanan_perorangan: toNum(findRowValue(ws, 'Perorangan', 2, 4)),
-    jumlah_rekanan_badan_hukum: toNum(findRowValue(ws, 'Badan Hukum', 2, 4)),
-    kap_nama: toStr(findRowValue(ws, 'Kantor Akuntan Publik', 2, 4)) || null,
-    akuntan_publik_nama: toStr(findRowValue(ws, 'Akuntan Publik', 2, 4)) || null,
-    nomor_izin_akuntan: toStr(findRowValue(ws, 'Surat Tanda Terdaftar', 2, 4)) || null,
-    opini_audit: toStr(findRowValue(ws, 'Opini', 2, 4)) || null,
+    jumlah_kantor_cabang: toNum(findRowValue(ws, 'Jumlah Kantor Selain Kantor Pusat', 1, 3)),
+    jumlah_pegawai: toNum(findRowValue(ws, 'termasuk pengurus', 1, 3)),
+    jumlah_rekanan_perorangan: toNum(findRowValue(ws, 'Perorangan', 1, 3)),
+    jumlah_rekanan_badan_hukum: toNum(findRowValue(ws, 'Badan Hukum', 1, 3)),
+    kap_nama: toStr(findRowValue(ws, 'Kantor Akuntan Publik', 1, 3)) || null,
+    akuntan_publik_nama: toStr(findRowValue(ws, 'Akuntan Publik', 1, 3)) || null,
+    nomor_izin_akuntan: toStr(findRowValue(ws, 'Surat Tanda Terdaftar', 1, 3)) || null,
+    opini_audit: toStr(findRowValue(ws, 'Opini', 1, 3)) || null,
   }
 }
 
@@ -140,14 +140,14 @@ function parsePP01(wb: XLSX.WorkBook) {
 
 function parsePP02(wb: XLSX.WorkBook) {
   const ws = getSheet(wb, 'PP02')
-  const dr = dataRows(ws, 2, 9)
+  const dr = dataRows(ws, 1, 9)
   return dr
-    .filter(r => toStr(r[4]).trim() !== '')
+    .filter(r => toStr(r[3]).trim() !== '')
     .map(r => ({
-      nama: toStr(r[4]),
-      nilai_rp: toNum(r[5]) ?? 0,
+      nama: toStr(r[3]),
+      nilai_rp: toNum(r[4]) ?? 0,
       persentase: (() => {
-        const p = toNum(r[6])
+        const p = toNum(r[5])
         return p != null ? (p < 1 ? p * 100 : p) : 0
       })(),
     }))
@@ -157,13 +157,13 @@ function parsePP02(wb: XLSX.WorkBook) {
 
 function parsePP03(wb: XLSX.WorkBook) {
   const ws = getSheet(wb, 'PP03')
-  const dr = dataRows(ws, 2, 9)
+  const dr = dataRows(ws, 1, 9)
   const list = dr
-    .filter(r => toStr(r[4]).trim() !== '')
+    .filter(r => toStr(r[3]).trim() !== '')
     .map(r => ({
-      nama: toStr(r[4]),
-      jabatan: toStr(r[5]),
-      surat_persetujuan_ojk: toStr(r[8]) || '',
+      nama: toStr(r[3]),
+      jabatan: toStr(r[4]),
+      surat_persetujuan_ojk: toStr(r[7]) || '',
     }))
 
   const komisaris = list.filter(r => r.jabatan.toLowerCase().includes('komisaris'))
@@ -314,29 +314,29 @@ function parsePK14(wb: XLSX.WorkBook) {
 function parseLK01(wb: XLSX.WorkBook) {
   const ws = getSheet(wb, 'LK01')
   return {
-    jumlah_aset: toNum(findRowValue(ws, 'Jumlah Aset', 2, 6)),
-    kas_setara_kas: toNum(findRowValue(ws, 'Kas dan Setara Kas', 2, 6)),
-    rekening_premi: toNum(findRowValue(ws, 'Rekening Premi', 2, 6)),
-    rekening_operasional: toNum(findRowValue(ws, 'Rekening Operasional', 2, 6)),
-    investasi: toNum(findRowValue(ws, 'Investasi', 2, 6)),
-    piutang_premi: toNum(findRowValue(ws, 'Piutang Premi', 2, 6)),
-    aset_tetap: toNum(findRowValue(ws, 'Aset Tetap', 2, 6)),
-    aset_lain: toNum(findRowValue(ws, 'Aset Lain', 2, 6)),
-    jumlah_liabilitas: toNum(findRowValue(ws, 'Jumlah Liabilitas', 2, 6)),
-    utang_premi: toNum(findRowValue(ws, 'Utang Premi', 2, 6)),
-    utang_klaim: toNum(findRowValue(ws, 'Utang Klaim', 2, 6)),
-    utang_komisi: toNum(findRowValue(ws, 'Utang Komisi', 2, 6)),
-    utang_pajak: toNum(findRowValue(ws, 'Utang Pajak', 2, 6)),
-    utang_lain: toNum(findRowValue(ws, 'Utang Lain', 2, 6)),
-    liabilitas_lain: toNum(findRowValue(ws, 'Liabilitas Lain', 2, 6)),
-    jumlah_ekuitas: toNum(findRowValue(ws, 'Jumlah Ekuitas', 2, 6)),
-    modal_disetor: toNum(findRowValue(ws, 'Modal Disetor', 2, 6)),
-    tambahan_modal: toNum(findRowValue(ws, 'Tambahan Modal Disetor', 2, 6)),
-    laba_ditahan: toNum(findRowValue(ws, 'Laba Ditahan', 2, 6)),
-    laba_tahun_berjalan: toNum(findRowValue(ws, 'Laba Tahun Berjalan', 2, 6)),
-    ekuitas_lainnya: toNum(findRowValue(ws, 'Ekuitas Lainnya', 2, 6)),
-    piutang_jasa: toNum(findRowValue(ws, 'Piutang Jasa Keperantaraan', 2, 6)),
-    piutang_klaim_aset: toNum(findRowValue(ws, 'Piutang Klaim', 2, 6)),
+    jumlah_aset: toNum(findRowValue(ws, 'Jumlah Aset', 1, 5)),
+    kas_setara_kas: toNum(findRowValue(ws, 'Kas dan Setara Kas', 1, 5)),
+    rekening_premi: toNum(findRowValue(ws, 'Rekening Premi', 1, 5)),
+    rekening_operasional: toNum(findRowValue(ws, 'Rekening Operasional', 1, 5)),
+    investasi: toNum(findRowValue(ws, 'Investasi', 1, 5)),
+    piutang_premi: toNum(findRowValue(ws, 'Piutang Premi', 1, 5)),
+    aset_tetap: toNum(findRowValue(ws, 'Aset Tetap', 1, 5)),
+    aset_lain: toNum(findRowValue(ws, 'Aset Lain', 1, 5)),
+    jumlah_liabilitas: toNum(findRowValue(ws, 'Jumlah Liabilitas', 1, 5)),
+    utang_premi: toNum(findRowValue(ws, 'Utang Premi', 1, 5)),
+    utang_klaim: toNum(findRowValue(ws, 'Utang Klaim', 1, 5)),
+    utang_komisi: toNum(findRowValue(ws, 'Utang Komisi', 1, 5)),
+    utang_pajak: toNum(findRowValue(ws, 'Utang Pajak', 1, 5)),
+    utang_lain: toNum(findRowValue(ws, 'Utang Lain', 1, 5)),
+    liabilitas_lain: toNum(findRowValue(ws, 'Liabilitas Lain', 1, 5)),
+    jumlah_ekuitas: toNum(findRowValue(ws, 'Jumlah Ekuitas', 1, 5)),
+    modal_disetor: toNum(findRowValue(ws, 'Modal Disetor', 1, 5)),
+    tambahan_modal: toNum(findRowValue(ws, 'Tambahan Modal Disetor', 1, 5)),
+    laba_ditahan: toNum(findRowValue(ws, 'Laba Ditahan', 1, 5)),
+    laba_tahun_berjalan: toNum(findRowValue(ws, 'Laba Tahun Berjalan', 1, 5)),
+    ekuitas_lainnya: toNum(findRowValue(ws, 'Ekuitas Lainnya', 1, 5)),
+    piutang_jasa: toNum(findRowValue(ws, 'Piutang Jasa Keperantaraan', 1, 5)),
+    piutang_klaim_aset: toNum(findRowValue(ws, 'Piutang Klaim', 1, 5)),
   }
 }
 
@@ -345,21 +345,21 @@ function parseLK01(wb: XLSX.WorkBook) {
 function parseLK02(wb: XLSX.WorkBook) {
   const ws = getSheet(wb, 'LK02')
   return {
-    pendapatan_jasa_keperantaraan: toNum(findRowValue(ws, 'Pendapatan Jasa Keperantaraan Langsung', 2, 6)),
-    pendapatan_tidak_langsung: toNum(findRowValue(ws, 'Pendapatan Jasa Keperantaraan Tidak Langsung', 2, 6)),
-    pendapatan_lainnya: toNum(findRowValue(ws, 'Pendapatan Lainnya', 2, 6)),
-    jumlah_pendapatan: toNum(findRowValue(ws, 'Jumlah Pendapatan', 2, 6)),
-    beban_pegawai: toNum(findRowValue(ws, 'Beban Pegawai dan Pengurus', 2, 6)),
-    beban_diklat: toNum(findRowValue(ws, 'Beban Pendidikan dan Latihan', 2, 6)),
-    beban_pemasaran: toNum(findRowValue(ws, 'Beban Pemasaran', 2, 6)),
-    beban_komisi: toNum(findRowValue(ws, 'Beban Komisi', 2, 6)),
-    beban_operasional_lain: toNum(findRowValue(ws, 'Beban Operasional Lain', 2, 6)),
-    beban_non_operasional: toNum(findRowValue(ws, 'Beban Non Operasional', 2, 6)),
-    jumlah_beban: toNum(findRowValue(ws, 'Jumlah Beban', 2, 6)),
-    beban_pajak: toNum(findRowValue(ws, 'Beban Pajak', 2, 6)),
-    laba_setelah_pajak: toNum(findRowValue(ws, 'Laba (Rugi) Setelah Pajak', 2, 6)),
-    laba_komprehensif: toNum(findRowValue(ws, 'Laba (Rugi) Komprehensif', 2, 6)),
-    beban_operasional_total: toNum(findRowValue(ws, 'Beban Operasional', 2, 6)),
+    pendapatan_jasa_keperantaraan: toNum(findRowValue(ws, 'Pendapatan Jasa Keperantaraan Langsung', 1, 5)),
+    pendapatan_tidak_langsung: toNum(findRowValue(ws, 'Pendapatan Jasa Keperantaraan Tidak Langsung', 1, 5)),
+    pendapatan_lainnya: toNum(findRowValue(ws, 'Pendapatan Lainnya', 1, 5)),
+    jumlah_pendapatan: toNum(findRowValue(ws, 'Jumlah Pendapatan', 1, 5)),
+    beban_pegawai: toNum(findRowValue(ws, 'Beban Pegawai dan Pengurus', 1, 5)),
+    beban_diklat: toNum(findRowValue(ws, 'Beban Pendidikan dan Latihan', 1, 5)),
+    beban_pemasaran: toNum(findRowValue(ws, 'Beban Pemasaran', 1, 5)),
+    beban_komisi: toNum(findRowValue(ws, 'Beban Komisi', 1, 5)),
+    beban_operasional_lain: toNum(findRowValue(ws, 'Beban Operasional Lain', 1, 5)),
+    beban_non_operasional: toNum(findRowValue(ws, 'Beban Non Operasional', 1, 5)),
+    jumlah_beban: toNum(findRowValue(ws, 'Jumlah Beban', 1, 5)),
+    beban_pajak: toNum(findRowValue(ws, 'Beban Pajak', 1, 5)),
+    laba_setelah_pajak: toNum(findRowValue(ws, 'Laba (Rugi) Setelah Pajak', 1, 5)),
+    laba_komprehensif: toNum(findRowValue(ws, 'Laba (Rugi) Komprehensif', 1, 5)),
+    beban_operasional_total: toNum(findRowValue(ws, 'Beban Operasional', 1, 5)),
   }
 }
 
@@ -530,7 +530,7 @@ function parseOP06(wb: XLSX.WorkBook) {
 
   let section = ''
   for (const row of rows(ws)) {
-    const label = toStr(row[2]).toLowerCase()
+    const label = toStr(row[1]).toLowerCase()
     if (label.includes('return on asset') || label.includes('roa')) section = 'roa'
     else if (label.includes('return on equity') || label.includes('roe')) section = 'roe'
     else if (label.includes('bopo')) section = 'bopo'
@@ -539,8 +539,8 @@ function parseOP06(wb: XLSX.WorkBook) {
     else if (label.includes('beban komisi')) section = 'komisi'
     else if (label.includes('biaya diklat') || label.includes('beban diklat') || label.includes('rasio biaya diklat')) section = 'diklat'
 
-    if (label.includes('rasio (a:b)') || label.includes('rasio (b:a)') || label.includes('rasio(a:b)') || label.includes('c.') && label.includes('rasio')) {
-      const v = toNum(row[4])
+    if (label.includes('rasio (a:b)') || label.includes('rasio (b:a)') || label.includes('rasio(a:b)') || (label.includes('c.') && label.includes('rasio'))) {
+      const v = toNum(row[3])
       if (v == null) continue
       // Convert decimal to percentage if abs < 5 (rasio seperti 0.108 = 10.8%)
       const vPct = Math.abs(v) < 5 ? v * 100 : v
@@ -710,10 +710,10 @@ function parseTPKP(wbTk: XLSX.WorkBook) {
   const ws = getSheet(wbTk, 'TPKP')
   const dr = dataRows(ws, 2, 8)
   const items = dr
-    .filter(r => r[4] !== null)
+    .filter(r => r[4] !== null && toStr(r[4]).trim() !== '')
     .map(r => ({
       tanggal: fmtDate(r[4]),
-      keputusan: toStr(r[6]),
+      keputusan: toStr(r[7]),
     }))
   return items.length > 0 ? items : null
 }
@@ -723,10 +723,10 @@ function parseTPKP(wbTk: XLSX.WorkBook) {
 function parsePP03Prev(wbPrev: XLSX.WorkBook) {
   const ws = getSheet(wbPrev, 'PP03')
   if (!ws) return []
-  const dr = dataRows(ws, 2, 9)
+  const dr = dataRows(ws, 1, 9)
   return dr
-    .filter(r => toStr(r[4]).trim() !== '')
-    .map(r => ({ nama: toStr(r[4]), jabatan: toStr(r[5]) }))
+    .filter(r => toStr(r[3]).trim() !== '')
+    .map(r => ({ nama: toStr(r[3]), jabatan: toStr(r[4]) }))
 }
 
 function parsePP04Prev(wbPrev: XLSX.WorkBook) {
@@ -741,14 +741,14 @@ function parsePP04Prev(wbPrev: XLSX.WorkBook) {
 function parsePP02Prev(wbPrev: XLSX.WorkBook) {
   const ws = getSheet(wbPrev, 'PP02')
   if (!ws) return []
-  const dr = dataRows(ws, 2, 9)
+  const dr = dataRows(ws, 1, 9)
   return dr
-    .filter(r => toStr(r[4]).trim() !== '')
+    .filter(r => toStr(r[3]).trim() !== '')
     .map(r => ({
-      nama: toStr(r[4]),
-      nilai_rp: toNum(r[5]) ?? 0,
+      nama: toStr(r[3]),
+      nilai_rp: toNum(r[4]) ?? 0,
       persentase: (() => {
-        const p = toNum(r[6])
+        const p = toNum(r[5])
         return p != null ? (p < 1 ? p * 100 : p) : 0
       })(),
     }))
@@ -955,12 +955,12 @@ export function parseLhptlExcel(
 
   // Izin usaha dari Data Umum (lebih lengkap dari PP01 izin usaha)
   const dataUmumWs = getSheet(wbLk, 'Data Umum')
-  const nomizin = toStr(findRowValue(dataUmumWs, 'Nomor Izin', 2, 4) ?? findRowValue(dataUmumWs, 'Kode Auditor', 2, 4))
+  const nomizin = toStr(findRowValue(dataUmumWs, 'Nomor Izin', 1, 3) ?? findRowValue(dataUmumWs, 'Kode Auditor', 1, 3))
   const izinUsahaFinal = pp01.izin_usaha ?? (nomizin || null)
 
   // Nomor registrasi akuntan dari Data Umum
-  const nomorIzinAkuntan = toStr(findRowValue(dataUmumWs, 'SK Izin Auditor', 2, 3) ?? null) || pp01.nomor_izin_akuntan
-  const nomorRegistrasiAkuntan = toStr(findRowValue(dataUmumWs, 'Kode Auditor', 2, 3) ?? null) || null
+  const nomorIzinAkuntan = toStr(findRowValue(dataUmumWs, 'SK Izin Auditor', 1, 2) ?? null) || pp01.nomor_izin_akuntan
+  const nomorRegistrasiAkuntan = toStr(findRowValue(dataUmumWs, 'Kode Auditor', 1, 2) ?? null) || null
 
   return {
     // Identitas
