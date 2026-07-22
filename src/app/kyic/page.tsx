@@ -398,14 +398,25 @@ export default function KyicV2Page() {
           {/* Template KYIC T-1 */}
           <div style={{ marginBottom: 20, padding: '10px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
             <p style={{ fontSize: 11, color: '#aab4bc', marginBottom: 8 }}>KYIC Template (T-1)</p>
-            {detail.session.template_nama ? (
-              <p style={{ fontSize: 11, color: '#45e661' }}>✓ {detail.session.template_nama}</p>
+            {uploadingTemplate ? (
+              <p style={{ fontSize: 11, color: '#828d96' }}>⏳ Memproses... (OCR aktif, tunggu ~60 detik)</p>
+            ) : detail.session.template_nama ? (
+              <div>
+                <p style={{ fontSize: 11, color: '#45e661', marginBottom: 6 }}>✓ {detail.session.template_nama}</p>
+                <label style={{ cursor: 'pointer' }}>
+                  <input type="file" accept=".docx,.pdf" style={{ display: 'none' }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { setTemplateFile(f); uploadTemplate(detail.session.id, f) } }} />
+                  <span style={{ fontSize: 11, color: '#828d96', cursor: 'pointer', textDecoration: 'underline' }}>
+                    Ganti template
+                  </span>
+                </label>
+              </div>
             ) : (
               <label style={{ cursor: 'pointer' }}>
                 <input type="file" accept=".docx,.pdf" style={{ display: 'none' }}
                   onChange={e => { const f = e.target.files?.[0]; if (f) { setTemplateFile(f); uploadTemplate(detail.session.id, f) } }} />
-                <span style={{ fontSize: 11, color: uploadingTemplate ? '#828d96' : '#ffbe50', cursor: 'pointer' }}>
-                  {uploadingTemplate ? '⏳ Mengupload...' : '⚠ Upload template KYIC T-1'}
+                <span style={{ fontSize: 11, color: '#ffbe50', cursor: 'pointer' }}>
+                  ⚠ Upload template KYIC T-1
                 </span>
               </label>
             )}
