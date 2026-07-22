@@ -154,27 +154,70 @@ function TabDokumen({ kode, items, onRefresh }: { kode: string; items: Dokumen[]
   const fileRef = useRef<HTMLInputElement>(null)
   const [departemen, setDepartemen] = useState(DEPARTEMEN[0])
   const [fokus, setFokus] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
+  const [mode, setMode] = useState<'per_file' | 'gabungan'>('per_file')
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<string>('')
   const [error, setError] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Poll setiap 4 detik selama ada item 'analyzing'
+  useEffect(() => {
+    const hasAnalyzing = items.some(d => d.status === 'analyzing')
+    if (hasAnalyzing) {
+      pollRef.current = setTimeout(() => onRefresh(), 4000)
+    }
+    return () => { if (pollRef.current) clearTimeout(pollRef.current) }
+  }, [items, onRefresh])
+
+  function addFiles(incoming: FileList | File[]) {
+    const arr = Array.from(incoming).filter(f => /\.(pdf|docx|doc|txt)$/i.test(f.name))
+    setFiles(prev => {
+      const names = new Set(prev.map(f => f.name))
+      return [...prev, ...arr.filter(f => !names.has(f.name))]
+    })
+    setError('')
+  }
+
+  function removeFile(idx: number) {
+    setFiles(prev => prev.filter((_, i) => i !== idx))
+  }
 
   async function handleUpload() {
-    if (!file) return
+    if (files.length === 0) return
     setUploading(true); setError('')
+
     try {
-      const fd = new FormData()
-      fd.append('kode', kode)
-      fd.append('departemen', departemen)
-      fd.append('fokus', fokus)
-      fd.append('file', file)
-      const res = await fetch('/api/onsite/dokumen', { method: 'POST', body: fd })
-      if (!res.ok) { const d = await res.json(); setError(d.error); return }
-      setFile(null); setFokus('')
+      if (mode === 'gabungan') {
+        setUploadProgress(`Menganalisis ${files.length} file secara gabungan...`)
+        const fd = new FormData()
+        fd.append('kode', kode)
+        fd.append('departemen', departemen)
+        fd.append('fokus', fokus)
+        files.forEach(f => fd.append('file', f))
+        const res = await fetch('/api/onsite/dokumen/gabungan', { method: 'POST', body: fd })
+        if (!res.ok) { const d = await res.json(); setError(d.error ?? 'Gagal upload'); return }
+      } else {
+        for (let i = 0; i < files.length; i++) {
+          const f = files[i]
+          setUploadProgress(`Mengupload ${i + 1}/${files.length}: ${f.name}`)
+          const fd = new FormData()
+          fd.append('kode', kode)
+          fd.append('departemen', departemen)
+          fd.append('fokus', fokus)
+          fd.append('file', f)
+          const res = await fetch('/api/onsite/dokumen', { method: 'POST', body: fd })
+          if (!res.ok) { const d = await res.json(); setError(`${f.name}: ${d.error ?? 'Gagal upload'}`); break }
+        }
+      }
+      setFiles([])
+      setFokus('')
       if (fileRef.current) fileRef.current.value = ''
       await onRefresh()
     } catch { setError('Gagal upload') }
-    finally { setUploading(false) }
+    finally { setUploading(false); setUploadProgress('') }
   }
 
   const panelStyle: React.CSSProperties = { width: 300, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.08)', padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }
@@ -195,20 +238,55 @@ function TabDokumen({ kode, items, onRefresh }: { kode: string; items: Dokumen[]
         </div>
 
         <div>
-          <label style={labelStyle}>File Dokumen</label>
-          <div onClick={() => fileRef.current?.click()} style={{ border: '1px dashed rgba(69,230,97,0.3)', borderRadius: 12, padding: 16, textAlign: 'center', cursor: 'pointer' }}>
-            {file ? (
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 500 }}>{file.name}</p>
-                <p style={{ fontSize: 11, color: '#aab4bc', marginTop: 4 }}>{(file.size / 1024).toFixed(0)} KB</p>
-              </div>
+          <label style={labelStyle}>File Dokumen <span style={{ color: '#828d96' }}>— bisa lebih dari satu</span></label>
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files) }}
+            onClick={() => fileRef.current?.click()}
+            style={{ border: `1px dashed ${dragOver ? '#45e661' : 'rgba(69,230,97,0.3)'}`, background: dragOver ? 'rgba(69,230,97,0.05)' : 'transparent', borderRadius: 12, padding: 16, textAlign: 'center', cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s' }}
+          >
+            {files.length === 0 ? (
+              <p style={{ fontSize: 12.5, color: '#828d96', margin: 0 }}>
+                Drag & drop file di sini<br/>
+                <span style={{ fontSize: 11 }}>atau klik untuk pilih — PDF, DOCX, TXT</span>
+              </p>
             ) : (
-              <p style={{ fontSize: 13, color: '#828d96' }}>Klik untuk pilih file<br/><span style={{ fontSize: 11 }}>PDF, DOCX, TXT — maks 20MB</span></p>
+              <p style={{ fontSize: 12, color: '#45e661', margin: 0 }}>{files.length} file dipilih — klik untuk tambah</p>
             )}
           </div>
-          <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.txt" style={{ display: 'none' }}
-            onChange={e => setFile(e.target.files?.[0] ?? null)} />
+          <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.txt" multiple style={{ display: 'none' }}
+            onChange={e => { if (e.target.files) addFiles(e.target.files) }} />
+
+          {files.length > 0 && (
+            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {files.map((f, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '5px 10px' }}>
+                  <span style={{ flex: 1, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#eef2ef' }}>{f.name}</span>
+                  <span style={{ fontSize: 10, color: '#828d96', flexShrink: 0 }}>{(f.size / 1024).toFixed(0)}KB</span>
+                  <button onClick={e => { e.stopPropagation(); removeFile(i) }} style={{ background: 'none', border: 'none', color: '#828d96', cursor: 'pointer', fontSize: 11, padding: '0 2px', fontFamily: 'inherit' }}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+
+        {files.length > 1 && (
+          <div>
+            <label style={labelStyle}>Mode Analisis</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['per_file', 'gabungan'] as const).map(m => (
+                <button key={m} onClick={() => setMode(m)}
+                  style={{ flex: 1, fontSize: 11.5, padding: '7px 0', borderRadius: 8, border: `1px solid ${mode === m ? '#45e661' : 'rgba(255,255,255,0.12)'}`, background: mode === m ? 'rgba(69,230,97,0.1)' : 'transparent', color: mode === m ? '#45e661' : '#aab4bc', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {m === 'per_file' ? 'Per File' : 'Gabungan'}
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize: 10.5, color: '#828d96', marginTop: 6 }}>
+              {mode === 'per_file' ? 'Setiap file dianalisis terpisah, temuan dikelompokkan per file.' : 'Semua file digabung, AI melihat keterkaitan antar dokumen.'}
+            </p>
+          </div>
+        )}
 
         <div>
           <label style={labelStyle}>Fokus Analisis <span style={{ color: '#828d96' }}>opsional</span></label>
@@ -217,10 +295,11 @@ function TabDokumen({ kode, items, onRefresh }: { kode: string; items: Dokumen[]
         </div>
 
         {error && <p style={{ color: '#ff6f61', fontSize: 12 }}>{error}</p>}
+        {uploading && uploadProgress && <p style={{ color: '#aab4bc', fontSize: 11 }}>{uploadProgress}</p>}
 
-        <button onClick={handleUpload} disabled={!file || uploading}
-          style={{ background: file && !uploading ? '#45e661' : 'rgba(255,255,255,0.06)', color: file && !uploading ? '#04120a' : '#828d96', border: 'none', borderRadius: 999, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: file && !uploading ? 'pointer' : 'default', fontFamily: 'inherit', width: '100%' }}>
-          {uploading ? 'Menganalisis...' : 'Mulai Analisis'}
+        <button onClick={handleUpload} disabled={files.length === 0 || uploading}
+          style={{ background: files.length > 0 && !uploading ? '#45e661' : 'rgba(255,255,255,0.06)', color: files.length > 0 && !uploading ? '#04120a' : '#828d96', border: 'none', borderRadius: 999, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: files.length > 0 && !uploading ? 'pointer' : 'default', fontFamily: 'inherit', width: '100%' }}>
+          {uploading ? 'Mengupload...' : files.length === 0 ? 'Mulai Analisis' : `Analisis ${files.length} File`}
         </button>
       </div>
 
@@ -281,6 +360,16 @@ function TabWawancara({ kode, items, onRefresh }: { kode: string; items: Wawanca
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    const hasAnalyzing = items.some(w => w.status === 'analyzing')
+    if (hasAnalyzing) {
+      pollRef.current = setTimeout(() => onRefresh(), 4000)
+    }
+    return () => { if (pollRef.current) clearTimeout(pollRef.current) }
+  }, [items, onRefresh])
 
   async function handleUpload() {
     if (!file) return
@@ -319,14 +408,22 @@ function TabWawancara({ kode, items, onRefresh }: { kode: string; items: Wawanca
 
         <div>
           <label style={labelStyle}>File Catatan / Paparan</label>
-          <div onClick={() => fileRef.current?.click()} style={{ border: '1px dashed rgba(69,230,97,0.3)', borderRadius: 12, padding: 16, textAlign: 'center', cursor: 'pointer' }}>
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) setFile(f) }}
+            onClick={() => fileRef.current?.click()}
+            style={{ border: `1px dashed ${dragOver ? '#45e661' : 'rgba(69,230,97,0.3)'}`, background: dragOver ? 'rgba(69,230,97,0.05)' : 'transparent', borderRadius: 12, padding: 16, textAlign: 'center', cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s' }}
+          >
             {file ? (
               <div>
                 <p style={{ fontSize: 13, fontWeight: 500 }}>{file.name}</p>
                 <p style={{ fontSize: 11, color: '#aab4bc', marginTop: 4 }}>{(file.size / 1024).toFixed(0)} KB</p>
               </div>
             ) : (
-              <p style={{ fontSize: 13, color: '#828d96' }}>Klik untuk pilih file<br/><span style={{ fontSize: 11 }}>PDF, DOCX, PPTX, TXT</span></p>
+              <p style={{ fontSize: 12.5, color: '#828d96', margin: 0 }}>
+                Drag & drop file di sini<br/><span style={{ fontSize: 11 }}>atau klik — PDF, DOCX, PPTX, TXT</span>
+              </p>
             )}
           </div>
           <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.pptx,.txt" style={{ display: 'none' }}
@@ -343,7 +440,7 @@ function TabWawancara({ kode, items, onRefresh }: { kode: string; items: Wawanca
 
         <button onClick={handleUpload} disabled={!file || uploading}
           style={{ background: file && !uploading ? '#45e661' : 'rgba(255,255,255,0.06)', color: file && !uploading ? '#04120a' : '#828d96', border: 'none', borderRadius: 999, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: file && !uploading ? 'pointer' : 'default', fontFamily: 'inherit', width: '100%' }}>
-          {uploading ? 'Menganalisis...' : 'Mulai Analisis Wawancara'}
+          {uploading ? 'Mengupload...' : 'Mulai Analisis Wawancara'}
         </button>
       </div>
 
