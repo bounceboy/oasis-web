@@ -4,12 +4,11 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import Navbar from '@/components/oasis/Navbar'
 import type { TemplateData } from '@/lib/psak-template-structure'
 import {
+  buildRasioGroups,
+  formatRasio,
   templateDataToDataKeuangan,
-  hitungRasio,
-  buildScorecard,
-  hitungSkor,
-  formatNilai,
-  type ScorecardItem,
+  type RasioGroup,
+  type DataKeuangan,
 } from '@/lib/psak-scorecard'
 
 type JenisUsaha = 'Jiwa' | 'Umum'
@@ -309,15 +308,11 @@ export default function PsakPage() {
   const isAnalyzing = detail.status === 'analyzing' || analyzing
   const showScorecard = hasTemplate && ['template_ready', 'analyzing', 'done'].includes(detail.status)
 
-  // Compute scorecard from template_data
-  const dk = hasTemplate ? templateDataToDataKeuangan(detail.template_data!) : null
-  const rasio = dk ? hitungRasio(dk) : null
-  const scorecard: ScorecardItem[] = rasio ? buildScorecard(rasio, detail.jenis_usaha) : []
-  const skor = scorecard.length > 0 ? hitungSkor(scorecard) : null
-
-  const ratingColor = skor?.rating === 'Baik' ? '#45e661' :
-    skor?.rating === 'Cukup' ? '#ffbe50' :
-    skor?.rating === 'Kurang' ? '#ff9940' : '#ff6f61'
+  // Compute rasio groups from template_data
+  const rasioGroups: RasioGroup[] = hasTemplate
+    ? buildRasioGroups(detail.template_data!, detail.jenis_usaha)
+    : []
+  const dk: DataKeuangan | null = hasTemplate ? templateDataToDataKeuangan(detail.template_data!) : null
 
   const TABS: { key: Tab; label: string }[] = [
     { key: 'scorecard', label: 'Scorecard & Rasio' },
@@ -414,11 +409,6 @@ export default function PsakPage() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            {skor && (
-              <span style={{ fontSize: 14, fontWeight: 600, color: ratingColor }}>
-                Rating: {skor.rating} ({skor.skor}/{skor.total})
-              </span>
-            )}
             {/* Download buttons */}
             <button onClick={() => downloadFile('download-template', 'template.xlsx')} disabled={downloading === 'template.xlsx'}
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#b7c0c6', borderRadius: 999, padding: '7px 14px', fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -456,56 +446,51 @@ export default function PsakPage() {
 
           {/* ── SCORECARD TAB ── */}
           {activeTab === 'scorecard' && (
-            <div>
-              {skor && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
-                  <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '20px 24px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 38, fontWeight: 300 }}>{skor.skor}<span style={{ fontSize: 20, color: '#828d96' }}>/{skor.total}</span></div>
-                    <div style={{ fontSize: 11, color: '#aab4bc', marginTop: 6 }}>Metrik Lulus</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+              {rasioGroups.map(group => (
+                <div key={group.title}>
+                  <div style={{ fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#45e661', marginBottom: 12 }}>
+                    {group.title}
                   </div>
-                  <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '20px 24px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 38, fontWeight: 300, color: ratingColor }}>{skor.rating}</div>
-                    <div style={{ fontSize: 11, color: '#aab4bc', marginTop: 6 }}>Rating Keseluruhan</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '20px 24px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 22, fontWeight: 300 }}>{detail.periode || '–'}</div>
-                    <div style={{ fontSize: 11, color: '#aab4bc', marginTop: 6 }}>Periode</div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr>
+                          {['Indikator', 'Formula', 'Nilai'].map((h, hi) => (
+                            <th key={h} style={{
+                              textAlign: hi === 2 ? 'right' : 'left',
+                              padding: '8px 14px',
+                              color: '#828d96',
+                              fontWeight: 500,
+                              fontSize: 10.5,
+                              letterSpacing: '0.08em',
+                              borderBottom: '1px solid rgba(255,255,255,0.07)',
+                              width: hi === 0 ? '35%' : hi === 1 ? '45%' : '20%',
+                            }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.items.map((item, i) => (
+                          <tr key={i} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                            <td style={{ padding: '10px 14px', color: '#eef2ef' }}>{item.metric}</td>
+                            <td style={{ padding: '10px 14px', color: '#828d96', fontSize: 12 }}>{item.formula}</td>
+                            <td style={{
+                              padding: '10px 14px',
+                              textAlign: 'right',
+                              fontFamily: 'monospace',
+                              fontVariantNumeric: 'tabular-nums',
+                              color: item.nilai == null ? '#454e55' : '#b7c0c6',
+                            }}>
+                              {formatRasio(item.nilai, item.format)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              )}
-
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr>
-                      {['Metrik', 'Nilai', 'Threshold', 'Status', 'Keterangan'].map(h => (
-                        <th key={h} style={{ textAlign: h === 'Nilai' ? 'right' : h === 'Status' ? 'center' : 'left', padding: '10px 16px', color: '#aab4bc', fontWeight: 500, fontSize: 11, letterSpacing: '0.08em', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {scorecard.map((s, i) => (
-                      <tr key={i} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                        <td style={{ padding: '11px 16px', color: '#eef2ef' }}>{s.metric}</td>
-                        <td style={{ padding: '11px 16px', textAlign: 'right', fontFamily: 'monospace', color: '#b7c0c6' }}>
-                          {formatNilai(s.nilai, s.threshold)}
-                        </td>
-                        <td style={{ padding: '11px 16px', color: '#828d96', fontSize: 12 }}>{s.threshold}</td>
-                        <td style={{ padding: '11px 16px', textAlign: 'center' }}>
-                          {s.pass === null ? (
-                            <span style={{ color: '#828d96', fontSize: 11 }}>–</span>
-                          ) : s.pass ? (
-                            <span style={{ background: 'rgba(69,230,97,0.12)', color: '#45e661', fontSize: 11, padding: '3px 10px', borderRadius: 999 }}>✓ Lulus</span>
-                          ) : (
-                            <span style={{ background: 'rgba(255,111,97,0.12)', color: '#ff6f61', fontSize: 11, padding: '3px 10px', borderRadius: 999 }}>✗ Tidak Lulus</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '11px 16px', color: '#aab4bc', fontSize: 12 }}>{s.keterangan}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              ))}
             </div>
           )}
 
