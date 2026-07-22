@@ -83,6 +83,7 @@ export const IFRS17_FIELDS = [
   { key: 'I17_CEDED_RES',    label_id: 'Ceded share of reserves / reinsurance recoverables', label_en: 'Ceded share of reserves / reinsurance recoverables on LIC' },
   { key: 'I17_GWP',          label_id: 'Gross written premium / GWP (management metric)', label_en: 'Gross written premium / GWP equivalent' },
   { key: 'I17_NWP',          label_id: 'Net written premium / NWP (management metric)',   label_en: 'Net written premium / NWP equivalent' },
+  { key: 'I17_CSM_RELEASE',  label_id: 'CSM yang dirilis ke P/L (rekonsiliasi CSM)',      label_en: 'CSM released to P/L during the year' },
   // Jiwa only
   { key: 'I17_CSM_OPEN',     label_id: 'CSM saldo awal',                                  label_en: 'CSM opening balance' },
   { key: 'I17_CSM_CLOSE',    label_id: 'CSM saldo akhir',                                 label_en: 'CSM closing balance' },
@@ -187,6 +188,7 @@ export const TEMPLATE_UMUM_MAPPING: Record<string, { sheet: string; row: number 
   I17_CEDED_RES: { sheet: 'Input_IFRS17_Detail', row: 23 },
   I17_GWP: { sheet: 'Input_IFRS17_Detail', row: 24 },
   I17_NWP: { sheet: 'Input_IFRS17_Detail', row: 25 },
+  I17_CSM_RELEASE: { sheet: 'Input_IFRS17_Detail', row: 26 },
   // Input_IFRS9_Detail rows 3-26
   I9_FVTPL: { sheet: 'Input_IFRS9_Detail', row: 3 },
   I9_FVOCI_DEBT: { sheet: 'Input_IFRS9_Detail', row: 4 },
@@ -278,6 +280,7 @@ export const V5_UMUM_MAPPING: Record<string, { sheet: string; row: number }> = {
   I17_CEDED_RES: { sheet: 'Raw_IFRS17', row: 23 },
   I17_GWP: { sheet: 'Raw_IFRS17', row: 24 },
   I17_NWP: { sheet: 'Raw_IFRS17', row: 25 },
+  I17_CSM_RELEASE: { sheet: 'Raw_IFRS17', row: 26 },
   I9_FVTPL: { sheet: 'Raw_IFRS9', row: 3 },
   I9_FVOCI_DEBT: { sheet: 'Raw_IFRS9', row: 4 },
   I9_FVOCI_EQ: { sheet: 'Raw_IFRS9', row: 5 },

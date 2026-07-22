@@ -152,7 +152,7 @@ export function templateDataToDataKeuangan(td: TemplateData): DataKeuangan {
     profit_tahun_berjalan: profit ?? undefined,
     csm_penutup: cy('I17_CSM_CLOSE') ?? undefined,
     csm_pembuka: cy('I17_CSM_OPEN') ?? undefined,
-    csm_release: undefined,
+    csm_release: cy('I17_CSM_RELEASE') ?? undefined,
     lrc: cy('I17_LRC') ?? undefined,
     lic: cy('I17_LIC') ?? undefined,
     loss_component: cy('I17_LOSS_COMP') ?? undefined,
