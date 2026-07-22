@@ -254,6 +254,7 @@ export default function KyicV2Page() {
   const currentDokumen = getBabDokumen(activeBab)
   const currentStatus = getBabStatus(activeBab)
   const baselineText = detail?.session.template_sections?.[activeBab] ?? null
+  const hasPdfTemplate = !!(detail?.session as unknown as Record<string, unknown>)?.template_storage_path
 
   // ─── Render: Session List ───────────────────────────────────────────────
 
@@ -399,7 +400,7 @@ export default function KyicV2Page() {
           <div style={{ marginBottom: 20, padding: '10px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
             <p style={{ fontSize: 11, color: '#aab4bc', marginBottom: 8 }}>KYIC Template (T-1)</p>
             {uploadingTemplate ? (
-              <p style={{ fontSize: 11, color: '#828d96' }}>⏳ Memproses... (OCR aktif, tunggu ~60 detik)</p>
+              <p style={{ fontSize: 11, color: '#828d96' }}>⏳ Menyimpan template...</p>
             ) : detail.session.template_nama ? (
               <div>
                 <p style={{ fontSize: 11, color: '#45e661', marginBottom: 6 }}>✓ {detail.session.template_nama}</p>
@@ -440,8 +441,8 @@ export default function KyicV2Page() {
                     {bab.nomor}. {bab.judul.length > 28 ? bab.judul.slice(0, 28) + '…' : bab.judul}
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginLeft: 6 }}>
-                    {hasBaseline && status === 'pending' && (
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(255,190,80,0.6)' }} title="Ada data T-1" />
+                    {(hasBaseline || hasPdfTemplate) && status === 'pending' && (
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(255,190,80,0.6)' }} title="Ada template T-1" />
                     )}
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLORS[status] }} />
                   </div>
@@ -464,6 +465,17 @@ export default function KyicV2Page() {
             </div>
             <p style={{ fontSize: 13, color: '#828d96' }}>{currentBab.deskripsi}</p>
           </div>
+
+          {/* Info box: PDF T-1 tersedia, baseline akan dibaca saat analisis */}
+          {hasPdfTemplate && !baselineText && currentStatus === 'pending' && (
+            <div style={{ background: 'rgba(69,230,97,0.05)', border: '1px solid rgba(69,230,97,0.2)', borderRadius: 12, padding: '12px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 18 }}>📄</span>
+              <div>
+                <p style={{ fontSize: 12, fontWeight: 600, color: '#45e661', marginBottom: 2 }}>Template KYIC T-1 (PDF) tersedia</p>
+                <p style={{ fontSize: 12, color: '#828d96' }}>Data baseline T-1 akan dibaca langsung dari PDF saat analisis dijalankan. Klik <strong style={{ color: '#aab4bc' }}>▶ Analisis BAB Ini</strong> untuk mulai.</p>
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
 
