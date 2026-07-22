@@ -84,6 +84,7 @@ export const IFRS17_FIELDS = [
   { key: 'I17_GWP',          label_id: 'Gross written premium / GWP (management metric)', label_en: 'Gross written premium / GWP equivalent' },
   { key: 'I17_NWP',          label_id: 'Net written premium / NWP (management metric)',   label_en: 'Net written premium / NWP equivalent' },
   { key: 'I17_CSM_RELEASE',  label_id: 'CSM yang dirilis ke P/L (rekonsiliasi CSM)',      label_en: 'CSM released to P/L during the year' },
+  { key: 'I17_ISR',          label_id: 'Hasil jasa asuransi / insurance service result (dari LUPLRG)', label_en: 'Insurance service result (direct from P&L)' },
   // Jiwa only
   { key: 'I17_CSM_OPEN',     label_id: 'CSM saldo awal',                                  label_en: 'CSM opening balance' },
   { key: 'I17_CSM_CLOSE',    label_id: 'CSM saldo akhir',                                 label_en: 'CSM closing balance' },

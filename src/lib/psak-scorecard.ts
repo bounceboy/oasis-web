@@ -12,7 +12,6 @@ export interface RasioItem {
 
 export interface RasioGroup {
   title: string
-  jiwaOnly?: boolean
   items: RasioItem[]
 }
 
@@ -30,7 +29,11 @@ export function buildRasioGroups(td: TemplateData, jenis: JenisUsaha): RasioGrou
     return num / den
   }
 
-  // ── Computed aggregates ───────────────────────────────────────────────────
+  function item(metric: string, formula: string, nilai: number | null, format: 'pct' | 'x' | 'num'): RasioItem {
+    return { metric, formula, nilai, format }
+  }
+
+  // ── Aggregates ────────────────────────────────────────────────────────────
   const totalAset = sum(
     'SFP_CASH', 'SFP_MM', 'SFP_FVTPL', 'SFP_FVOCI_DEBT', 'SFP_FVOCI_EQ',
     'SFP_AC', 'SFP_INVPROP', 'SFP_RECEIV', 'SFP_UNDERWRITING_OTHER',
@@ -48,10 +51,12 @@ export function buildRasioGroups(td: TemplateData, jenis: JenisUsaha): RasioGrou
     'SFP_FVOCI_RES', 'SFP_IFOCI_RES', 'SFP_OTHER_RES',
   )
 
-  const investasiTotal = sum(
-    'SFP_MM', 'SFP_FVTPL', 'SFP_FVOCI_DEBT', 'SFP_FVOCI_EQ', 'SFP_AC', 'SFP_INVPROP',
-  )
+  const insLiab = cy('SFP_INS_LIAB') ?? cy('I17_INS_LIAB')
+  const reinsAsset = cy('SFP_REINS_ASSET') ?? cy('I17_REINS_ASSET')
+  const kas = cy('SFP_CASH')
+  const fvociRes = cy('SFP_FVOCI_RES') ?? cy('I9_FVOCI_RES')
 
+  // Profit = sum of all P&L lines (requires at least 4 lines to be meaningful)
   const plKeys = [
     'PL_INS_REV', 'PL_INS_EXP', 'PL_REINS_NET', 'PL_INV_RES', 'PL_IF_FIN',
     'PL_REINS_FIN', 'PL_IMPAIR', 'PL_FEE_OTHER', 'PL_OPEX', 'PL_OTHER_NONOP', 'PL_TAX',
@@ -59,149 +64,151 @@ export function buildRasioGroups(td: TemplateData, jenis: JenisUsaha): RasioGrou
   const plVals = plKeys.map(k => cy(k)).filter((x): x is number => x != null)
   const profit = plVals.length >= 4 ? plVals.reduce((a, b) => a + b, 0) : null
 
-  // ISR = Insurance Revenue + Service Expense + Net Reins
-  const isr = (() => {
+  // ISR: use direct value from Excel if available, else compute from P&L lines
+  const isrDirect = cy('I17_ISR')
+  const isrComputed = (() => {
     const rev = cy('PL_INS_REV')
     if (rev == null) return null
-    return (cy('PL_INS_REV') ?? 0) + (cy('PL_INS_EXP') ?? 0) + (cy('PL_REINS_NET') ?? 0)
+    return rev + (cy('PL_INS_EXP') ?? 0) + (cy('PL_REINS_NET') ?? 0)
   })()
-
+  const isr = isrDirect ?? isrComputed
   const insRev = cy('PL_INS_REV')
-  const kas = cy('SFP_CASH')
-  const insLiab = cy('SFP_INS_LIAB') ?? cy('I17_INS_LIAB')
-  const reinsAsset = cy('SFP_REINS_ASSET') ?? cy('I17_REINS_ASSET')
-  const fvociRes = cy('SFP_FVOCI_RES') ?? cy('I9_FVOCI_RES')
 
-  const gwp = cy('I17_GWP')
-  const nwp = cy('I17_NWP')
-  const retensi = ratio(nwp, gwp)
-  const cessi = retensi != null ? 1 - retensi : null
+  // Expense ratio: (acquisition CF amortisation + other UW expenses) / insurance revenue
+  const aclCF = cy('I17_ACQ_CF')
+  const uwExp = cy('I17_UW_EXP')
+  const expenseRatio = (aclCF != null || uwExp != null) && insRev
+    ? Math.abs((aclCF ?? 0) + (uwExp ?? 0)) / insRev
+    : null
 
-  const lrc = cy('I17_LRC')
-  const lic = cy('I17_LIC')
-  const lossComp = cy('I17_LOSS_COMP')
-  const ra = cy('I17_RA')
-  const ocr = cy('I17_OCR')
-  const ibnr = cy('I17_IBNR')
-  const cedRes = cy('I17_CEDED_RES')
-
-  const s1exp = cy('I9_S1_EXP')
-  const s2exp = cy('I9_S2_EXP')
-  const s3exp = cy('I9_S3_EXP')
-  const totalExp = sum('I9_S1_EXP', 'I9_S2_EXP', 'I9_S3_EXP')
-  const stage23 = sum('I9_S2_EXP', 'I9_S3_EXP')
-  const totalAllow = sum('I9_S1_ALLOW', 'I9_S2_ALLOW', 'I9_S3_ALLOW')
-
-  const fvtpl9 = cy('I9_FVTPL')
-  const fvociDebt9 = cy('I9_FVOCI_DEBT')
-  const fvociEq9 = cy('I9_FVOCI_EQ')
-  const ac9 = cy('I9_AC')
+  // Investasi (for Jiwa portofolio indicator)
+  const investasiTotal = sum('SFP_MM', 'SFP_FVTPL', 'SFP_FVOCI_DEBT', 'SFP_FVOCI_EQ', 'SFP_AC', 'SFP_INVPROP')
   const inv9Total = sum('I9_FVTPL', 'I9_FVOCI_DEBT', 'I9_FVOCI_EQ', 'I9_AC', 'I9_LOANS')
 
+  // ECL: Stage 1 only (companies rarely fill stage 2+3)
+  const eclS1Allow = cy('I9_S1_ALLOW')
+  // Denominator = total financial assets with ECL (use I9 totals or investasi total as fallback)
+  const eclBase = inv9Total ?? investasiTotal
+  const eclCoverage = ratio(eclS1Allow, eclBase)
+
+  // CSM
   const csmOpen = cy('I17_CSM_OPEN')
   const csmClose = cy('I17_CSM_CLOSE')
   const csmRelease = cy('I17_CSM_RELEASE')
-  const raOpen = cy('I17_RA_OPEN')
-  const aclCF = cy('I17_ACQ_CF')
-  const uwExp = cy('I17_UW_EXP')
 
-  function item(metric: string, formula: string, nilai: number | null, format: 'pct' | 'x' | 'num'): RasioItem {
-    return { metric, formula, nilai, format }
+  // RA: RA_OPEN = saldo awal, I17_RA = saldo akhir
+  const raOpen = cy('I17_RA_OPEN')
+  const raClose = cy('I17_RA')
+  const perubahanRA = ratio(raClose, raOpen)
+
+  const lossComp = cy('I17_LOSS_COMP')
+  const ocf = cy('CF_OP')
+
+  // ── ASURANSI UMUM ─────────────────────────────────────────────────────────
+  if (jenis === 'Umum') {
+    return [
+      {
+        title: 'Profitabilitas',
+        items: [
+          item('ROA', 'Profit / Total Aset', ratio(profit, totalAset), 'pct'),
+          item('ROE', 'Profit / Total Ekuitas', ratio(profit, totalEkuitas), 'pct'),
+        ],
+      },
+      {
+        title: 'Underwriting',
+        items: [
+          item('Expense Ratio', '|Biaya Akuisisi + Biaya UW| / Pendapatan Asuransi', expenseRatio, 'pct'),
+        ],
+      },
+      {
+        title: 'Reasuransi',
+        items: [
+          item('Reinsurance Asset / Ekuitas', 'Aset Kontrak Reasuransi / Ekuitas', ratio(reinsAsset, totalEkuitas), 'x'),
+        ],
+      },
+      {
+        title: 'Likuiditas',
+        items: [
+          item('Cash / Total Liabilitas', 'Kas & Setara Kas / Total Liabilitas', ratio(kas, totalLiab), 'pct'),
+        ],
+      },
+      {
+        title: 'Arus Kas',
+        items: [
+          item('OCF / Profit', 'Arus Kas Operasi / Profit', ratio(ocf, profit), 'x'),
+        ],
+      },
+      {
+        title: 'IFRS 9 — Kualitas Aset Keuangan',
+        items: [
+          item('ECL Coverage', 'Cadangan ECL Stage 1 / Total Aset Investasi', eclCoverage, 'pct'),
+        ],
+      },
+      {
+        title: 'IFRS 17 — Kinerja & Struktur Kontrak',
+        items: [
+          item('CSM Growth', 'CSM Saldo Akhir / CSM Saldo Awal', ratio(csmClose, csmOpen), 'x'),
+          item('CSM Release', 'CSM Dirilis / CSM Saldo Awal', ratio(csmRelease, csmOpen), 'pct'),
+          item('Perubahan RA', 'RA Tahun Ini / RA Tahun Lalu', perubahanRA, 'x'),
+          item('Loss Component Weight', 'Loss Component / Liab. Kontrak Asuransi',
+            lossComp != null && insLiab ? Math.abs(lossComp) / insLiab : null, 'pct'),
+        ],
+      },
+    ]
   }
 
-  // ── Groups ────────────────────────────────────────────────────────────────
-  const groups: RasioGroup[] = [
-
+  // ── ASURANSI JIWA ─────────────────────────────────────────────────────────
+  return [
     {
-      title: 'Keuangan Umum',
+      title: 'Profitabilitas',
       items: [
-        item('ROE', 'Profit / Ekuitas', ratio(profit, totalEkuitas), 'pct'),
         item('ROA', 'Profit / Total Aset', ratio(profit, totalAset), 'pct'),
-        item('Leverage', 'Total Liabilitas / Ekuitas', ratio(totalLiab, totalEkuitas), 'x'),
-        item('Likuiditas (Kas)', 'Kas / Total Liabilitas', ratio(kas, totalLiab), 'pct'),
-        item('Investasi / Total Aset', 'Total Investasi / Total Aset', ratio(investasiTotal, totalAset), 'pct'),
-        item('Liab. Kontrak Asuransi / Total Aset', 'Liab. Kontrak Asuransi / Total Aset', ratio(insLiab, totalAset), 'pct'),
-        item('Aset Reasuransi / Ekuitas', 'Aset Kontrak Reasuransi / Ekuitas', ratio(reinsAsset, totalEkuitas), 'x'),
+        item('ROE', 'Profit / Total Ekuitas', ratio(profit, totalEkuitas), 'pct'),
+      ],
+    },
+    {
+      title: 'Margin',
+      items: [
+        item('ISR Margin', 'Insurance Service Result / Pendapatan Asuransi', ratio(isr, insRev), 'pct'),
+      ],
+    },
+    {
+      title: 'Likuiditas',
+      items: [
+        item('Cash / Total Liabilitas', 'Kas & Setara Kas / Total Liabilitas', ratio(kas, totalLiab), 'pct'),
+      ],
+    },
+    {
+      title: 'Portofolio Investasi',
+      items: [
+        item('Aset Investasi / Total Aset',
+          '(FVTPL + FVOCI + AC) / Total Aset',
+          ratio(inv9Total ?? investasiTotal, totalAset), 'pct'),
+      ],
+    },
+    {
+      title: 'IFRS 17 — Struktur Liabilitas & CSM',
+      items: [
+        item('Liab. Kontrak Asuransi / Ekuitas', 'Liab. Kontrak Asuransi / Ekuitas', ratio(insLiab, totalEkuitas), 'x'),
+        item('CSM Growth', 'CSM Saldo Akhir / CSM Saldo Awal', ratio(csmClose, csmOpen), 'x'),
+        item('CSM Release', 'CSM Dirilis / CSM Saldo Awal', ratio(csmRelease, csmOpen), 'pct'),
+        item('Perubahan RA', 'RA Tahun Ini / RA Tahun Lalu', perubahanRA, 'x'),
+      ],
+    },
+    {
+      title: 'IFRS 9 — Kualitas Aset Keuangan',
+      items: [
+        item('ECL Coverage', 'Cadangan ECL Stage 1 / Total Aset Investasi', eclCoverage, 'pct'),
         item('FVOCI Reserve / Ekuitas', 'Cadangan FVOCI / Ekuitas', ratio(fvociRes, totalEkuitas), 'pct'),
       ],
     },
-
     {
-      title: 'PSAK 117 — Kinerja Underwriting',
+      title: 'Arus Kas',
       items: [
-        item('ISR Margin', 'ISR / Insurance Revenue', ratio(isr, insRev), 'pct'),
-        item('Expense Ratio', '|Akuisisi + UW| / Insurance Revenue',
-          (aclCF != null || uwExp != null) && insRev
-            ? Math.abs((aclCF ?? 0) + (uwExp ?? 0)) / insRev
-            : null,
-          'pct',
-        ),
-        item('Retensi', 'NWP / GWP', retensi, 'pct'),
-        item('Cessi', '1 − NWP/GWP', cessi, 'pct'),
-        item('Investment Yield', 'Hasil Investasi / Total Investasi', ratio(cy('PL_INV_RES'), investasiTotal), 'pct'),
-        item('OCF / Profit', 'Arus Kas Operasi / Profit', ratio(cy('CF_OP'), profit), 'pct'),
-        item('Gross Claims / Insurance Revenue', 'Gross Claims / Insurance Revenue',
-          ratio(cy('I17_GROSS_CLAIMS'), insRev), 'pct'),
-        item('Reins Recovery / Insurance Revenue', 'Reins Recoveries / Insurance Revenue',
-          ratio(cy('I17_REINS_RECOV'), insRev), 'pct'),
+        item('OCF / Profit', 'Arus Kas Operasi / Profit', ratio(ocf, profit), 'x'),
       ],
     },
-
-    {
-      title: 'PSAK 117 — Struktur Liabilitas',
-      items: [
-        item('LRC / Liab. Kontrak Asuransi', 'LRC / Total Liab. Kontrak', ratio(lrc, insLiab), 'pct'),
-        item('LIC / Liab. Kontrak Asuransi', 'LIC / Total Liab. Kontrak', ratio(lic, insLiab), 'pct'),
-        item('Loss Component / Liab. Kontrak', 'Loss Component / Total Liab. Kontrak',
-          lossComp != null && insLiab ? Math.abs(lossComp) / insLiab : null, 'pct'),
-        item('Risk Adjustment / LIC', 'RA / LIC', ratio(ra, lic), 'pct'),
-        item('IBNR / (OCR + IBNR)', 'IBNR / (OCR + IBNR)',
-          (ocr != null || ibnr != null)
-            ? ratio(ibnr, (ocr ?? 0) + (ibnr ?? 0))
-            : null,
-          'pct',
-        ),
-        item('Ceded Reserves / Liab. Kontrak', 'Ceded Share / Total Liab. Kontrak', ratio(cedRes, insLiab), 'pct'),
-      ],
-    },
-
-    {
-      title: 'PSAK 117 — CSM (Asuransi Jiwa)',
-      jiwaOnly: true,
-      items: [
-        item('CSM Akhir / Ekuitas', 'CSM Close / Ekuitas', ratio(csmClose, totalEkuitas), 'pct'),
-        item('CSM Growth', 'CSM Akhir / CSM Awal', ratio(csmClose, csmOpen), 'x'),
-        item('CSM Release Ratio', 'CSM Release / CSM Awal', ratio(csmRelease, csmOpen), 'pct'),
-        item('RA Change', 'RA Akhir / RA Awal', ratio(ra, raOpen), 'x'),
-      ],
-    },
-
-    {
-      title: 'PSAK 109 — Kualitas Aset Keuangan',
-      items: [
-        item('FVTPL / Total Investasi', 'FVTPL / Total Investasi (I9)',
-          ratio(fvtpl9, inv9Total ?? investasiTotal), 'pct'),
-        item('FVOCI / Total Investasi', '(FVOCI Debt + Equity) / Total Investasi',
-          (fvociDebt9 != null || fvociEq9 != null)
-            ? ratio((fvociDebt9 ?? 0) + (fvociEq9 ?? 0), inv9Total ?? investasiTotal)
-            : null,
-          'pct',
-        ),
-        item('AC / Total Investasi', 'Amortised Cost / Total Investasi',
-          ratio(ac9, inv9Total ?? investasiTotal), 'pct'),
-        item('ECL Coverage', 'Total ECL Allowance / Total Gross Exposure',
-          ratio(totalAllow, totalExp), 'pct'),
-        item('Stage 2+3 Ratio', '(Stage 2 + Stage 3 Exp) / Total Exp',
-          ratio(stage23, totalExp), 'pct'),
-        item('Write-off Ratio', 'Write-offs / Total Exposure',
-          ratio(cy('I9_WRITEOFF'), totalExp), 'pct'),
-      ],
-    },
-
   ]
-
-  // Filter jiwaOnly groups based on jenis
-  return groups.filter(g => !g.jiwaOnly || jenis === 'Jiwa')
 }
 
 // ── DataKeuangan helper (used by Data Lengkap tab) ──────────────────────────
@@ -229,8 +236,6 @@ export interface DataKeuangan {
   risk_adjustment_pembuka?: number
   ecl_total?: number
   ecl_base?: number
-  stage2_3_exposure?: number
-  stage_total_exposure?: number
   arus_kas_operasi?: number
 }
 
@@ -251,10 +256,13 @@ export function templateDataToDataKeuangan(td: TemplateData): DataKeuangan {
     'PL_REINS_FIN','PL_IMPAIR','PL_FEE_OTHER','PL_OPEX','PL_OTHER_NONOP','PL_TAX']
   const plVals = plKeys.map(k => cy(k)).filter((x): x is number => x != null)
   const profit = plVals.length >= 4 ? plVals.reduce((a, b) => a + b, 0) : null
-  const isr = (() => {
+
+  const isrDirect = cy('I17_ISR')
+  const isrComputed = (() => {
     const rev = cy('PL_INS_REV'); if (rev == null) return null
     return rev + (cy('PL_INS_EXP') ?? 0) + (cy('PL_REINS_NET') ?? 0)
   })()
+
   return {
     total_aset: totalAset ?? undefined,
     total_liabilitas: totalLiab ?? undefined,
@@ -266,7 +274,7 @@ export function templateDataToDataKeuangan(td: TemplateData): DataKeuangan {
     pendapatan_asuransi: cy('PL_INS_REV') ?? undefined,
     beban_jasa_asuransi: cy('PL_INS_EXP') ?? undefined,
     klaim_dan_manfaat: cy('I17_GROSS_CLAIMS') ?? undefined,
-    insurance_service_result: isr ?? undefined,
+    insurance_service_result: (isrDirect ?? isrComputed) ?? undefined,
     hasil_investasi: cy('PL_INV_RES') ?? undefined,
     profit_tahun_berjalan: profit ?? undefined,
     csm_penutup: cy('I17_CSM_CLOSE') ?? undefined,
@@ -277,10 +285,8 @@ export function templateDataToDataKeuangan(td: TemplateData): DataKeuangan {
     loss_component: cy('I17_LOSS_COMP') ?? undefined,
     risk_adjustment: cy('I17_RA') ?? undefined,
     risk_adjustment_pembuka: cy('I17_RA_OPEN') ?? undefined,
-    ecl_total: sumKeys('I9_S1_ALLOW','I9_S2_ALLOW','I9_S3_ALLOW') ?? undefined,
-    ecl_base: sumKeys('I9_S1_EXP','I9_S2_EXP','I9_S3_EXP') ?? undefined,
-    stage2_3_exposure: sumKeys('I9_S2_EXP','I9_S3_EXP') ?? undefined,
-    stage_total_exposure: sumKeys('I9_S1_EXP','I9_S2_EXP','I9_S3_EXP') ?? undefined,
+    ecl_total: cy('I9_S1_ALLOW') ?? undefined,
+    ecl_base: sumKeys('I9_FVTPL','I9_FVOCI_DEBT','I9_FVOCI_EQ','I9_AC','I9_LOANS') ?? undefined,
     arus_kas_operasi: cy('CF_OP') ?? undefined,
   }
 }

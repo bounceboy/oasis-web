@@ -64,10 +64,13 @@ export default function PsakPage() {
 
   // Action state
   const [uploading, setUploading] = useState(false)
+  const [uploadingExcel, setUploadingExcel] = useState(false)
   const [extracting, setExtracting] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [downloading, setDownloading] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [excelError, setExcelError] = useState<string | null>(null)
+  const [excelImported, setExcelImported] = useState<number | null>(null)
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -168,6 +171,30 @@ export default function PsakPage() {
       setUploadError(err instanceof Error ? err.message : String(err))
     } finally {
       setUploading(false)
+    }
+  }
+
+  async function uploadExcel(file: File) {
+    if (!detail) return
+    setUploadingExcel(true)
+    setExcelError(null)
+    setExcelImported(null)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch(`/api/psak/v2/session/${detail.id}/upload-excel`, { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Gagal upload Excel')
+      setExcelImported(data.fieldsImported)
+      // Reload session untuk update template_data
+      const updated = await loadDetail(detail.id)
+      if (updated && !['template_ready', 'analyzing', 'done'].includes(updated.status)) {
+        startPoll(detail.id)
+      }
+    } catch (err) {
+      setExcelError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setUploadingExcel(false)
     }
   }
 
@@ -375,14 +402,41 @@ export default function PsakPage() {
             {uploadError && <p style={{ fontSize: 11.5, color: '#ff6f61', margin: '8px 0 0' }}>{uploadError}</p>}
           </StepCard>
 
-          {/* STEP 2 — Ekstraksi */}
-          <StepCard num={2} title="Ekstraksi Data ke Template" done={false} active={hasLK && !isExtracting} loading={isExtracting}>
+          {/* STEP 2 — Upload Excel */}
+          <StepCard num={2} title="Upload Excel PSAK 117 (OJK Template)" done={false} active={hasLK} loading={uploadingExcel}>
+            <p style={{ fontSize: 12, color: '#828d96', margin: '0 0 12px' }}>
+              Template Excel format OJK — sheet: LUPSPK, LUPLRG, LUPAKS, LUPCRF, LUPSAGP, LUPAKD, LUPSKV
+            </p>
+            {uploadingExcel ? (
+              <p style={{ fontSize: 12.5, color: '#ffbe50', margin: 0 }}>⏳ Membaca Excel dan mengisi data...</p>
+            ) : excelImported != null ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 12.5, color: '#45e661' }}>✓ {excelImported} field berhasil diimport dari Excel</span>
+                <label style={{ cursor: 'pointer' }}>
+                  <input type="file" accept=".xlsx,.xls,.xlsm" style={{ display: 'none' }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadExcel(f); e.target.value = '' }} />
+                  <span style={{ fontSize: 11, color: '#828d96', textDecoration: 'underline' }}>Upload ulang</span>
+                </label>
+              </div>
+            ) : (
+              <label style={{ cursor: hasLK ? 'pointer' : 'default', display: 'block', border: `1px dashed ${hasLK ? 'rgba(69,230,97,0.35)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 14, padding: '20px', textAlign: 'center', opacity: hasLK ? 1 : 0.5 }}>
+                <input type="file" accept=".xlsx,.xls,.xlsm" style={{ display: 'none' }} disabled={!hasLK}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadExcel(f); e.target.value = '' }} />
+                <div style={{ fontSize: 13, color: '#b7c0c6', fontWeight: 500 }}>Klik untuk upload Excel PSAK 117</div>
+                <div style={{ fontSize: 11, color: '#828d96', marginTop: 4 }}>.xlsx / .xls / .xlsm · Diutamakan setelah upload PDF</div>
+              </label>
+            )}
+            {excelError && <p style={{ fontSize: 11.5, color: '#ff6f61', margin: '8px 0 0' }}>{excelError}</p>}
+          </StepCard>
+
+          {/* STEP 3 — Ekstraksi PDF */}
+          <StepCard num={3} title="Ekstraksi Data dari PDF (AI)" done={false} active={hasLK && !isExtracting} loading={isExtracting}>
             {isExtracting ? (
               <p style={{ fontSize: 12.5, color: '#ffbe50', margin: 0 }}>⏳ AI sedang membaca PDF dan mengisi template (~60 detik)...</p>
             ) : hasLK ? (
-              <p style={{ fontSize: 12.5, color: '#828d96', margin: 0 }}>Menunggu proses ekstraksi...</p>
+              <p style={{ fontSize: 12.5, color: '#828d96', margin: 0 }}>Menunggu proses ekstraksi PDF...</p>
             ) : (
-              <p style={{ fontSize: 12.5, color: '#828d96', margin: 0 }}>Upload LK terlebih dahulu</p>
+              <p style={{ fontSize: 12.5, color: '#828d96', margin: 0 }}>Upload LK PDF terlebih dahulu</p>
             )}
           </StepCard>
         </div>
@@ -424,10 +478,18 @@ export default function PsakPage() {
                 {downloading === 'analisis.docx' ? '...' : '↓ Analisis (.docx)'}
               </button>
             )}
-            {/* Re-upload */}
+            {/* Re-upload PDF */}
             <label style={{ cursor: 'pointer' }}>
               <input type="file" accept=".pdf" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadLK(f); e.target.value = '' }} />
               <span style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', color: '#828d96', borderRadius: 999, padding: '7px 12px', fontSize: 11, cursor: 'pointer' }}>↑ Ganti PDF</span>
+            </label>
+            {/* Re-upload Excel */}
+            <label style={{ cursor: 'pointer' }}>
+              <input type="file" accept=".xlsx,.xls,.xlsm" style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) uploadExcel(f); e.target.value = '' }} />
+              <span style={{ background: 'transparent', border: `1px solid ${excelImported != null ? 'rgba(69,230,97,0.3)' : 'rgba(255,255,255,0.06)'}`, color: excelImported != null ? '#45e661' : '#828d96', borderRadius: 999, padding: '7px 12px', fontSize: 11, cursor: 'pointer' }}>
+                {uploadingExcel ? '⏳' : excelImported != null ? `✓ Excel (${excelImported})` : '↑ Upload Excel'}
+              </span>
             </label>
           </div>
         </div>
@@ -571,10 +633,8 @@ export default function PsakPage() {
                     { label: 'CSM saldo awal', val: dk.csm_pembuka },
                   ]},
                   { title: 'IFRS 9 — ECL & Staging', items: [
-                    { label: 'ECL total', val: dk.ecl_total },
-                    { label: 'ECL base', val: dk.ecl_base },
-                    { label: 'Stage 2+3 exposure', val: dk.stage2_3_exposure },
-                    { label: 'Stage total exposure', val: dk.stage_total_exposure },
+                    { label: 'ECL cadangan (Stage 1)', val: dk.ecl_total },
+                    { label: 'Total aset finansial (ECL base)', val: dk.ecl_base },
                     { label: 'Arus kas operasi', val: dk.arus_kas_operasi },
                   ]},
                 ].map(section => (
