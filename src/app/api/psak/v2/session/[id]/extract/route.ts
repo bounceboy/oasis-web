@@ -3,6 +3,7 @@ import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { createClient } from '@supabase/supabase-js'
 import { buildExtractionPrompt, type JenisUsaha, type TemplateData } from '@/lib/psak-template-structure'
+import { mergeExcelIntoTemplateData } from '@/lib/psak-excel-parser'
 
 export const maxDuration = 300
 
@@ -26,15 +27,18 @@ function isFinancialPage(text: string): boolean {
   return FINANCIAL_KEYWORDS.filter(k => lower.includes(k)).length >= 2
 }
 
-async function doExtract(sessionId: string, storagePath: string, jenis: JenisUsaha) {
+async function doExtract(
+  sessionId: string,
+  storagePath: string,
+  jenis: JenisUsaha,
+  excelOverride: Record<string, { CY: number | null; PY: number | null; PPY: number | null }> | null,
+) {
   try {
     const { data, error } = await adminClient.storage.from('psak-uploads').download(storagePath)
     if (error || !data) throw new Error('Gagal mengunduh PDF LK')
 
     const buf = Buffer.from(await data.arrayBuffer())
 
-    // Extract text from PDF to bypass Anthropic 100-page limit
-    // Import via internal path to avoid pdf-parse's self-test bug on Vercel
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfParse = require('pdf-parse/lib/pdf-parse.js')
     let pdfText = ''
@@ -46,7 +50,6 @@ async function doExtract(sessionId: string, storagePath: string, jenis: JenisUsa
           })
         },
       })
-      // Filter to financial pages only to reduce token usage
       const pages: string[] = parsed.text.split(/\f/)
       const relevantPages = pages.filter(p => isFinancialPage(p))
       pdfText = relevantPages.length > 0 ? relevantPages.join('\n\n---\n\n') : parsed.text
@@ -58,11 +61,8 @@ async function doExtract(sessionId: string, storagePath: string, jenis: JenisUsa
       throw new Error('Teks PDF terlalu pendek atau kosong — kemungkinan PDF berbasis gambar (scan)')
     }
 
-    // Truncate to ~150k chars to stay within token limits
     const maxChars = 150000
-    if (pdfText.length > maxChars) {
-      pdfText = pdfText.slice(0, maxChars)
-    }
+    if (pdfText.length > maxChars) pdfText = pdfText.slice(0, maxChars)
 
     const prompt = buildExtractionPrompt(jenis)
 
@@ -78,9 +78,7 @@ async function doExtract(sessionId: string, storagePath: string, jenis: JenisUsa
         max_tokens: 16000,
         messages: [{
           role: 'user',
-          content: [
-            { type: 'text', text: `Berikut adalah teks dari Laporan Keuangan Audited:\n\n${pdfText}\n\n---\n\n${prompt}` },
-          ],
+          content: [{ type: 'text', text: `Berikut adalah teks dari Laporan Keuangan Audited:\n\n${pdfText}\n\n---\n\n${prompt}` }],
         }],
       }),
     })
@@ -103,15 +101,20 @@ async function doExtract(sessionId: string, storagePath: string, jenis: JenisUsa
       throw new Error('Gagal parse JSON dari respons AI')
     }
 
+    // Merge Excel values on top of AI-extracted values (Excel takes priority)
+    if (excelOverride && Object.keys(excelOverride).length > 0) {
+      templateData = mergeExcelIntoTemplateData(templateData, excelOverride) as TemplateData
+    }
+
     const filledCount = Object.values(templateData.values || {})
       .filter(v => v.CY != null || v.PY != null).length
 
-    console.log(`[psak] extract selesai: ${filledCount} field terisi dari ${Object.keys(templateData.values || {}).length}`)
+    console.log(`[psak] extract selesai: ${filledCount} field terisi (PDF+Excel) untuk sesi ${sessionId}`)
 
     await db()
       .from('psak_session')
       .update({
-        template_data: templateData,
+        template_data: templateData, // clean: tanpa _excel_override
         status: 'template_ready',
         updated_at: new Date().toISOString(),
       })
@@ -136,7 +139,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params
   const { data: sess } = await db()
     .from('psak_session')
-    .select('lk_storage_path, jenis_usaha, user_id')
+    .select('lk_storage_path, jenis_usaha, user_id, template_data')
     .eq('id', id)
     .single()
 
@@ -146,12 +149,16 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   }
   if (!sess.lk_storage_path) return NextResponse.json({ error: 'PDF LK belum diupload' }, { status: 400 })
 
+  // Ambil excel_override yang sudah disimpan dari upload Excel sebelumnya
+  const td = sess.template_data as Record<string, unknown> | null
+  const excelOverride = (td?._excel_override as Record<string, { CY: number | null; PY: number | null; PPY: number | null }> | null) ?? null
+
   await db()
     .from('psak_session')
     .update({ status: 'extracting', error_msg: null, updated_at: new Date().toISOString() })
     .eq('id', id)
 
-  after(() => doExtract(id, sess.lk_storage_path as string, sess.jenis_usaha as JenisUsaha))
+  after(() => doExtract(id, sess.lk_storage_path as string, sess.jenis_usaha as JenisUsaha, excelOverride))
 
   return NextResponse.json({ ok: true, extracting: true })
 }

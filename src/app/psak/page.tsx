@@ -70,7 +70,6 @@ export default function PsakPage() {
   const [downloading, setDownloading] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [excelError, setExcelError] = useState<string | null>(null)
-  const [excelImported, setExcelImported] = useState<number | null>(null)
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -163,10 +162,8 @@ export default function PsakPage() {
       })
       if (!setRes.ok) throw new Error('Gagal menyimpan path file')
 
-      await fetch(`/api/psak/v2/session/${detail.id}/extract`, { method: 'POST' })
-      setExtracting(true)
-      startPoll(detail.id)
-      setDetail(prev => prev ? { ...prev, lk_file_name: file.name, lk_storage_path: urlData.storagePath, status: 'extracting' } : prev)
+      // Jangan auto-extract — tunggu Excel juga diupload, lalu user klik Mulai Analisis
+      setDetail(prev => prev ? { ...prev, lk_file_name: file.name, lk_storage_path: urlData.storagePath, status: 'idle' } : prev)
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -178,24 +175,26 @@ export default function PsakPage() {
     if (!detail) return
     setUploadingExcel(true)
     setExcelError(null)
-    setExcelImported(null)
     try {
       const formData = new FormData()
       formData.append('file', file)
       const res = await fetch(`/api/psak/v2/session/${detail.id}/upload-excel`, { method: 'POST', body: formData })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Gagal upload Excel')
-      setExcelImported(data.fieldsImported)
-      // Reload session untuk update template_data
-      const updated = await loadDetail(detail.id)
-      if (updated && !['template_ready', 'analyzing', 'done'].includes(updated.status)) {
-        startPoll(detail.id)
-      }
+      await loadDetail(detail.id)
     } catch (err) {
       setExcelError(err instanceof Error ? err.message : String(err))
     } finally {
       setUploadingExcel(false)
     }
+  }
+
+  async function mulaiAnalisis() {
+    if (!detail) return
+    setExtracting(true)
+    await fetch(`/api/psak/v2/session/${detail.id}/extract`, { method: 'POST' })
+    setDetail(prev => prev ? { ...prev, status: 'extracting' } : prev)
+    startPoll(detail.id)
   }
 
   async function triggerAnalysis() {
@@ -329,11 +328,16 @@ export default function PsakPage() {
   if (!detail) return null
 
   const hasLK = !!detail.lk_storage_path
-  const hasTemplate = !!detail.template_data
+  const td = detail.template_data as Record<string, unknown> | null
+  const hasExcel = !!(td?._excel_override || td?._excel_file_name)
+  const excelFileName = (td?._excel_file_name as string | undefined) ?? null
+  const excelFieldCount = (td?._excel_field_count as number | undefined) ?? null
+  const hasTemplate = !!detail.template_data && !!('values' in (detail.template_data as object))
   const hasAnalysis = !!detail.analisis_text
   const isExtracting = detail.status === 'extracting' || extracting
   const isAnalyzing = detail.status === 'analyzing' || analyzing
   const showScorecard = hasTemplate && ['template_ready', 'analyzing', 'done'].includes(detail.status)
+  const canStart = hasLK && hasExcel && !isExtracting && detail.status !== 'extracting'
 
   // Compute rasio groups from template_data
   const rasioGroups: RasioGroup[] = hasTemplate
@@ -347,98 +351,155 @@ export default function PsakPage() {
     { key: 'detail', label: 'Data Lengkap' },
   ]
 
-  // ── Pre-extraction: step-card UI ─────────────────────────────────────────
+  // ── Pre-extraction UI ────────────────────────────────────────────────────
   if (!showScorecard) return (
     <div style={{ minHeight: '100vh', color: '#eef2ef' }}>
-      <div style={{ maxWidth: 860, margin: '0 auto', padding: '20px 24px 64px' }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '20px 24px 64px' }}>
         <Navbar simple />
         <button onClick={() => { setView('list'); setDetail(null); if (pollRef.current) clearInterval(pollRef.current) }}
-          style={{ background: 'transparent', border: 'none', color: '#828d96', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 20, padding: 0 }}>
+          style={{ background: 'transparent', border: 'none', color: '#828d96', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 24, padding: 0 }}>
           ← Semua Analisis
         </button>
 
-        <div style={{ marginBottom: 28 }}>
+        <div style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 22, fontWeight: 500, margin: 0 }}>{detail.nama_entitas}</h2>
-          <div style={{ fontSize: 12.5, color: '#aab4bc', marginTop: 5 }}>{detail.jenis_usaha === 'Jiwa' ? 'Asuransi Jiwa' : 'Asuransi Umum'} · {detail.periode || '—'}</div>
+          <div style={{ fontSize: 12.5, color: '#aab4bc', marginTop: 5 }}>
+            {detail.jenis_usaha === 'Jiwa' ? 'Asuransi Jiwa' : 'Asuransi Umum'} · {detail.periode || '—'}
+          </div>
         </div>
 
+        {/* Error banner */}
         {detail.status === 'error' && detail.error_msg && (
-          <div style={{ background: 'rgba(255,111,97,0.08)', border: '1px solid rgba(255,111,97,0.25)', borderRadius: 14, padding: '14px 20px', marginBottom: 20, fontSize: 13, color: '#ff6f61' }}>
-            ✗ {detail.error_msg}
-            <button
-              onClick={async () => {
-                setExtracting(true)
-                setDetail(prev => prev ? { ...prev, status: 'extracting', error_msg: null } : prev)
-                await fetch(`/api/psak/v2/session/${detail.id}/extract`, { method: 'POST' })
-                startPoll(detail.id)
-              }}
-              style={{ marginLeft: 16, background: 'rgba(255,111,97,0.15)', border: '1px solid rgba(255,111,97,0.4)', borderRadius: 999, padding: '4px 12px', fontSize: 11, color: '#ff6f61', cursor: 'pointer', fontFamily: 'inherit' }}
-            >
-              ↺ Coba lagi
-            </button>
+          <div style={{ background: 'rgba(255,111,97,0.08)', border: '1px solid rgba(255,111,97,0.25)', borderRadius: 14, padding: '14px 20px', marginBottom: 24, fontSize: 13, color: '#ff6f61', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>✗ {detail.error_msg}</span>
+            {canStart && (
+              <button onClick={mulaiAnalisis}
+                style={{ background: 'rgba(255,111,97,0.15)', border: '1px solid rgba(255,111,97,0.4)', borderRadius: 999, padding: '6px 14px', fontSize: 11.5, color: '#ff6f61', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', marginLeft: 16 }}>
+                ↺ Coba lagi
+              </button>
+            )}
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* STEP 1 — Upload */}
-          <StepCard num={1} title="Upload Laporan Keuangan Audited (PDF)" done={hasLK} active={!hasLK}>
-            {hasLK ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 12.5, color: '#45e661' }}>✓ {detail.lk_file_name || 'File terupload'}</span>
-                <label style={{ cursor: 'pointer' }}>
+        {/* Extracting banner */}
+        {isExtracting && (
+          <div style={{ background: 'rgba(255,190,80,0.06)', border: '1px solid rgba(255,190,80,0.2)', borderRadius: 14, padding: '18px 24px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 20, height: 20, border: '2px solid rgba(255,190,80,0.2)', borderTopColor: '#ffbe50', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: 13.5, fontWeight: 500, color: '#ffbe50' }}>Analisis sedang berjalan...</div>
+              <div style={{ fontSize: 12, color: '#828d96', marginTop: 3 }}>AI membaca PDF + menggabungkan data Excel (~60–90 detik)</div>
+            </div>
+          </div>
+        )}
+
+        {/* Upload area — dua kolom sejajar */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+
+          {/* PDF upload */}
+          <div style={{ background: 'rgba(8,12,18,0.85)', border: `1px solid ${hasLK ? 'rgba(69,230,97,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '24px 24px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, background: hasLK ? 'rgba(69,230,97,0.15)' : 'rgba(255,255,255,0.06)', color: hasLK ? '#45e661' : '#828d96', border: `1px solid ${hasLK ? 'rgba(69,230,97,0.35)' : 'rgba(255,255,255,0.12)'}`, flexShrink: 0 }}>
+                {hasLK ? '✓' : '1'}
+              </div>
+              <span style={{ fontSize: 13.5, fontWeight: 500, color: hasLK ? '#45e661' : '#eef2ef' }}>Laporan Keuangan PDF</span>
+            </div>
+            <p style={{ fontSize: 11.5, color: '#828d96', margin: 0, lineHeight: 1.5 }}>
+              LK Audited lengkap · termasuk CALK · maks 50 MB
+            </p>
+            {uploading ? (
+              <div style={{ border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 14, padding: '28px 16px', textAlign: 'center' }}>
+                <p style={{ fontSize: 12.5, color: '#ffbe50', margin: 0 }}>⏳ Mengupload PDF...</p>
+              </div>
+            ) : hasLK ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(69,230,97,0.06)', borderRadius: 12, padding: '10px 14px' }}>
+                <span style={{ fontSize: 12.5, color: '#b7c0c6', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{detail.lk_file_name || 'Terupload'}</span>
+                <label style={{ cursor: 'pointer', flexShrink: 0 }}>
                   <input type="file" accept=".pdf" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadLK(f); e.target.value = '' }} />
-                  <span style={{ fontSize: 11, color: '#828d96', textDecoration: 'underline', cursor: 'pointer' }}>Ganti PDF</span>
+                  <span style={{ fontSize: 11, color: '#828d96', textDecoration: 'underline' }}>Ganti</span>
                 </label>
               </div>
-            ) : uploading ? (
-              <p style={{ fontSize: 12.5, color: '#ffbe50', margin: 0 }}>⏳ Mengupload PDF...</p>
             ) : (
-              <label style={{ cursor: 'pointer', display: 'block', border: '1px dashed rgba(69,230,97,0.4)', borderRadius: 14, padding: '24px 20px', textAlign: 'center' }}>
+              <label style={{ cursor: 'pointer', display: 'block', border: '1px dashed rgba(255,255,255,0.15)', borderRadius: 14, padding: '32px 16px', textAlign: 'center' }}>
                 <input type="file" accept=".pdf" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadLK(f); e.target.value = '' }} />
-                <div style={{ fontSize: 13.5, color: '#b7c0c6', fontWeight: 500 }}>Klik untuk upload Lapkeu PDF</div>
-                <div style={{ fontSize: 11, color: '#828d96', marginTop: 4 }}>Maks 50 MB · dengan CALK lengkap</div>
+                <div style={{ fontSize: 24, marginBottom: 8 }}>📄</div>
+                <div style={{ fontSize: 13, color: '#b7c0c6', fontWeight: 500 }}>Klik untuk upload PDF</div>
+                <div style={{ fontSize: 11, color: '#828d96', marginTop: 4 }}>.pdf</div>
               </label>
             )}
-            {uploadError && <p style={{ fontSize: 11.5, color: '#ff6f61', margin: '8px 0 0' }}>{uploadError}</p>}
-          </StepCard>
+            {uploadError && <p style={{ fontSize: 11.5, color: '#ff6f61', margin: 0 }}>{uploadError}</p>}
+          </div>
 
-          {/* STEP 2 — Upload Excel */}
-          <StepCard num={2} title="Upload Excel PSAK 117 (OJK Template)" done={false} active={hasLK} loading={uploadingExcel}>
-            <p style={{ fontSize: 12, color: '#828d96', margin: '0 0 12px' }}>
-              Template Excel format OJK — sheet: LUPSPK, LUPLRG, LUPAKS, LUPCRF, LUPSAGP, LUPAKD, LUPSKV
+          {/* Excel upload */}
+          <div style={{ background: 'rgba(8,12,18,0.85)', border: `1px solid ${hasExcel ? 'rgba(69,230,97,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '24px 24px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, background: hasExcel ? 'rgba(69,230,97,0.15)' : 'rgba(255,255,255,0.06)', color: hasExcel ? '#45e661' : '#828d96', border: `1px solid ${hasExcel ? 'rgba(69,230,97,0.35)' : 'rgba(255,255,255,0.12)'}`, flexShrink: 0 }}>
+                {hasExcel ? '✓' : '2'}
+              </div>
+              <span style={{ fontSize: 13.5, fontWeight: 500, color: hasExcel ? '#45e661' : '#eef2ef' }}>Excel PSAK 117 (OJK)</span>
+            </div>
+            <p style={{ fontSize: 11.5, color: '#828d96', margin: 0, lineHeight: 1.5 }}>
+              Template OJK · sheet: LUPSPK, LUPLRG, LUPAKS, LUPCRF, LUPSAGP, LUPAKD, LUPSKV
             </p>
             {uploadingExcel ? (
-              <p style={{ fontSize: 12.5, color: '#ffbe50', margin: 0 }}>⏳ Membaca Excel dan mengisi data...</p>
-            ) : excelImported != null ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 12.5, color: '#45e661' }}>✓ {excelImported} field berhasil diimport dari Excel</span>
-                <label style={{ cursor: 'pointer' }}>
-                  <input type="file" accept=".xlsx,.xls,.xlsm" style={{ display: 'none' }}
-                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadExcel(f); e.target.value = '' }} />
-                  <span style={{ fontSize: 11, color: '#828d96', textDecoration: 'underline' }}>Upload ulang</span>
+              <div style={{ border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 14, padding: '28px 16px', textAlign: 'center' }}>
+                <p style={{ fontSize: 12.5, color: '#ffbe50', margin: 0 }}>⏳ Membaca Excel...</p>
+              </div>
+            ) : hasExcel ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(69,230,97,0.06)', borderRadius: 12, padding: '10px 14px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, color: '#b7c0c6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{excelFileName || 'Terupload'}</div>
+                  {excelFieldCount != null && <div style={{ fontSize: 11, color: '#828d96', marginTop: 2 }}>{excelFieldCount} field terbaca</div>}
+                </div>
+                <label style={{ cursor: 'pointer', flexShrink: 0 }}>
+                  <input type="file" accept=".xlsx,.xls,.xlsm" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadExcel(f); e.target.value = '' }} />
+                  <span style={{ fontSize: 11, color: '#828d96', textDecoration: 'underline' }}>Ganti</span>
                 </label>
               </div>
             ) : (
-              <label style={{ cursor: hasLK ? 'pointer' : 'default', display: 'block', border: `1px dashed ${hasLK ? 'rgba(69,230,97,0.35)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 14, padding: '20px', textAlign: 'center', opacity: hasLK ? 1 : 0.5 }}>
-                <input type="file" accept=".xlsx,.xls,.xlsm" style={{ display: 'none' }} disabled={!hasLK}
-                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadExcel(f); e.target.value = '' }} />
-                <div style={{ fontSize: 13, color: '#b7c0c6', fontWeight: 500 }}>Klik untuk upload Excel PSAK 117</div>
-                <div style={{ fontSize: 11, color: '#828d96', marginTop: 4 }}>.xlsx / .xls / .xlsm · Diutamakan setelah upload PDF</div>
+              <label style={{ cursor: 'pointer', display: 'block', border: '1px dashed rgba(255,255,255,0.15)', borderRadius: 14, padding: '32px 16px', textAlign: 'center' }}>
+                <input type="file" accept=".xlsx,.xls,.xlsm" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadExcel(f); e.target.value = '' }} />
+                <div style={{ fontSize: 24, marginBottom: 8 }}>📊</div>
+                <div style={{ fontSize: 13, color: '#b7c0c6', fontWeight: 500 }}>Klik untuk upload Excel</div>
+                <div style={{ fontSize: 11, color: '#828d96', marginTop: 4 }}>.xlsx / .xls / .xlsm</div>
               </label>
             )}
-            {excelError && <p style={{ fontSize: 11.5, color: '#ff6f61', margin: '8px 0 0' }}>{excelError}</p>}
-          </StepCard>
+            {excelError && <p style={{ fontSize: 11.5, color: '#ff6f61', margin: 0 }}>{excelError}</p>}
+          </div>
+        </div>
 
-          {/* STEP 3 — Ekstraksi PDF */}
-          <StepCard num={3} title="Ekstraksi Data dari PDF (AI)" done={false} active={hasLK && !isExtracting} loading={isExtracting}>
-            {isExtracting ? (
-              <p style={{ fontSize: 12.5, color: '#ffbe50', margin: 0 }}>⏳ AI sedang membaca PDF dan mengisi template (~60 detik)...</p>
-            ) : hasLK ? (
-              <p style={{ fontSize: 12.5, color: '#828d96', margin: 0 }}>Menunggu proses ekstraksi PDF...</p>
-            ) : (
-              <p style={{ fontSize: 12.5, color: '#828d96', margin: 0 }}>Upload LK PDF terlebih dahulu</p>
-            )}
-          </StepCard>
+        {/* Mulai Analisis button */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          {!hasLK && !hasExcel ? (
+            <p style={{ fontSize: 13, color: '#828d96', margin: 0 }}>Upload PDF dan Excel untuk melanjutkan</p>
+          ) : !hasLK ? (
+            <p style={{ fontSize: 13, color: '#828d96', margin: 0 }}>Menunggu upload PDF...</p>
+          ) : !hasExcel ? (
+            <p style={{ fontSize: 13, color: '#828d96', margin: 0 }}>Menunggu upload Excel...</p>
+          ) : null}
+
+          <button
+            onClick={mulaiAnalisis}
+            disabled={!canStart || isExtracting}
+            style={{
+              background: canStart && !isExtracting ? '#45e661' : 'rgba(255,255,255,0.06)',
+              color: canStart && !isExtracting ? '#04120a' : '#454e55',
+              border: 'none',
+              borderRadius: 999,
+              padding: '14px 40px',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: canStart && !isExtracting ? 'pointer' : 'not-allowed',
+              fontFamily: 'inherit',
+              transition: 'all 0.15s',
+            }}
+          >
+            {isExtracting ? '⏳ Sedang dianalisis...' : 'Mulai Analisis →'}
+          </button>
+          {canStart && !isExtracting && (
+            <p style={{ fontSize: 11.5, color: '#828d96', margin: 0, textAlign: 'center' }}>
+              AI akan membaca PDF + menggabungkan data Excel (~60–90 detik)
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -478,19 +539,12 @@ export default function PsakPage() {
                 {downloading === 'analisis.docx' ? '...' : '↓ Analisis (.docx)'}
               </button>
             )}
-            {/* Re-upload PDF */}
-            <label style={{ cursor: 'pointer' }}>
-              <input type="file" accept=".pdf" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadLK(f); e.target.value = '' }} />
-              <span style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', color: '#828d96', borderRadius: 999, padding: '7px 12px', fontSize: 11, cursor: 'pointer' }}>↑ Ganti PDF</span>
-            </label>
-            {/* Re-upload Excel */}
-            <label style={{ cursor: 'pointer' }}>
-              <input type="file" accept=".xlsx,.xls,.xlsm" style={{ display: 'none' }}
-                onChange={e => { const f = e.target.files?.[0]; if (f) uploadExcel(f); e.target.value = '' }} />
-              <span style={{ background: 'transparent', border: `1px solid ${excelImported != null ? 'rgba(69,230,97,0.3)' : 'rgba(255,255,255,0.06)'}`, color: excelImported != null ? '#45e661' : '#828d96', borderRadius: 999, padding: '7px 12px', fontSize: 11, cursor: 'pointer' }}>
-                {uploadingExcel ? '⏳' : excelImported != null ? `✓ Excel (${excelImported})` : '↑ Upload Excel'}
-              </span>
-            </label>
+            {/* Re-analisis */}
+            <button
+              onClick={() => { setView('list'); setDetail(null) }}
+              style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', color: '#828d96', borderRadius: 999, padding: '7px 14px', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
+              ↩ Ganti file
+            </button>
           </div>
         </div>
 
