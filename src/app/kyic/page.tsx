@@ -70,6 +70,8 @@ export default function KyicV2Page() {
   const [activeBab, setActiveBab] = useState<BabId>(KYIC_BABS[0].id)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Form state untuk sesi baru
@@ -177,6 +179,14 @@ export default function KyicV2Page() {
     await loadDetail(sessionId)
   }
 
+  async function deleteSession(id: string) {
+    setDeletingId(id)
+    await fetch(`/api/kyic/v2/session/${id}/delete`, { method: 'DELETE' })
+    setConfirmDeleteId(null)
+    setDeletingId(null)
+    await loadSessions()
+  }
+
   async function analyzeBab(sessionId: string, babId: BabId) {
     setAnalyzingBab(babId)
     const res = await fetch(`/api/kyic/v2/session/${sessionId}/bab/${babId}/analyze`, {
@@ -214,8 +224,8 @@ export default function KyicV2Page() {
 
   if (view === 'list') return (
     <div style={{ minHeight: '100vh', background: '#080c12', color: '#eef2ef', fontFamily: 'var(--font-sans, system-ui)' }}>
-      <Navbar />
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '40px 20px' }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 20px 0' }}><Navbar simple /></div>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '8px 20px 40px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>KYIC — Know Your Insurance Company</h1>
@@ -233,17 +243,37 @@ export default function KyicV2Page() {
             <p style={{ fontSize: 13 }}>Buat sesi baru untuk mulai analisis</p>
           </div>
         ) : sessions.map(s => (
-          <div key={s.id} onClick={async () => { await loadDetail(s.id); setActiveBab(KYIC_BABS[0].id); setView('detail') }}
-            style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '16px 20px', marginBottom: 12, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-            onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)')}
-            onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}>
-            <div>
+          <div key={s.id}
+            style={{ background: 'rgba(8,12,18,0.85)', border: `1px solid ${confirmDeleteId === s.id ? 'rgba(255,111,97,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 14, padding: '16px 20px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            onMouseEnter={e => { if (confirmDeleteId !== s.id) e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)' }}
+            onMouseLeave={e => { if (confirmDeleteId !== s.id) e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}>
+            <div style={{ cursor: 'pointer', flex: 1 }} onClick={async () => { await loadDetail(s.id); setActiveBab(KYIC_BABS[0].id); setView('detail') }}>
               <p style={{ fontWeight: 600, marginBottom: 4 }}>{s.nama_entitas}</p>
               <p style={{ fontSize: 12, color: '#828d96' }}>{s.kode} · {s.periode} · {s.jenis_usaha}</p>
             </div>
-            <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#aab4bc' }}>
-              {s.status}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+              <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#aab4bc' }}>
+                {s.status}
+              </span>
+              {confirmDeleteId === s.id ? (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => deleteSession(s.id)} disabled={deletingId === s.id}
+                    style={{ padding: '5px 12px', background: 'rgba(255,111,97,0.15)', color: '#ff6f61', border: '1px solid rgba(255,111,97,0.3)', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontSize: 11 }}>
+                    {deletingId === s.id ? '...' : 'Hapus'}
+                  </button>
+                  <button onClick={e => { e.stopPropagation(); setConfirmDeleteId(null) }}
+                    style={{ padding: '5px 10px', background: 'transparent', color: '#828d96', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontSize: 11 }}>
+                    Batal
+                  </button>
+                </div>
+              ) : (
+                <button onClick={e => { e.stopPropagation(); setConfirmDeleteId(s.id) }}
+                  style={{ padding: '5px 10px', background: 'transparent', color: '#828d96', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontSize: 11 }}
+                  title="Hapus sesi">
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -254,9 +284,9 @@ export default function KyicV2Page() {
 
   if (view === 'new') return (
     <div style={{ minHeight: '100vh', background: '#080c12', color: '#eef2ef', fontFamily: 'var(--font-sans, system-ui)' }}>
-      <Navbar />
-      <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 20px' }}>
-        <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', color: '#828d96', cursor: 'pointer', fontSize: 13, padding: 0, marginBottom: 24 }}>← Kembali</button>
+      <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 20px 0' }}><Navbar simple /></div>
+      <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 20px 40px' }}>
+        <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', color: '#828d96', cursor: 'pointer', fontSize: 13, padding: 0, marginBottom: 24 }}>← Kembali ke Daftar Sesi</button>
 
         <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 24 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Sesi KYIC Baru</h2>
@@ -312,12 +342,11 @@ export default function KyicV2Page() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#080c12', color: '#eef2ef', fontFamily: 'var(--font-sans, system-ui)' }}>
-      <Navbar />
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 20px 0' }}><Navbar simple /></div>
       <div style={{ display: 'flex', maxWidth: 1280, margin: '0 auto' }}>
 
         {/* ─── Sidebar BAB Navigator ─── */}
-        <div style={{ width: 260, flexShrink: 0, padding: '24px 0 24px 20px', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
-          <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', color: '#828d96', cursor: 'pointer', fontSize: 12, padding: 0, marginBottom: 16 }}>← Semua Sesi</button>
+        <div style={{ width: 260, flexShrink: 0, padding: '8px 0 24px 20px', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
           <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{detail.session.nama_entitas}</p>
           <p style={{ fontSize: 11, color: '#828d96', marginBottom: 4 }}>{detail.session.kode} · {detail.session.periode}</p>
 
