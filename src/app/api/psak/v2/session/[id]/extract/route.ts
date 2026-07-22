@@ -34,8 +34,9 @@ async function doExtract(sessionId: string, storagePath: string, jenis: JenisUsa
     const buf = Buffer.from(await data.arrayBuffer())
 
     // Extract text from PDF to bypass Anthropic 100-page limit
+    // Import via internal path to avoid pdf-parse's self-test bug on Vercel
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require('pdf-parse')
+    const pdfParse = require('pdf-parse/lib/pdf-parse.js')
     let pdfText = ''
     try {
       const parsed = await pdfParse(buf, {
