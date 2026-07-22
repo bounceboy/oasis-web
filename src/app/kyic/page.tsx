@@ -255,33 +255,45 @@ export default function KyicV2Page() {
   if (view === 'new') return (
     <div style={{ minHeight: '100vh', background: '#080c12', color: '#eef2ef', fontFamily: 'var(--font-sans, system-ui)' }}>
       <Navbar />
-      <div style={{ maxWidth: 560, margin: '0 auto', padding: '40px 20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
-          <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', color: '#828d96', cursor: 'pointer', fontSize: 13, padding: 0 }}>← Kembali</button>
-          <h2 style={{ fontSize: 18, fontWeight: 700 }}>Sesi KYIC Baru</h2>
-        </div>
+      <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 20px' }}>
+        <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', color: '#828d96', cursor: 'pointer', fontSize: 13, padding: 0, marginBottom: 24 }}>← Kembali</button>
 
-        {error && <div style={{ background: 'rgba(255,111,97,0.1)', border: '1px solid rgba(255,111,97,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13, color: '#ff6f61' }}>{error}</div>}
+        <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 24 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Sesi KYIC Baru</h2>
 
-        {[
-          { label: 'Kode Pemeriksaan', value: formKode, set: setFormKode, placeholder: 'cth: ASYKI-2025', hint: 'Kode unik sesi ini' },
-          { label: 'Nama Entitas', value: formNama, set: setFormNama, placeholder: 'cth: PT Asuransi Syariah Keluarga Indonesia', hint: '' },
-          { label: 'Jenis Usaha', value: formJenis, set: setFormJenis, placeholder: 'cth: Asuransi Jiwa Syariah', hint: 'Akan menentukan POJK yang digunakan' },
-          { label: 'Periode Penilaian', value: formPeriode, set: setFormPeriode, placeholder: 'cth: 31 Desember 2025', hint: '' },
-        ].map(f => (
-          <div key={f.label} style={{ marginBottom: 18 }}>
-            <label style={{ fontSize: 12, color: '#aab4bc', display: 'block', marginBottom: 6 }}>{f.label}</label>
-            <input value={f.value} onChange={e => f.set(e.target.value)}
-              placeholder={f.placeholder}
-              style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '10px 12px', color: '#eef2ef', fontSize: 13, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
-            {f.hint && <p style={{ fontSize: 11, color: '#828d96', marginTop: 4 }}>{f.hint}</p>}
+          {error && (
+            <div style={{ background: 'rgba(255,111,97,0.08)', border: '1px solid rgba(255,111,97,0.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13, color: '#ff6f61' }}>
+              {error}
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            {[
+              { label: 'Kode Pemeriksaan', value: formKode, set: setFormKode, placeholder: 'cth: ASYKI-2025', hint: 'Kode unik sesi ini', full: false },
+              { label: 'Periode Penilaian', value: formPeriode, set: setFormPeriode, placeholder: 'cth: 31 Desember 2025', hint: '', full: false },
+              { label: 'Nama Entitas', value: formNama, set: setFormNama, placeholder: 'cth: PT Asuransi Syariah Keluarga Indonesia', hint: '', full: true },
+              { label: 'Jenis Usaha', value: formJenis, set: setFormJenis, placeholder: 'cth: Asuransi Jiwa Syariah', hint: 'Menentukan POJK yang digunakan', full: true },
+            ].map(f => (
+              <div key={f.label} style={{ gridColumn: f.full ? '1 / -1' : 'auto' }}>
+                <label style={{ fontSize: 11, color: '#828d96', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{f.label}</label>
+                <input
+                  value={f.value}
+                  onChange={e => f.set(e.target.value)}
+                  placeholder={f.placeholder}
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#eef2ef', padding: '8px 0', fontSize: 13, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                />
+                {f.hint && <p style={{ fontSize: 11, color: '#828d96', marginTop: 4 }}>{f.hint}</p>}
+              </div>
+            ))}
           </div>
-        ))}
 
-        <button onClick={createSession} disabled={loading}
-          style={{ width: '100%', padding: '12px 0', background: loading ? 'rgba(69,230,97,0.06)' : 'rgba(69,230,97,0.12)', color: '#45e661', border: '1px solid rgba(69,230,97,0.3)', borderRadius: 10, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, marginTop: 8 }}>
-          {loading ? 'Membuat...' : 'Buat Sesi'}
-        </button>
+          <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
+            <button onClick={createSession} disabled={loading}
+              style={{ padding: '10px 24px', background: 'rgba(69,230,97,0.1)', color: '#45e661', border: '1px solid rgba(69,230,97,0.25)', borderRadius: 10, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, opacity: loading ? 0.6 : 1 }}>
+              {loading ? 'Membuat...' : 'Buat Sesi →'}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )
