@@ -5,8 +5,60 @@ import { callOpenRouter } from '@/lib/claude'
 import { searchRelevantPojk } from '@/lib/pojk-search'
 import { searchSedk } from '@/lib/sedk-search'
 import { BabId, KYIC_BABS_MAP } from '@/lib/kyic-sections'
+import { createClient } from '@supabase/supabase-js'
 
 export const maxDuration = 300
+
+const adminClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+// Unduh PDF dari storage dan ekstrak teks khusus untuk satu BAB via Anthropic Vision
+async function extractBabFromPdf(storagePath: string, babNomor: number, babJudul: string): Promise<string> {
+  const { data, error } = await adminClient.storage.from('ky-uploads').download(storagePath)
+  if (error || !data) throw new Error('Gagal mengunduh PDF template dari storage')
+
+  const buf = Buffer.from(await data.arrayBuffer())
+  const base64 = buf.toString('base64')
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': process.env.ANTHROPIC_API_KEY!,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'pdfs-2024-09-25',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 8000,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+          {
+            type: 'text',
+            text: `Dokumen ini adalah KYIC (Know Your Insurance Company) perusahaan asuransi Indonesia periode sebelumnya (T-1).
+
+Fokus HANYA pada BAB ${babNomor} — "${babJudul}".
+
+Ekstrak selengkap mungkin semua informasi, angka, tabel, dan narasi dari bagian tersebut.
+Jangan ringkas — tulis semua kontennya apa adanya sebagai plain text.
+Abaikan bagian lain yang tidak relevan dengan BAB ${babNomor}.`,
+          },
+        ],
+      }],
+    }),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Anthropic PDF OCR error ${res.status}: ${err.slice(0, 200)}`)
+  }
+  const data2 = await res.json()
+  return (data2.content?.[0]?.text as string) || ''
+}
 
 async function runBabAnalysis(
   sessionId: string,
@@ -129,7 +181,7 @@ export async function POST(
   // Ambil data session
   const { data: session, error: sessErr } = await db()
     .from('ky_session')
-    .select('id, jenis_usaha, template_text')
+    .select('id, jenis_usaha, template_text, template_sections, template_storage_path')
     .eq('id', sessionId)
     .single()
 
@@ -189,13 +241,33 @@ export async function POST(
       .eq('id', analisisRec.id)
   }
 
+  // Tentukan template text untuk BAB ini:
+  // 1. Kalau docx → pakai template_sections[babId] (sudah di-parse per-BAB)
+  // 2. Kalau PDF scan (template_storage_path ada) → OCR per-BAB via Anthropic saat after()
+  const sections = (session.template_sections ?? {}) as Record<string, string>
+  const storagePath: string | null = (session as Record<string, unknown>).template_storage_path as string | null
+  const babInfo = KYIC_BABS_MAP[babId as BabId]
+  const templateTextFromSections = sections[babId] ?? session.template_text ?? ''
+
   after(async () => {
+    let templateText = templateTextFromSections
+
+    // PDF scan: ekstrak teks BAB ini dari Anthropic dulu
+    if (storagePath && !templateText.trim()) {
+      try {
+        templateText = await extractBabFromPdf(storagePath, babInfo?.nomor ?? 0, babInfo?.judul ?? babId)
+      } catch (err) {
+        console.error(`[kyic/v2] OCR bab=${babId} gagal:`, err)
+        templateText = '(Gagal membaca PDF T-1 untuk BAB ini)'
+      }
+    }
+
     await runBabAnalysis(
       sessionId,
       babId as BabId,
       analisisRec.id,
       session.jenis_usaha ?? '',
-      session.template_text ?? '',
+      templateText,
       dokumenTeks,
       catatanPengawas,
       prevResults,

@@ -10,73 +10,24 @@ const adminClient = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export const maxDuration = 300
-
-const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages'
-const ANTHROPIC_MODEL = 'claude-sonnet-4-5'
-
-// OCR untuk PDF scan — kirim PDF langsung ke Anthropic API (support document type native)
-async function ocrPdfWithVision(buf: Buffer): Promise<string> {
-  const base64 = buf.toString('base64')
-
-  const res = await fetch(ANTHROPIC_API, {
-    method: 'POST',
-    headers: {
-      'x-api-key': process.env.ANTHROPIC_API_KEY!,
-      'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'pdfs-2024-09-25',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 16000,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'document',
-            source: { type: 'base64', media_type: 'application/pdf', data: base64 },
-          },
-          {
-            type: 'text',
-            text: `Ini adalah dokumen KYIC (Know Your Insurance Company) perusahaan asuransi Indonesia.
-Ekstrak SEMUA teks dari dokumen ini secara lengkap, pertahankan struktur aslinya termasuk judul BAB/bagian.
-Pastikan semua angka, nama, tabel, dan data penting tercakup.
-Format output: plain text, pisahkan tiap bagian dengan baris kosong.
-Jangan rangkum — tulis semua teks apa adanya.`,
-          },
-        ],
-      }],
-    }),
-  })
-
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Anthropic OCR error ${res.status}: ${err.slice(0, 300)}`)
-  }
-
-  const data = await res.json()
-  return (data.content?.[0]?.text as string) || ''
-}
+export const maxDuration = 60
 
 // Mapping Heading1 titles di dokumen KYIC → bab_id
 const HEADING_TO_BAB: [RegExp, BabId][] = [
-  [/kepemilikan/i,                        'kepemilikan'],
-  [/kegiatan.*bisnis|bisnis.*utama/i,     'kegiatan_bisnis'],
-  [/kegiatan.*penunjang|penunjang/i,      'kegiatan_penunjang'],
-  [/rencana.*bisnis/i,                    'rencana_bisnis'],
-  [/tingkat.*kesehatan/i,                 'tingkat_kesehatan'],
-  [/kinerja.*keuangan/i,                  'kinerja_keuangan'],
+  [/kepemilikan/i,                               'kepemilikan'],
+  [/kegiatan.*bisnis|bisnis.*utama/i,            'kegiatan_bisnis'],
+  [/kegiatan.*penunjang|penunjang/i,             'kegiatan_penunjang'],
+  [/rencana.*bisnis/i,                           'rencana_bisnis'],
+  [/tingkat.*kesehatan/i,                        'tingkat_kesehatan'],
+  [/kinerja.*keuangan/i,                         'kinerja_keuangan'],
   [/organisasi.*manajemen|manajemen.*risiko.*spi/i, 'organisasi_mr_spi'],
-  [/status.*pengawasan|kepatuhan.*isu/i,  'status_pengawasan'],
-  [/penetapan.*fokus|fokus.*pengawasan/i, 'fokus_pengawasan'],
+  [/status.*pengawasan|kepatuhan.*isu/i,         'status_pengawasan'],
+  [/penetapan.*fokus|fokus.*pengawasan/i,        'fokus_pengawasan'],
 ]
 
 function parseSectionsFromDocx(buf: Buffer): Record<BabId, string> {
   const zip = new AdmZip(buf)
   const xml = zip.readAsText('word/document.xml')
-
-  // Extract paragraphs with their heading style
   const paraRegex = /<w:p[ >][\s\S]*?<\/w:p>/g
   const styleRegex = /<w:pStyle w:val="([^"]+)"/
   const textRegex = /<w:t[^>]*>([^<]*)<\/w:t>/g
@@ -86,45 +37,30 @@ function parseSectionsFromDocx(buf: Buffer): Record<BabId, string> {
   let currentLines: string[] = []
 
   const paras = xml.match(paraRegex) ?? []
-
   for (const para of paras) {
     const styleMatch = para.match(styleRegex)
     const style = styleMatch?.[1] ?? ''
     const isHeading1 = style === 'Heading1' || style === 'heading1' || style === '1'
 
-    // Extract plain text from paragraph
     let paraText = ''
     let m
     const textRe = new RegExp(textRegex.source, 'g')
-    while ((m = textRe.exec(para)) !== null) {
-      paraText += m[1]
-    }
+    while ((m = textRe.exec(para)) !== null) paraText += m[1]
     paraText = paraText.trim()
     if (!paraText) continue
 
     if (isHeading1) {
-      // Save previous section
-      if (currentBab && currentLines.length > 0) {
-        sections[currentBab] = currentLines.join('\n')
-      }
-      // Find matching bab
+      if (currentBab && currentLines.length > 0) sections[currentBab] = currentLines.join('\n')
       currentBab = null
       for (const [pattern, babId] of HEADING_TO_BAB) {
-        if (pattern.test(paraText)) {
-          currentBab = babId
-          break
-        }
+        if (pattern.test(paraText)) { currentBab = babId; break }
       }
       currentLines = []
     } else if (currentBab) {
       currentLines.push(paraText)
     }
   }
-  // Save last section
-  if (currentBab && currentLines.length > 0) {
-    sections[currentBab] = currentLines.join('\n')
-  }
-
+  if (currentBab && currentLines.length > 0) sections[currentBab] = currentLines.join('\n')
   return sections as unknown as Record<BabId, string>
 }
 
@@ -133,119 +69,54 @@ function parseSectionsFromText(fullText: string): Record<BabId, string> {
   let currentBab: BabId | null = null
   let currentLines: string[] = []
 
-  const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean)
-
-  for (const line of lines) {
-    // Short line, all-caps or title-case heading
+  for (const line of fullText.split('\n').map(l => l.trim()).filter(Boolean)) {
     const isHeadingLike = line.length < 80 && (line === line.toUpperCase() || /^[A-Z][a-z]/.test(line))
-
     if (isHeadingLike) {
       let matched: BabId | null = null
       for (const [pattern, babId] of HEADING_TO_BAB) {
         if (pattern.test(line)) { matched = babId; break }
       }
       if (matched) {
-        if (currentBab && currentLines.length > 0) {
-          sections[currentBab] = currentLines.join('\n')
-        }
+        if (currentBab && currentLines.length > 0) sections[currentBab] = currentLines.join('\n')
         currentBab = matched
         currentLines = []
         continue
       }
     }
-
     if (currentBab) currentLines.push(line)
   }
-  if (currentBab && currentLines.length > 0) {
-    sections[currentBab] = currentLines.join('\n')
-  }
-
+  if (currentBab && currentLines.length > 0) sections[currentBab] = currentLines.join('\n')
   return sections as unknown as Record<BabId, string>
 }
 
-async function parseAndSave(id: string, buf: Buffer, fileName: string) {
-  const ext = fileName.toLowerCase().split('.').pop()
-  let fullText = ''
-  let templateSections: Record<BabId, string> = {} as Record<BabId, string>
-
-  if (ext === 'pdf') {
-    const pdfParse = require('pdf-parse/lib/pdf-parse')
-    fullText = (await pdfParse(buf)).text
-
-    // PDF scan (gambar) — fallback ke OCR via Claude Vision
-    if (fullText.replace(/\s/g, '').length < 500) {
-      fullText = await ocrPdfWithVision(buf)
-    }
-
-    templateSections = parseSectionsFromText(fullText)
-  } else if (ext === 'docx' || ext === 'doc') {
-    templateSections = parseSectionsFromDocx(buf)
-    const zip = new AdmZip(buf)
-    const xml = zip.readAsText('word/document.xml')
-    fullText = xml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-    const filledSections = Object.values(templateSections).filter(v => v.length > 50).length
-    if (filledSections < 3) {
-      templateSections = parseSectionsFromText(fullText)
-    }
-  } else {
-    throw new Error('Format tidak didukung (gunakan .docx atau .pdf)')
-  }
-
-  const trimmedSections: Record<string, string> = {}
-  for (const [babId, text] of Object.entries(templateSections)) {
-    trimmedSections[babId] = text.slice(0, 8000)
-  }
-
-  const { error } = await db()
-    .from('ky_session')
-    .update({
-      template_text: fullText.slice(0, 60000),
-      template_nama: fileName,
-      template_sections: trimmedSections,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-
-  if (error) throw new Error(error.message)
-
-  const parsedCount = Object.values(trimmedSections).filter(v => v.length > 50).length
-  return { ok: true, chars: fullText.length, sections_parsed: parsedCount }
-}
-
-// POST — upload KYIC T-1, parse per-BAB, simpan ke template_text + template_sections
-// Supports two modes:
-//   1. FormData with 'file' — for small files (< ~4MB)
-//   2. JSON { storagePath, fileName } — for large files uploaded directly to Supabase Storage
+// POST — upload KYIC T-1
+// - PDF: simpan ke Supabase Storage, OCR dilakukan per-BAB saat analisis
+// - docx/doc: extract text langsung, simpan ke template_sections
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
-
   const contentType = req.headers.get('content-type') ?? ''
 
-  let buf: Buffer
+  let buf: Buffer | null = null
   let fileName: string
+  let storagePath: string | null = null
 
   if (contentType.includes('application/json')) {
-    // Large file path: download from Supabase Storage
-    const { storagePath, fileName: fn } = await req.json()
-    if (!storagePath || !fn) return NextResponse.json({ error: 'storagePath dan fileName diperlukan' }, { status: 400 })
-    fileName = fn
-
-    const { data, error } = await adminClient.storage.from('ky-uploads').download(storagePath)
-    if (error || !data) return NextResponse.json({ error: 'Gagal mengambil file dari storage' }, { status: 500 })
-    buf = Buffer.from(await data.arrayBuffer())
-
-    // Cleanup storage after download
-    adminClient.storage.from('ky-uploads').remove([storagePath]).catch(() => {})
+    // Large file — already uploaded to storage
+    const body = await req.json()
+    fileName = body.fileName
+    storagePath = body.storagePath
+    if (!storagePath || !fileName)
+      return NextResponse.json({ error: 'storagePath dan fileName diperlukan' }, { status: 400 })
   } else {
-    // Small file path: direct FormData upload
+    // Small file — FormData
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     if (!file) return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 400 })
-    buf = Buffer.from(await file.arrayBuffer())
     fileName = file.name
+    buf = Buffer.from(await file.arrayBuffer())
   }
 
   const ext = fileName.toLowerCase().split('.').pop()
@@ -253,8 +124,68 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Format tidak didukung (gunakan .docx atau .pdf)' }, { status: 422 })
 
   try {
-    const result = await parseAndSave(id, buf, fileName)
-    return NextResponse.json(result)
+    if (ext === 'pdf') {
+      // PDF — simpan ke storage, OCR dilakukan per-BAB saat analisis (tidak sekarang)
+      if (buf && !storagePath) {
+        // Small PDF — upload ke storage dulu
+        const path = `templates/${id}/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+        const { error: uploadError } = await adminClient.storage
+          .from('ky-uploads')
+          .upload(path, buf, { contentType: 'application/pdf', upsert: true })
+        if (uploadError) throw new Error('Gagal menyimpan PDF ke storage')
+        storagePath = path
+      }
+
+      const { error } = await db()
+        .from('ky_session')
+        .update({
+          template_nama: fileName,
+          template_storage_path: storagePath,
+          template_sections: {},
+          template_text: '',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+      if (error) throw new Error(error.message)
+
+      return NextResponse.json({ ok: true, mode: 'pdf_stored', message: 'PDF tersimpan — teks akan diekstrak per-BAB saat analisis dijalankan' })
+    } else {
+      // docx/doc — extract text sekarang
+      if (!buf) {
+        // Kalau dari storage, download dulu
+        const { data, error: dlErr } = await adminClient.storage.from('ky-uploads').download(storagePath!)
+        if (dlErr || !data) throw new Error('Gagal mengambil file dari storage')
+        buf = Buffer.from(await data.arrayBuffer())
+        adminClient.storage.from('ky-uploads').remove([storagePath!]).catch(() => {})
+      }
+
+      let templateSections = parseSectionsFromDocx(buf)
+      const zip = new AdmZip(buf)
+      const xml = zip.readAsText('word/document.xml')
+      const fullText = xml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      const filledSections = Object.values(templateSections).filter(v => v.length > 50).length
+      if (filledSections < 3) templateSections = parseSectionsFromText(fullText)
+
+      const trimmedSections: Record<string, string> = {}
+      for (const [babId, text] of Object.entries(templateSections)) {
+        trimmedSections[babId] = text.slice(0, 8000)
+      }
+
+      const { error } = await db()
+        .from('ky_session')
+        .update({
+          template_nama: fileName,
+          template_text: fullText.slice(0, 60000),
+          template_sections: trimmedSections,
+          template_storage_path: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+      if (error) throw new Error(error.message)
+
+      const parsedCount = Object.values(trimmedSections).filter(v => v.length > 50).length
+      return NextResponse.json({ ok: true, mode: 'docx_parsed', sections_parsed: parsedCount })
+    }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Gagal memproses file template'
     return NextResponse.json({ error: msg }, { status: 422 })
