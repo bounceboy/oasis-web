@@ -9,118 +9,209 @@ export const maxDuration = 300
 function buildAnalysisPrompt(data: TemplateData): string {
   const v = data.values || {}
   const m = data.metadata
+  const isJiwa = m.jenis_usaha === 'Jiwa'
 
-  // Helper: format number
-  const fmt = (n: number | null | undefined) =>
-    n == null ? 'N/A' : `Rp${n.toLocaleString('id-ID')} juta`
+  const cy = (k: string) => v[k]?.CY ?? null
+  const py = (k: string) => v[k]?.PY ?? null
 
-  // Derived figures
-  const totalAset = (v['SFP_CASH']?.CY ?? 0) + (v['SFP_MM']?.CY ?? 0) + (v['SFP_FVTPL']?.CY ?? 0) +
-    (v['SFP_FVOCI_DEBT']?.CY ?? 0) + (v['SFP_AC']?.CY ?? 0) + (v['SFP_REINS_ASSET']?.CY ?? 0) +
-    (v['SFP_PPE']?.CY ?? 0) + (v['SFP_OTHER']?.CY ?? 0)
-  const totalLiab = (v['SFP_INS_LIAB']?.CY ?? 0) + (v['SFP_REINS_LIAB']?.CY ?? 0) +
-    (v['SFP_PAYABLES']?.CY ?? 0) + (v['SFP_OTHER_LIAB']?.CY ?? 0)
-  const totalEkuitas = (v['SFP_SHARECAP']?.CY ?? 0) + (v['SFP_RETAINED']?.CY ?? 0) + (v['SFP_FVOCI_RES']?.CY ?? 0)
-  const lrc = v['I17_LRC']?.CY
-  const lic = v['I17_LIC']?.CY
-  const lossComp = v['I17_LOSS_COMP']?.CY
-  const ra = v['I17_RA']?.CY
-  const csm = v['I17_CSM_CLOSE']?.CY
-  const insRev = v['PL_INS_REV']?.CY
-  const insExp = v['PL_INS_EXP']?.CY
-  const reinsNet = v['PL_REINS_NET']?.CY
-  const grossClaims = v['I17_GROSS_CLAIMS']?.CY
-  const nwp = v['I17_NWP']?.CY
-  const gwp = v['I17_GWP']?.CY
-  const retention = (nwp && gwp && gwp !== 0) ? (nwp / gwp * 100).toFixed(1) : null
-  const lossRatio = (grossClaims && gwp && gwp !== 0) ? (grossClaims / gwp * 100).toFixed(1) : null
-  const ocr = v['I17_OCR']?.CY
-  const ibnr = v['I17_IBNR']?.CY
-  const fvociDebt = v['I9_FVOCI_DEBT']?.CY
-  const amortCost = v['I9_AC']?.CY
-  const s1exp = v['I9_S1_EXP']?.CY; const s1allow = v['I9_S1_ALLOW']?.CY
-  const s2exp = v['I9_S2_EXP']?.CY; const s2allow = v['I9_S2_ALLOW']?.CY
-  const s3exp = v['I9_S3_EXP']?.CY; const s3allow = v['I9_S3_ALLOW']?.CY
+  const fmt = (n: number | null | undefined, unit = 'juta') =>
+    n == null ? 'N/A' : `Rp${n.toLocaleString('id-ID')} ${unit}`
+
+  const pct = (a: number | null, b: number | null) =>
+    a != null && b != null && b !== 0 ? (a / b * 100).toFixed(2) + '%' : 'N/A'
+
+  // SFP
+  const kas = cy('SFP_CASH')
+  const mm = cy('SFP_MM')
+  const fvtpl = cy('I9_FVTPL') ?? cy('SFP_FVTPL')
+  const fvociDebt = cy('I9_FVOCI_DEBT') ?? cy('SFP_FVOCI_DEBT')
+  const fvociEq = cy('I9_FVOCI_EQ') ?? cy('SFP_FVOCI_EQ')
+  const ac = cy('I9_AC') ?? cy('SFP_AC')
+  const reinsAsset = cy('SFP_REINS_ASSET') ?? cy('I17_REINS_ASSET')
+  const totalInvest = (fvtpl ?? 0) + (fvociDebt ?? 0) + (fvociEq ?? 0) + (ac ?? 0) + (mm ?? 0) + (cy('SFP_INVPROP') ?? 0)
+  const insLiab = cy('SFP_INS_LIAB') ?? cy('I17_INS_LIAB')
+  const sharecap = cy('SFP_SHARECAP')
+  const retained = cy('SFP_RETAINED')
+  const fvociRes = cy('SFP_FVOCI_RES') ?? cy('I9_FVOCI_RES')
+  const ifociRes = cy('SFP_IFOCI_RES')
+  const totalEkuitas = (sharecap ?? 0) + (cy('SFP_APIC') ?? 0) + (retained ?? 0) + (fvociRes ?? 0) + (ifociRes ?? 0) + (cy('SFP_OTHER_RES') ?? 0)
+  const totalLiab = (insLiab ?? 0) + (cy('SFP_REINS_LIAB') ?? 0) + (cy('SFP_INVEST_LIAB') ?? 0) + (cy('SFP_PAYABLES') ?? 0) + (cy('SFP_TAX_LIAB') ?? 0) + (cy('SFP_LEASE_DEBT') ?? 0) + (cy('SFP_OTHER_LIAB') ?? 0)
+  const totalAset = totalLiab + totalEkuitas
+
+  // P/L
+  const insRev = cy('PL_INS_REV')
+  const insExp = cy('PL_INS_EXP')
+  const reinsNet = cy('PL_REINS_NET')
+  const invRes = cy('PL_INV_RES')
+  const ifFin = cy('PL_IF_FIN')
+  const opex = cy('PL_OPEX')
+  const tax = cy('PL_TAX')
+  const ociFvoci = cy('OCI_FVOCI')
+  const ociIfoci = cy('OCI_IFOCI')
+  const cfOp = cy('CF_OP')
+
+  // ISR = revenue + exp (exp biasanya negatif) + reins_net
+  const isr = insRev != null ? (insRev ?? 0) + (insExp ?? 0) + (reinsNet ?? 0) : null
+  // Profit approx = ISR + inv + ifFin + opex + tax
+  const profitApprox = insRev != null ? (insRev ?? 0) + (insExp ?? 0) + (reinsNet ?? 0) + (invRes ?? 0) + (ifFin ?? 0) + (opex ?? 0) + (cy('PL_IMPAIR') ?? 0) + (cy('PL_FEE_OTHER') ?? 0) + (cy('PL_OTHER_NONOP') ?? 0) + (tax ?? 0) : null
+  const totalCompIncome = profitApprox != null ? profitApprox + (ociFvoci ?? 0) + (ociIfoci ?? 0) + (cy('OCI_OTHER') ?? 0) : null
+
+  // IFRS17
+  const gwp = cy('I17_GWP'); const gwpPY = py('I17_GWP')
+  const nwp = cy('I17_NWP')
+  const grossClaims = cy('I17_GROSS_CLAIMS')
+  const reinsRecov = cy('I17_REINS_RECOV')
+  const acqCf = cy('I17_ACQ_CF')
+  const uwExp = cy('I17_UW_EXP')
+  const onerous = cy('I17_ONEROUS')
+  const insLiabDetail = cy('I17_INS_LIAB') ?? insLiab
+  const lrc = cy('I17_LRC')
+  const lic = cy('I17_LIC')
+  const lossComp = cy('I17_LOSS_COMP')
+  const ra = cy('I17_RA'); const raOpen = cy('I17_RA_OPEN')
+  const ocr = cy('I17_OCR')
+  const ibnr = cy('I17_IBNR')
+  const cedRes = cy('I17_CEDED_RES')
+  const dac = cy('I17_DAC')
+  const csmClose = cy('I17_CSM_CLOSE'); const csmOpen = cy('I17_CSM_OPEN')
+  const paa = cy('I17_PAA'); const vfa = cy('I17_VFA')
+
+  // IFRS9
+  const s1exp = cy('I9_S1_EXP'); const s1allow = cy('I9_S1_ALLOW')
+  const s2exp = cy('I9_S2_EXP'); const s2allow = cy('I9_S2_ALLOW')
+  const s3exp = cy('I9_S3_EXP'); const s3allow = cy('I9_S3_ALLOW')
   const totalECL = (s1allow ?? 0) + (s2allow ?? 0) + (s3allow ?? 0)
-  const totalFAECL = (s1exp ?? 0) + (s2exp ?? 0) + (s3exp ?? 0)
-  const coverageRatio = totalFAECL > 0 ? (totalECL / totalFAECL * 100).toFixed(2) : null
+  const totalExp = (s1exp ?? 0) + (s2exp ?? 0) + (s3exp ?? 0)
+  const invInc = cy('I9_INV_INC'); const fvPL = cy('I9_FV_PL')
+  const writeoff = cy('I9_WRITEOFF')
+  const avgAssets = cy('I9_AVG_ASSETS')
 
-  return `Kamu adalah pengawas asuransi senior OJK yang berpengalaman (world class insurance supervisor) yang memahami:
-- PSAK 117 (setara IFRS 17) – Kontrak Asuransi
-- PSAK 109 (setara IFRS 9) – Instrumen Keuangan
-- Peraturan OJK No. 26 Tahun 2025 dan regulasi terkait
+  const tahun = m.periode || 'tahun berjalan'
+  const perusahaan = m.nama_entitas
+  const unit = m.unit || 'juta'
 
-Berikut adalah data keuangan audited ${m.nama_entitas} (${m.jenis_usaha === 'Jiwa' ? 'Asuransi Jiwa' : 'Asuransi Umum'}) periode ${m.periode || 'tahun berjalan'} dalam ${m.unit}:
+  return `Kamu adalah pengawas asuransi senior OJK yang berpengalaman dan memahami PSAK 117 (IFRS 17), PSAK 109 (IFRS 9), serta regulasi OJK perasuransian Indonesia.
+
+DATA KEUANGAN AUDITED: ${perusahaan} (${isJiwa ? 'Asuransi Jiwa' : 'Asuransi Umum'}) — ${tahun} (dalam ${unit})
 
 === POSISI KEUANGAN ===
-Total Aset (estimasi): ${fmt(totalAset)}
-Total Liabilitas (estimasi): ${fmt(totalLiab)}
-Total Ekuitas (estimasi): ${fmt(totalEkuitas)}
-Liabilitas Kontrak Asuransi: ${fmt(v['SFP_INS_LIAB']?.CY)}
-Aset Kontrak Reasuransi: ${fmt(v['SFP_REINS_ASSET']?.CY)}
-${csm ? `CSM Saldo Akhir: ${fmt(csm)}` : ''}
+Kas & setara kas: ${fmt(kas)} | Money market: ${fmt(mm)}
+Investasi total: ${fmt(totalInvest)} (FVTPL: ${fmt(fvtpl)}, FVOCI debt: ${fmt(fvociDebt)}, FVOCI ekuitas: ${fmt(fvociEq)}, AC: ${fmt(ac)})
+Aset kontrak reasuransi: ${fmt(reinsAsset)}
+Total aset: ${fmt(totalAset)}
+Liabilitas kontrak asuransi: ${fmt(insLiabDetail)}
+Total liabilitas: ${fmt(totalLiab)}
+Total ekuitas: ${fmt(totalEkuitas)} (FVOCI reserve: ${fmt(fvociRes)}, IFOCI reserve: ${fmt(ifociRes)})
 
-=== LABA RUGI ===
-Insurance Revenue (Pendapatan Asuransi): ${fmt(insRev)}
-Insurance Service Expense (Beban Jasa): ${fmt(insExp)}
-Net Reinsurance Result: ${fmt(reinsNet)}
-Hasil Investasi: ${fmt(v['PL_INV_RES']?.CY)}
-Laba Sebelum Pajak: ${fmt(v['PL_TAX']?.CY ? (insRev ?? 0) - (insExp ?? 0) - (reinsNet ?? 0) + (v['PL_INV_RES']?.CY ?? 0) - (v['PL_OPEX']?.CY ?? 0) : null)}
+=== LABA RUGI & OCI ===
+Insurance revenue (pendapatan jasa asuransi): ${fmt(insRev)}
+Insurance service expense (beban jasa asuransi): ${fmt(insExp)}
+Net reinsurance result: ${fmt(reinsNet)}
+Insurance service result (ISR): ${fmt(isr)}
+Hasil investasi: ${fmt(invRes)}
+Insurance finance income/(expense): ${fmt(ifFin)}
+Beban operasional: ${fmt(opex)}
+Beban pajak: ${fmt(tax)}
+Laba setelah pajak (estimasi): ${fmt(profitApprox)}
+OCI – pergerakan FVOCI: ${fmt(ociFvoci)}
+OCI – insurance finance OCI: ${fmt(ociIfoci)}
+Total comprehensive income (estimasi): ${fmt(totalCompIncome)}
+Arus kas operasi: ${fmt(cfOp)}
 
-=== ARUS KAS ===
-Operasi: ${fmt(v['CF_OP']?.CY)}
-Investasi: ${fmt(v['CF_INV']?.CY)}
-Pendanaan: ${fmt(v['CF_FIN']?.CY)}
-
-=== DETAIL PSAK 117 / IFRS 17 ===
-GWP (management): ${fmt(gwp)}
-NWP (management): ${fmt(nwp)}
-Retention Ratio: ${retention ? retention + '%' : 'N/A'}
-Gross Claims Incurred: ${fmt(grossClaims)}
-Loss Ratio (gross): ${lossRatio ? lossRatio + '%' : 'N/A'}
+=== DETAIL PSAK 117 ===
+GWP: ${fmt(gwp)} | GWP tahun lalu: ${fmt(gwpPY)} | NWP: ${fmt(nwp)}
+Retention ratio: ${pct(nwp, gwp)}
+Gross claims incurred: ${fmt(grossClaims)}
+Reinsurance recoveries on claims: ${fmt(reinsRecov)}
+Acquisition CF amortisation: ${fmt(acqCf)} | Other UW expenses: ${fmt(uwExp)}
+Losses on onerous contracts: ${fmt(onerous)}
 LRC (excl. loss component): ${fmt(lrc)}
 LIC (Liability for Incurred Claims): ${fmt(lic)}
-Loss Component: ${fmt(lossComp)}
-Risk Adjustment: ${fmt(ra)}
+Loss component: ${fmt(lossComp)}
+Risk adjustment (penutup): ${fmt(ra)} | RA pembuka: ${fmt(raOpen)}
 OCR (Outstanding Claims Reserve): ${fmt(ocr)}
-IBNR Reserve: ${fmt(ibnr)}
-Reinsurance Recoverables on LIC: ${fmt(v['I17_CEDED_RES']?.CY)}
-Acquisition Cash Flow Asset (DAC): ${fmt(v['I17_DAC']?.CY)}
+IBNR reserve: ${fmt(ibnr)}
+OCR + IBNR total: ${fmt((ocr ?? 0) + (ibnr ?? 0))}
+Ceded reserves (reins recoverables on LIC): ${fmt(cedRes)}
+DAC / Acquisition cash flow asset: ${fmt(dac)}
+${isJiwa ? `CSM saldo akhir: ${fmt(csmClose)} | CSM saldo awal: ${fmt(csmOpen)}` : ''}
+${isJiwa && paa != null ? `PAA liabilities: ${fmt(paa)}` : ''}
+${isJiwa && vfa != null ? `VFA liabilities: ${fmt(vfa)}` : ''}
 
-=== DETAIL PSAK 109 / IFRS 9 ===
-FVTPL: ${fmt(v['I9_FVTPL']?.CY)}
-FVOCI Debt: ${fmt(fvociDebt)}
-Amortised Cost: ${fmt(amortCost)}
-Stage 1 Exposure: ${fmt(s1exp)} | Allowance: ${fmt(s1allow)}
-Stage 2 Exposure: ${fmt(s2exp)} | Allowance: ${fmt(s2allow)}
-Stage 3 Exposure: ${fmt(s3exp)} | Allowance: ${fmt(s3allow)}
-Total ECL Coverage Ratio: ${coverageRatio ? coverageRatio + '%' : 'N/A'}
-FVOCI Reserve (OCI): ${fmt(v['I9_FVOCI_RES']?.CY)}
-Investment Income: ${fmt(v['I9_INV_INC']?.CY)}
+=== DETAIL PSAK 109 ===
+FVTPL: ${fmt(fvtpl)} | FVOCI debt: ${fmt(fvociDebt)} | FVOCI ekuitas: ${fmt(fvociEq)} | AC: ${fmt(ac)}
+ECL Stage 1 — exposure: ${fmt(s1exp)}, allowance: ${fmt(s1allow)}
+ECL Stage 2 — exposure: ${fmt(s2exp)}, allowance: ${fmt(s2allow)}
+ECL Stage 3 — exposure: ${fmt(s3exp)}, allowance: ${fmt(s3allow)}
+Total ECL: ${fmt(totalECL)} | Total exposure: ${fmt(totalExp)} | Coverage: ${pct(totalECL, totalExp)}
+Write-offs: ${fmt(writeoff)}
+FVOCI reserve closing: ${fmt(fvociRes)}
+Investment income: ${fmt(invInc)} | FV gain/(loss) FVTPL di P/L: ${fmt(fvPL)}
+Average investment assets: ${fmt(avgAssets)}
+Investment yield (proxy): ${pct(invRes, totalInvest > 0 ? totalInvest : null)}
 
-=== INSTRUKSI ANALISIS ===
-Buatkan deskripsi hasil analisis yang **detail, komprehensif, dan mudah dipahami minimal 3 halaman** dari dua aspek:
+=== FORMAT OUTPUT YANG WAJIB DIIKUTI (ikuti persis termasuk penomoran) ===
 
-**A. PSAK 117 – Kontrak Asuransi** (lebih detail):
-1. Dampak PSAK 117 terhadap penyajian pendapatan (insurance revenue vs premi bruto) — berikan angka konkret
-2. Analisis liabilitas kontrak asuransi: struktur LRC vs LIC, loss component, risk adjustment — interpretasi pengawas
-3. Outstanding Claims Reserve (OCR), IBNR, dan kecukupannya
-4. Analisis reasuransi: reinsurance contract assets/liabilities, retention ratio, ceded reserves
-5. ${m.jenis_usaha === 'Jiwa' ? 'Analisis CSM (Contractual Service Margin) dan pergerakannya' : 'Analisis combined ratio, underwriting result, dan kontrak merugi per lini usaha'}
-6. Perbandingan CY vs PY untuk setiap metrik di atas — tren dan signifikansi
-7. Implikasi dan rekomendasi pengawas berdasarkan POJK No. 26/2025
+Tulis analisis dengan format berikut (bahasa Indonesia formal, minimal 3 halaman, setiap subseksi minimal 2 paragraf panjang berisi angka konkret dari data di atas):
 
-**B. PSAK 109 – Instrumen Keuangan** (lebih detail):
-1. Komposisi portofolio investasi: FVTPL, FVOCI, Amortised Cost — analisis strategi investasi
-2. Analisis ECL (Expected Credit Loss): Stage 1/2/3 exposure dan allowance
-3. Coverage ratio dan kecukupan pencadangan ECL
-4. Credit-impaired assets dan write-offs — kualitas aset keuangan
-5. FVOCI reserve movement dan dampak ke ekuitas
-6. Investment yield dan efisiensi portofolio
-7. Risiko interest rate dan dampak terhadap nilai aset keuangan
+Analisis PSAK 117 dan PSAK 109 Tahun Buku ${tahun.replace('31 Desember ', '').replace('Desember ', '')}
+${perusahaan}
 
-Gunakan bahasa Indonesia formal (bahasa pengawas OJK). Setiap poin harus menyebutkan angka konkret dari data di atas.
-Akhiri dengan **Kesimpulan dan Rekomendasi Pengawas** yang berisi temuan utama, risiko yang perlu dipantau, dan tindak lanjut yang disarankan.`
+1.    Analisis PSAK 117 – Kontrak Asuransi
+
+a.     Dampak PSAK 117 terhadap Penyajian Kinerja Asuransi
+[2-3 paragraf: bandingkan insurance revenue vs pendekatan premi lama, jelaskan insurance service expense, hitung ISR kotor dan bersih setelah reinsurance, interpretasi pengawas atas besarnya beban reasuransi vs manfaat perlindungan risiko]
+
+b.     Analisis Liabilitas Kontrak Asuransi
+[2-3 paragraf: struktur LRC, LIC, loss component, risk adjustment dalam total liabilitas kontrak asuransi; interpretasi proporsi LRC vs LIC; implikasi pengawasan terkait kecukupan cadangan, kecepatan penyelesaian klaim, recoverability reasuransi]
+
+c.     Outstanding Claims Reserve, IBNR, dan Risk Adjustment
+[2-3 paragraf: nilai OCR dan IBNR, total cadangan klaim, rasio RA terhadap LIC, makna fullfilment cash flows dalam PSAK 117, relevansi untuk pengawasan kecukupan cadangan]
+
+d.     Kontrak Merugi dan Loss Component
+[2-3 paragraf: nilai loss component absolut dan relatif terhadap total LCA, sinyal pricing/klaim, implikasi pengawasan per lini usaha]
+
+${isJiwa ? `e.     Contractual Service Margin (CSM) dan Pergerakannya
+[2-3 paragraf: saldo awal dan akhir CSM, pertumbuhan CSM, makna CSM sebagai unearned profit, relevansi untuk prospek profitabilitas jangka panjang, PAA/VFA jika relevan]` : `e.     Reasuransi dalam PSAK 117
+[2-3 paragraf: nilai aset kontrak reasuransi, pemulihan klaim dari reasuradur, alokasi premi reasuransi, beban kontrak reasuransi neto, rekomendasi pengawasan: credit quality reasuradur, aging, recoverability, ketergantungan reasuransi]`}
+
+2.    Analisis PSAK 109 – Instrumen Keuangan
+
+a.     Komposisi Portofolio Investasi
+[2-3 paragraf: rincian FVTPL, FVOCI debt, FVOCI ekuitas, AC; persentase terhadap total aset; implikasi paparan volatilitas laba vs OCI; risiko pasar, kredit, dan likuiditas]
+
+b.     Kinerja Investasi dan Yield
+[2-3 paragraf: nilai hasil investasi, rincian komponen (bunga, dividen, gain), proxy yield, analisis kecukupan yield terhadap struktur portofolio, peringatan atas ketergantungan investasi untuk menutup tekanan underwriting]
+
+c.     FVOCI dan Dampak terhadap Ekuitas
+[2-3 paragraf: nilai OCI FVOCI (positif/negatif), dampak terhadap laba komprehensif vs laba bersih, volatilitas ekuitas, rekomendasi manajemen risiko pasar dan stress testing]
+
+d.     ECL dan Kualitas Kredit
+[2-3 paragraf: nilai ECL per stage, coverage ratio, makna portofolio di Stage 1 vs potensi migrasi Stage 2/3, write-offs, rekomendasi review kualitas kredit dan kebijakan pemantauan]
+
+3.    Kesimpulan Supervisory dan Fokus Tindak Lanjut
+
+[1-2 paragraf pembuka: ringkasan profil keuangan keseluruhan, area positif dan area perhatian utama]
+
+Secara supervisory judgement, terdapat beberapa concern:
+
+1. [concern pertama — gunakan data konkret]
+2. [concern kedua]
+3. [concern ketiga]
+4. [concern keempat]
+5. [concern kelima]
+
+Dengan demikian, rekomendasi pengawasan adalah memantau analisis tambahan yang mencakup:
+a.     [rekomendasi a]
+b.     [rekomendasi b]
+c.     [rekomendasi c]
+d.     [rekomendasi d]
+e.     [rekomendasi e]
+f.      [rekomendasi f]
+
+[1 paragraf penutup: pentingnya langkah-langkah tersebut untuk memastikan kualitas keuangan yang sesungguhnya]
+
+PENTING: Jangan gunakan tanda ## atau ** atau tanda markdown lain. Gunakan hanya penomoran 1. / a. / b. persis seperti format di atas. Setiap subseksi harus menyebutkan angka konkret dari data yang diberikan.`
 }
 
 async function doAnalyze(sessionId: string) {
