@@ -65,16 +65,17 @@ Balas HANYA dalam JSON:
       ...complianceList.map(t => ({ ...t, tipe_analisis: 'compliance' })),
     ]
 
+    console.log(`[onsite/dokumen] risk=${riskList.length} compliance=${complianceList.length} total=${toInsert.length}`)
     if (toInsert.length > 0) {
-      await db().from('onsite_temuan').insert(
-        toInsert.map(t => ({
-          kode, judul: t.judul, uraian: t.uraian, urgensi: t.urgensi, sifat: t.sifat,
-          kluster: t.kluster, kluster_nama: KLUSTER[t.kluster] ?? '',
-          pasal_terkait: t.pasal_terkait ?? [], rekomendasi: t.rekomendasi,
-          tipe_analisis: t.tipe_analisis,
-          sumber_tipe: 'dokumen', sumber_id: dokId, sumber_nama: namaFile, status: 'draft',
-        }))
-      )
+      const rows = toInsert.map(t => ({
+        kode, judul: t.judul, uraian: t.uraian, urgensi: t.urgensi, sifat: t.sifat,
+        kluster: t.kluster, kluster_nama: KLUSTER[t.kluster] ?? '',
+        pasal_terkait: t.pasal_terkait ?? [], rekomendasi: t.rekomendasi,
+        tipe_analisis: t.tipe_analisis,
+        sumber_tipe: 'dokumen', sumber_id: dokId, sumber_nama: namaFile, status: 'draft',
+      }))
+      const { error: insErr } = await db().from('onsite_temuan').insert(rows)
+      if (insErr) console.error('[onsite/dokumen] temuan insert error:', JSON.stringify(insErr))
     }
     await db().from('onsite_dokumen').update({ status: 'done', ringkasan }).eq('id', dokId)
   } catch (err) {
