@@ -95,7 +95,24 @@ export default function PsakPage() {
     pollRef.current = setInterval(async () => {
       const data = await loadDetail(id)
       if (!data) return
-      if (data.status === 'template_ready' || data.status === 'done' || data.status === 'error') {
+
+      if (data.status === 'template_ready') {
+        // Extract selesai → auto-trigger analisis narasi langsung
+        clearInterval(pollRef.current!)
+        setExtracting(false)
+        setAnalyzing(true)
+        setDetail(prev => prev ? { ...prev, status: 'analyzing' } : prev)
+        const res = await fetch(`/api/psak/v2/session/${id}/analyze`, { method: 'POST' })
+        if (res.ok) {
+          // Lanjut poll sampai done
+          startPoll(id)
+        } else {
+          setAnalyzing(false)
+        }
+        return
+      }
+
+      if (data.status === 'done' || data.status === 'error') {
         clearInterval(pollRef.current!)
         setExtracting(false)
         setAnalyzing(false)
@@ -381,13 +398,26 @@ export default function PsakPage() {
           </div>
         )}
 
-        {/* Extracting banner */}
-        {isExtracting && (
-          <div style={{ background: 'rgba(255,190,80,0.06)', border: '1px solid rgba(255,190,80,0.2)', borderRadius: 14, padding: '18px 24px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 20, height: 20, border: '2px solid rgba(255,190,80,0.2)', borderTopColor: '#ffbe50', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: 13.5, fontWeight: 500, color: '#ffbe50' }}>Analisis sedang berjalan...</div>
-              <div style={{ fontSize: 12, color: '#828d96', marginTop: 3 }}>AI membaca PDF + menggabungkan data Excel (~60–90 detik)</div>
+        {/* Progress banner — extracting atau analyzing */}
+        {(isExtracting || isAnalyzing) && (
+          <div style={{ background: 'rgba(255,190,80,0.06)', border: '1px solid rgba(255,190,80,0.2)', borderRadius: 14, padding: '18px 24px', marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
+              <div style={{ width: 20, height: 20, border: '2px solid rgba(255,190,80,0.2)', borderTopColor: '#ffbe50', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+              <div style={{ fontSize: 13.5, fontWeight: 500, color: '#ffbe50' }}>
+                {isExtracting ? 'Langkah 1/2 — Membaca PDF & menggabungkan Excel...' : 'Langkah 2/2 — Menulis analisis narasi...'}
+              </div>
+            </div>
+            {/* Step indicators */}
+            <div style={{ display: 'flex', gap: 8, paddingLeft: 34 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: isExtracting ? '#ffbe50' : '#45e661' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: isExtracting ? '#ffbe50' : '#45e661', display: 'inline-block' }} />
+                AI baca PDF (CALK + data struktural)
+              </div>
+              <span style={{ color: '#454e55' }}>+</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: isExtracting ? '#454e55' : '#ffbe50' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: isExtracting ? '#454e55' : '#ffbe50', display: 'inline-block' }} />
+                {isAnalyzing ? 'Rule-based ✓ · Menulis narasi analisis...' : 'Rule-based merger Excel (otomatis)'}
+              </div>
             </div>
           </div>
         )}
@@ -640,13 +670,10 @@ export default function PsakPage() {
                   </div>
                 </div>
               ) : (
-                <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                  <p style={{ fontSize: 13, color: '#aab4bc', marginBottom: 20 }}>
-                    Buat analisis komprehensif PSAK 117 & PSAK 109 berdasarkan data yang telah diekstrak.
+                <div style={{ textAlign: 'center', padding: '60px 0', color: '#828d96' }}>
+                  <p style={{ fontSize: 13, margin: 0 }}>
+                    Analisis akan dibuat otomatis setelah ekstraksi PDF selesai.
                   </p>
-                  <button onClick={triggerAnalysis} className="btn-filled" style={{ fontSize: 13 }}>
-                    Generate Analisis PSAK 117 & PSAK 109 ↗
-                  </button>
                 </div>
               )}
             </div>
