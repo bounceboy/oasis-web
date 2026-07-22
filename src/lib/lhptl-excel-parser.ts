@@ -247,32 +247,35 @@ function parsePK09(wb: XLSX.WorkBook) {
     .filter(r => toStr(r[4]).trim() !== '')
     .map(r => ({ nama: toStr(r[4]), nilai: toNum(r[6]) ?? 0 }))
   const total = items.reduce((s, x) => s + x.nilai, 0)
+  if (ws === null) return { aset_lain_lain: null, total_aset_lain: null }
   const lainLain = items.filter(r => {
     const n = r.nama.toLowerCase()
     return n.includes('lain') || n.includes('other')
   })
-  return { aset_lain_lain: lainLain.length > 0 ? lainLain : null, total_aset_lain: total }
+  // Return [] (not null) when sheet ada tapi tidak ada item lain-lain → rules tidak push "tidak tersedia"
+  return { aset_lain_lain: lainLain, total_aset_lain: total }
 }
 
 // ─── PK10 — utang premi (aging piutang) ──────────────────────────────────────
 
 function parsePK10(wb: XLSX.WorkBook) {
   const ws = getSheet(wb, 'PK10')
+  if (!ws) return { piutang_aging_lewat_30_sudah_bayar: null, total_utang_premi: null }
   const dr = dataRows(ws, 2, 9)
   const items = dr.filter(r => toStr(r[4]).trim() !== '')
-  const total = items.reduce((s, r) => s + (toNum(r[9]) ?? 0), 0)
+  // col[8]=status, col[9]=aging, col[10]=jumlah
+  const total = items.reduce((s, r) => s + (toNum(r[10]) ?? 0), 0)
 
-  // aging >30 dan status sudah bayar — rule pk10_aging_piutang_lewat_30_hari_sudah_bayar
   const lewat30SudahBayar = items.filter(r => {
-    const aging = toStr(r[8]).toLowerCase()
-    const status = toStr(r[7]).toLowerCase()
+    const status = toStr(r[8]).toLowerCase()
+    const aging = toStr(r[9]).toLowerCase()
     const sudahBayar = status.includes('sudah')
     const lewat30 = aging.includes('> 30') || aging.includes('>30') || aging.includes('90') || aging.includes('30 -')
     return sudahBayar && lewat30
-  }).map(r => ({ nilai: toNum(r[9]) ?? 0 }))
+  }).map(r => ({ nilai: toNum(r[10]) ?? 0 }))
 
   return {
-    piutang_aging_lewat_30_sudah_bayar: lewat30SudahBayar.length > 0 ? lewat30SudahBayar : null,
+    piutang_aging_lewat_30_sudah_bayar: lewat30SudahBayar,
     total_utang_premi: total,
   }
 }
@@ -281,32 +284,35 @@ function parsePK10(wb: XLSX.WorkBook) {
 
 function parsePK11(wb: XLSX.WorkBook) {
   const ws = getSheet(wb, 'PK11')
+  if (!ws) return null
   const dr = dataRows(ws, 2, 9)
   const items = dr
-    .filter(r => toStr(r[4]).trim() !== '')
+    .filter(r => toStr(r[4]).trim() !== '' && (toNum(r[8]) ?? 0) > 0)
     .map(r => ({
       nama_tertanggung: toStr(r[4]),
       nama_penanggung: toStr(r[5]),
       nilai: toNum(r[8]) ?? 0,
       tanggal: fmtDate(r[7]),
     }))
-  return items.length > 0 ? items : null
+  // Return [] (not null) when sheet ada tapi tidak ada utang klaim
+  return items
 }
 
 // ─── PK14 — utang lain ───────────────────────────────────────────────────────
 
 function parsePK14(wb: XLSX.WorkBook) {
   const ws = getSheet(wb, 'PK14')
+  if (!ws) return { utang_lain_lain: null, total_utang_lain: null }
   const dr = dataRows(ws, 2, 9)
   const items = dr
-    .filter(r => toStr(r[4]).trim() !== '')
+    .filter(r => toStr(r[4]).trim() !== '' && (toNum(r[5]) ?? 0) > 0)
     .map(r => ({ nama: toStr(r[4]), nilai: toNum(r[5]) ?? 0 }))
   const total = items.reduce((s, x) => s + x.nilai, 0)
   const lainLain = items.filter(r => {
     const n = r.nama.toLowerCase()
     return n.includes('lain') || n.includes('other')
   })
-  return { utang_lain_lain: lainLain.length > 0 ? lainLain : null, total_utang_lain: total }
+  return { utang_lain_lain: lainLain, total_utang_lain: total }
 }
 
 // ─── LK01 — laporan posisi keuangan ─────────────────────────────────────────
@@ -505,10 +511,12 @@ function parseOP02(wb: XLSX.WorkBook) {
     }
   }
 
+  // Return [] (not null) when sheet ada tapi tidak ada keterlambatan → rule silent, tidak push "tidak tersedia"
+  const adaData = dr.some(r => toStr(r[4]).trim() !== '')
   return {
-    klaim_terlambat_penerusan: terlambatPenerusan.length > 0 ? terlambatPenerusan : null,
-    klaim_terlambat_tanggapan: terlambatTanggapan.length > 0 ? terlambatTanggapan : null,
-    klaim_terlambat_dokumen: terlambatDokumen.length > 0 ? terlambatDokumen : null,
+    klaim_terlambat_penerusan: adaData ? terlambatPenerusan : null,
+    klaim_terlambat_tanggapan: adaData ? terlambatTanggapan : null,
+    klaim_terlambat_dokumen: adaData ? terlambatDokumen : null,
   }
 }
 
@@ -675,8 +683,10 @@ type HubunganEntry = { nama: string; jabatan: string; status_komisaris: string; 
 
 function parseHubungan(wbTk: XLSX.WorkBook, sheetName: string): HubunganEntry[] | null {
   const ws = getSheet(wbTk, sheetName)
+  if (!ws) return null
   const dr = dataRows(ws, 2, 9)
-  const items = dr
+  // Return [] (not null) when sheet ada tapi "TIDAK ADA" → rule silent
+  return dr
     .filter(r => toStr(r[4]).trim() !== '' && toStr(r[4]).trim().toUpperCase() !== 'TIDAK ADA')
     .map(r => ({
       nama: toStr(r[4]),
@@ -685,15 +695,16 @@ function parseHubungan(wbTk: XLSX.WorkBook, sheetName: string): HubunganEntry[] 
       status_direksi: toStr(r[8]) || '-',
       status_ps: toStr(r[10]) || '-',
     }))
-  return items.length > 0 ? items : null
 }
 
 // ─── RJBT — rangkap jabatan ──────────────────────────────────────────────────
 
 function parseRJBT(wbTk: XLSX.WorkBook) {
   const ws = getSheet(wbTk, 'RJBT')
+  if (!ws) return null
   const dr = dataRows(ws, 2, 8)
-  const items = dr
+  // Return [] (not null) when "TIDAK ADA" → rule silent
+  return dr
     .filter(r => toStr(r[4]).trim() !== '' && toStr(r[4]).trim().toUpperCase() !== 'TIDAK ADA')
     .map(r => ({
       nama: toStr(r[4]),
@@ -701,7 +712,6 @@ function parseRJBT(wbTk: XLSX.WorkBook) {
       perusahaan_lain: toStr(r[7]),
       bidang_usaha: toStr(r[8]),
     }))
-  return items.length > 0 ? items : null
 }
 
 // ─── TPKP — RUPS ─────────────────────────────────────────────────────────────

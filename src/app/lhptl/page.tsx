@@ -123,9 +123,8 @@ export default function LhptlPage() {
       const pathGcg = await uploadFileToStorage(fileGcg)
 
       addLog('Membaca sheet Excel...')
-      addLog('AI mengekstrak data dari semua sheet...')
       addLog('Menjalankan rules deterministik...')
-      addLog('Menyusun Kesimpulan dan Tindak Lanjut...')
+      addLog('AI menyusun Kesimpulan dan Tindak Lanjut...')
 
       const res = await fetch('/api/lhptl/analyze', {
         method: 'POST',
