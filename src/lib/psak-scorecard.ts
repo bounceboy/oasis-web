@@ -181,8 +181,7 @@ export function hitungRasio(d: DataKeuangan): RasioKeuangan {
     r.leverage = d.total_liabilitas / d.total_ekuitas
   if (d.kas != null && d.total_liabilitas)
     r.liquidity = d.kas / d.total_liabilitas
-  if (d.klaim_dan_manfaat != null && d.pendapatan_asuransi)
-    r.claim_ratio = Math.abs(d.klaim_dan_manfaat) / d.pendapatan_asuransi
+  // claim_ratio tidak dihitung — I17_GROSS_CLAIMS tidak dapat dibagi insurance revenue secara valid
   if (d.csm_penutup != null && d.total_ekuitas)
     r.csm_equity = d.csm_penutup / d.total_ekuitas
   if (d.ecl_total != null && d.ecl_base)
@@ -199,8 +198,7 @@ export function hitungRasio(d: DataKeuangan): RasioKeuangan {
     r.reserve_leverage = d.liabilitas_kontrak_asuransi / d.total_ekuitas
   if (d.beban_underwriting != null && d.pendapatan_asuransi)
     r.expense_ratio = Math.abs(d.beban_underwriting) / d.pendapatan_asuransi
-  if (r.claim_ratio != null && r.expense_ratio != null)
-    r.combined_ratio = r.claim_ratio + r.expense_ratio
+  // combined_ratio dihapus — tidak ada claim_ratio yang valid
   if (d.aset_kontrak_reasuransi != null && d.total_ekuitas)
     r.reins_asset_equity = d.aset_kontrak_reasuransi / d.total_ekuitas
   if (d.csm_penutup != null && d.csm_pembuka && d.csm_pembuka > 0)
@@ -240,17 +238,10 @@ export function buildScorecard(rasio: RasioKeuangan, jenis: JenisUsaha): Scoreca
     rasio.leverage != null ? rasio.leverage <= THRESHOLD.leverage_max : null,
     rasio.leverage != null ? (rasio.leverage <= THRESHOLD.leverage_max ? 'Memenuhi' : 'Leverage tinggi') : 'Data tidak tersedia'))
 
-  items.push(item('Claim Ratio', rasio.claim_ratio, `<= ${(THRESHOLD.claim_ratio_max * 100).toFixed(0)}%`,
-    rasio.claim_ratio != null ? rasio.claim_ratio <= THRESHOLD.claim_ratio_max : null,
-    rasio.claim_ratio != null ? (rasio.claim_ratio <= THRESHOLD.claim_ratio_max ? 'Memenuhi' : 'Klaim tinggi') : 'Data tidak tersedia'))
-
   if (jenis === 'Umum') {
     items.push(item('Expense Ratio', rasio.expense_ratio, `<= ${(THRESHOLD.expense_ratio_max * 100).toFixed(0)}%`,
       rasio.expense_ratio != null ? rasio.expense_ratio <= THRESHOLD.expense_ratio_max : null,
       rasio.expense_ratio != null ? (rasio.expense_ratio <= THRESHOLD.expense_ratio_max ? 'Memenuhi' : 'Beban usaha tinggi') : 'Data tidak tersedia'))
-    items.push(item('Combined Ratio', rasio.combined_ratio, `<= ${(THRESHOLD.combined_ratio_max * 100).toFixed(0)}%`,
-      rasio.combined_ratio != null ? rasio.combined_ratio <= THRESHOLD.combined_ratio_max : null,
-      rasio.combined_ratio != null ? (rasio.combined_ratio <= THRESHOLD.combined_ratio_max ? 'Memenuhi' : 'Operasi underwriting merugi') : 'Data tidak tersedia'))
     items.push(item('Aset Reasuransi / Ekuitas', rasio.reins_asset_equity, `<= ${THRESHOLD.reins_asset_equity_max}x`,
       rasio.reins_asset_equity != null ? rasio.reins_asset_equity <= THRESHOLD.reins_asset_equity_max : null,
       rasio.reins_asset_equity != null ? (rasio.reins_asset_equity <= THRESHOLD.reins_asset_equity_max ? 'Memenuhi' : 'Dependensi reasuransi tinggi') : 'Data tidak tersedia'))
