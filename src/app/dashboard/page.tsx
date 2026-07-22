@@ -10,7 +10,7 @@ export default async function DashboardPage() {
   const firstName = (user.nama_lengkap || user.username).split(' ')[0]
 
   const offsiteModules = [
-    { href: '/psak117', label: 'PSAK 117',    sub: 'Analisis Lapkeu Asuransi' },
+    { href: '/psak',    label: 'PSAK',         sub: 'Analisis LK PSAK 117 & 109' },
     { href: '/lhptl',   label: 'LHPTL',       sub: 'Pengawasan Tidak Langsung Pialang' },
     { href: '/kyic',    label: 'KYIC/KYNBFI', sub: 'Know Your Insurance Company' },
     { href: '/renbis',  label: 'Renbis',       sub: 'Evaluasi Rencana Bisnis Tahunan' },
