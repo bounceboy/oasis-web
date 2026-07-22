@@ -151,12 +151,47 @@ export default function KyicV2Page() {
 
   async function uploadTemplate(sessionId: string, file: File) {
     setUploadingTemplate(true)
-    const fd = new FormData()
-    fd.append('file', file)
-    const res = await fetch(`/api/kyic/v2/session/${sessionId}/upload-template`, { method: 'POST', body: fd })
-    if (!res.ok) setError('Gagal upload template')
-    else await loadDetail(sessionId)
-    setUploadingTemplate(false)
+    setError(null)
+    try {
+      const SIZE_LIMIT = 3 * 1024 * 1024 // 3MB — stay safely under Vercel's 4.5MB body limit
+
+      if (file.size > SIZE_LIMIT) {
+        // Large file: upload directly to Supabase Storage, then call API with path
+        const signRes = await fetch(`/api/kyic/v2/session/${sessionId}/upload-signed-url`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: file.name }),
+        })
+        if (!signRes.ok) { setError('Gagal mendapatkan upload URL'); return }
+        const { signedUrl, storagePath } = await signRes.json()
+
+        // Upload langsung ke Supabase Storage
+        const uploadRes = await fetch(signedUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        })
+        if (!uploadRes.ok) { setError('Gagal mengupload file ke storage'); return }
+
+        // Minta server proses dari storage
+        const processRes = await fetch(`/api/kyic/v2/session/${sessionId}/upload-template`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ storagePath, fileName: file.name }),
+        })
+        if (!processRes.ok) setError('Gagal memproses template')
+        else await loadDetail(sessionId)
+      } else {
+        // Small file: kirim langsung via FormData
+        const fd = new FormData()
+        fd.append('file', file)
+        const res = await fetch(`/api/kyic/v2/session/${sessionId}/upload-template`, { method: 'POST', body: fd })
+        if (!res.ok) setError('Gagal upload template')
+        else await loadDetail(sessionId)
+      }
+    } finally {
+      setUploadingTemplate(false)
+    }
   }
 
   async function uploadBabDocs(sessionId: string, babId: BabId, files: File[]) {
