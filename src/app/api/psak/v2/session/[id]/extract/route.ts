@@ -11,13 +11,57 @@ const adminClient = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+const FINANCIAL_KEYWORDS = [
+  'aset', 'liabilitas', 'ekuitas', 'pendapatan', 'beban', 'laba', 'rugi',
+  'arus kas', 'investasi', 'premi', 'klaim', 'cadangan', 'ibnr', 'gmm',
+  'lrc', 'lic', 'bba', 'vfa', 'csm', 'ra ', 'kontrak asuransi',
+  'instrumen keuangan', 'ifrs 17', 'ifrs 9', 'psak 117', 'psak 109',
+  'neraca', 'laporan posisi keuangan', 'laporan laba rugi', 'laporan arus kas',
+  'total aset', 'total liabilitas', 'modal', 'dividen', 'obligasi', 'saham',
+  'amortized cost', 'fvoci', 'fvtpl', 'ecl', 'stage 1', 'stage 2',
+]
+
+function isFinancialPage(text: string): boolean {
+  const lower = text.toLowerCase()
+  return FINANCIAL_KEYWORDS.filter(k => lower.includes(k)).length >= 2
+}
+
 async function doExtract(sessionId: string, storagePath: string, jenis: JenisUsaha) {
   try {
     const { data, error } = await adminClient.storage.from('psak-uploads').download(storagePath)
     if (error || !data) throw new Error('Gagal mengunduh PDF LK')
 
     const buf = Buffer.from(await data.arrayBuffer())
-    const base64 = buf.toString('base64')
+
+    // Extract text from PDF to bypass Anthropic 100-page limit
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParse = require('pdf-parse')
+    let pdfText = ''
+    try {
+      const parsed = await pdfParse(buf, {
+        pagerender: (pageData: { getTextContent: () => Promise<{ items: Array<{ str: string }> }> }) => {
+          return pageData.getTextContent().then((tc: { items: Array<{ str: string }> }) => {
+            return tc.items.map((i: { str: string }) => i.str).join(' ')
+          })
+        },
+      })
+      // Filter to financial pages only to reduce token usage
+      const pages: string[] = parsed.text.split(/\f/)
+      const relevantPages = pages.filter(p => isFinancialPage(p))
+      pdfText = relevantPages.length > 0 ? relevantPages.join('\n\n---\n\n') : parsed.text
+    } catch {
+      throw new Error('Gagal membaca teks dari PDF — pastikan PDF tidak terenkripsi')
+    }
+
+    if (!pdfText || pdfText.trim().length < 100) {
+      throw new Error('Teks PDF terlalu pendek atau kosong — kemungkinan PDF berbasis gambar (scan)')
+    }
+
+    // Truncate to ~150k chars to stay within token limits
+    const maxChars = 150000
+    if (pdfText.length > maxChars) {
+      pdfText = pdfText.slice(0, maxChars)
+    }
 
     const prompt = buildExtractionPrompt(jenis)
 
@@ -26,7 +70,6 @@ async function doExtract(sessionId: string, storagePath: string, jenis: JenisUsa
       headers: {
         'x-api-key': process.env.ANTHROPIC_API_KEY!,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'pdfs-2024-09-25',
         'content-type': 'application/json',
       },
       body: JSON.stringify({
@@ -35,8 +78,7 @@ async function doExtract(sessionId: string, storagePath: string, jenis: JenisUsa
         messages: [{
           role: 'user',
           content: [
-            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
-            { type: 'text', text: prompt },
+            { type: 'text', text: `Berikut adalah teks dari Laporan Keuangan Audited:\n\n${pdfText}\n\n---\n\n${prompt}` },
           ],
         }],
       }),
