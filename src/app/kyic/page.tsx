@@ -1,658 +1,598 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import Link from 'next/link'
-import { RisikoRating, RiskLevel } from '@/lib/kyic'
+import { useState, useEffect, useRef } from 'react'
 import Navbar from '@/components/oasis/Navbar'
-import StepIndicator from '@/components/oasis/StepIndicator'
-import ProgressLog from '@/components/oasis/ProgressLog'
-import { useSessionPolling } from '@/lib/useSessionPolling'
-import { supabaseBrowser } from '@/lib/supabase-browser'
+import { KYIC_BABS, BabId } from '@/lib/kyic-sections'
 
-interface KyicResult {
-  sessionId: string
-  nama_perusahaan: string
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface KySession {
+  id: string
+  kode: string
+  nama_entitas: string
+  jenis_usaha: string
   periode: string
-  supervisory_concern: string
-  analisis_akar: string
-  supervisory_action: string
-  risk_matrix: RisikoRating[]
-  gcg: RiskLevel
-  gcg_analisis: string
-  rentabilitas: RiskLevel
-  rentabilitas_analisis: string
-  permodalan: RiskLevel
-  permodalan_analisis: string
-  peringkat_komposit: RiskLevel
-  peringkat_komposit_analisis: string
-  sections_updated: string[]
-  progress_log: string[]
+  status: string
+  template_nama?: string
+  template_text?: string
+  template_sections?: Record<string, string>
+  created_at: string
 }
 
-type Step = 'upload' | 'processing' | 'hasil'
-
-const RATING_COLORS: Record<number, string> = {
-  1: '#16a34a', 2: '#65a30d', 3: '#ca8a04', 4: '#ea580c', 5: '#dc2626',
-}
-const RATING_LABELS: Record<number, string> = {
-  1: 'Sangat Rendah', 2: 'Rendah', 3: 'Moderat', 4: 'Tinggi', 5: 'Sangat Tinggi',
-}
-
-const MAX_TEMPLATE = 20_971_520  // 20 MB
-const MAX_DOC      = 52_428_800  // 50 MB per file
-const ALLOWED_DOC_EXT = ['pdf','docx','doc','xlsx','xls','xlsm','png','jpg','jpeg']
-
-function RatingBadge({ value }: { value: number }) {
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      width: 28, height: 28, borderRadius: '50%', fontWeight: 700, fontSize: '0.85rem',
-      background: RATING_COLORS[value] + '22', color: RATING_COLORS[value],
-      border: `1.5px solid ${RATING_COLORS[value]}44`,
-    }}>{value}</span>
-  )
+interface KyAnalisis {
+  id: string
+  bab_id: BabId
+  status: 'pending' | 'analyzing' | 'done' | 'error'
+  catatan_pengawas: string
+  hasil_json: Record<string, unknown> | null
+  analyzed_at: string | null
 }
 
-export default function KyicPage() {
-  const [step, setStep] = useState<Step>('upload')
-  const [namaEntitas, setNamaEntitas] = useState('')
-  const [periode, setPeriode] = useState('')
-  const [templateFile, setTemplateFile] = useState<File | null>(null)
-  const [dokFiles, setDokFiles] = useState<File[]>([])
-  const [zipFile, setZipFile] = useState<File | null>(null)
-  const [catatanPengawas, setCatatanPengawas] = useState('')
+interface KyDokumen {
+  id: string
+  bab_id: BabId
+  nama_file: string
+  uploaded_at: string
+}
+
+interface SessionDetail {
+  session: KySession
+  analisis: KyAnalisis[]
+  dokumen: KyDokumen[]
+}
+
+// ─── Colors ──────────────────────────────────────────────────────────────────
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: '#828d96',
+  analyzing: '#45e661',
+  done: '#45e661',
+  error: '#ff6f61',
+}
+const STATUS_LABELS: Record<string, string> = {
+  pending: 'Belum Dianalisis',
+  analyzing: 'Sedang Dianalisis...',
+  done: 'Selesai',
+  error: 'Error',
+}
+const PRIORITAS_COLORS: Record<string, string> = {
+  tinggi: '#ff6f61',
+  sedang: '#ffbe50',
+  opsional: '#828d96',
+}
+
+// ─── Component Utama ─────────────────────────────────────────────────────────
+
+export default function KyicV2Page() {
+  const [view, setView] = useState<'list' | 'new' | 'detail'>('list')
+  const [sessions, setSessions] = useState<KySession[]>([])
+  const [detail, setDetail] = useState<SessionDetail | null>(null)
+  const [activeBab, setActiveBab] = useState<BabId>(KYIC_BABS[0].id)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<KyicResult | null>(null)
-  const [progressLog, setProgressLog] = useState<string[]>([])
-  const [activeRisk, setActiveRisk] = useState<string | null>(null)
-  const [activeComposit, setActiveComposit] = useState<string | null>(null)
-  const [riwayat, setRiwayat] = useState<{id: string; nama_entitas: string; created_at: string}[]>([])
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const [pollingId, setPollingId] = useState<string | null>(null)
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useSessionPolling(pollingId, (data) => {
-    const id = pollingId
-    setPollingId(null)
-    if (data.status === 'selesai' && data.hasil) {
-      const h = data.hasil as unknown as KyicResult & { progress_log?: string[] }
-      setResult({ ...h, sessionId: id! })
-      setSaveState('saved')
-      if (h.progress_log) setProgressLog(h.progress_log)
-      setStep('hasil')
-      fetch('/api/sessions?modul=kyic').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
-    } else {
-      setError('Analisis gagal di server. Coba lagi.')
-      setStep('upload')
-    }
-  })
+  // Form state untuk sesi baru
+  const [formNama, setFormNama] = useState('')
+  const [formJenis, setFormJenis] = useState('')
+  const [formPeriode, setFormPeriode] = useState('')
+  const [formKode, setFormKode] = useState('')
+  const [templateFile, setTemplateFile] = useState<File | null>(null)
+  const [uploadingTemplate, setUploadingTemplate] = useState(false)
 
+  // Per-BAB state
+  const [babFiles, setBabFiles] = useState<File[]>([])
+  const [babCatatan, setBabCatatan] = useState<Record<BabId, string>>({} as Record<BabId, string>)
+  const [uploadingBab, setUploadingBab] = useState(false)
+  const [analyzingBab, setAnalyzingBab] = useState<BabId | null>(null)
+  const [expandedFinding, setExpandedFinding] = useState<number | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const [showBaseline, setShowBaseline] = useState(true)
+
+  // ─── Data fetching ──────────────────────────────────────────────────────
+
+  async function loadSessions() {
+    const res = await fetch('/api/kyic/v2/session')
+    if (res.ok) setSessions(await res.json())
+  }
+
+  async function loadDetail(id: string) {
+    setLoading(true)
+    const res = await fetch(`/api/kyic/v2/session/${id}`)
+    if (res.ok) setDetail(await res.json())
+    setLoading(false)
+  }
+
+  useEffect(() => { loadSessions() }, [])
+
+  // Polling saat ada BAB yang sedang analyzing
   useEffect(() => {
-    fetch('/api/sessions?modul=kyic')
-      .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) setRiwayat(data) })
-      .catch(() => {})
-  }, [])
+    if (!detail) return
+    const anyAnalyzing = detail.analisis.some(a => a.status === 'analyzing')
+    if (anyAnalyzing) {
+      pollingRef.current = setInterval(async () => {
+        const res = await fetch(`/api/kyic/v2/session/${detail.session.id}`)
+        if (res.ok) {
+          const data: SessionDetail = await res.json()
+          setDetail(data)
+          if (!data.analisis.some(a => a.status === 'analyzing')) {
+            clearInterval(pollingRef.current!)
+          }
+        }
+      }, 4000)
+    }
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current) }
+  }, [detail?.analisis.map(a => a.status).join(',')])
 
-  const templateRef = useRef<HTMLInputElement>(null)
-  const dokRef = useRef<HTMLInputElement>(null)
-  const zipRef = useRef<HTMLInputElement>(null)
+  // ─── Handlers ──────────────────────────────────────────────────────────
 
-  function handleDokFiles(files: FileList | null) {
-    if (!files) return
-    const arr = Array.from(files)
-    setDokFiles((prev) => {
-      const existing = new Set(prev.map((f) => f.name))
-      return [...prev, ...arr.filter((f) => !existing.has(f.name))]
-    })
-  }
+  async function createSession() {
+    if (!formNama || !formJenis || !formPeriode || !formKode) {
+      setError('Semua field wajib diisi'); return
+    }
+    setLoading(true); setError(null)
 
-  function removeDok(name: string) {
-    setDokFiles((prev) => prev.filter((f) => f.name !== name))
-  }
-
-  async function uploadFileToStorage(f: File): Promise<string> {
-    const urlRes = await fetch('/api/kyic/upload-url', {
+    const res = await fetch('/api/kyic/v2/session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileName: f.name }),
+      body: JSON.stringify({ nama_entitas: formNama, jenis_usaha: formJenis, periode: formPeriode, kode: formKode }),
     })
-    const urlData = await urlRes.json()
-    if (!urlRes.ok) throw new Error(urlData.error || `Gagal menyiapkan upload untuk ${f.name}`)
+    if (!res.ok) { setError((await res.json()).error); setLoading(false); return }
 
-    const { error } = await supabaseBrowser()
-      .storage
-      .from('kyic-uploads')
-      .uploadToSignedUrl(urlData.path, urlData.token, f)
-
-    if (error) throw new Error(`Gagal upload ${f.name}: ${error.message}`)
-    return urlData.path as string
+    const sess: KySession = await res.json()
+    await loadSessions()
+    await loadDetail(sess.id)
+    setView('detail')
+    setActiveBab(KYIC_BABS[0].id)
+    setLoading(false)
   }
 
-  async function handleAnalyze() {
-    if (!templateFile || !namaEntitas.trim() || !periode.trim()) {
-      setError('Lengkapi nama perusahaan, periode, dan upload template KYIC.')
-      return
-    }
-    if (templateFile.size > MAX_TEMPLATE) {
-      setError('Template melebihi 20 MB.')
-      return
-    }
-    if (!templateFile.name.toLowerCase().endsWith('.docx')) {
-      setError('Template harus berformat .docx.')
-      return
-    }
-    for (const f of dokFiles) {
-      const ext = f.name.toLowerCase().split('.').pop() ?? ''
-      if (f.size > MAX_DOC) {
-        setError(`File ${f.name} melebihi 50 MB.`)
-        return
-      }
-      if (!ALLOWED_DOC_EXT.includes(ext)) {
-        setError(`Format file ${f.name} tidak didukung.`)
-        return
-      }
-    }
-
-    setError(null)
-    setStep('processing')
-    setProgressLog(['Memulai proses...'])
-
-    try {
-      setProgressLog(prev => [...prev, `Mengupload template: ${templateFile.name}`])
-      const templatePath = await uploadFileToStorage(templateFile)
-
-      const docPaths: Array<{ path: string; name: string }> = []
-      for (const f of dokFiles) {
-        setProgressLog(prev => [...prev, `Mengupload dokumen: ${f.name}`])
-        const path = await uploadFileToStorage(f)
-        docPaths.push({ path, name: f.name })
-      }
-
-      let zipPath: string | undefined
-      if (zipFile) {
-        setProgressLog(prev => [...prev, `Mengupload ZIP: ${zipFile.name}`])
-        zipPath = await uploadFileToStorage(zipFile)
-      }
-
-      setProgressLog(prev => [...prev, 'Menganalisis dokumen di server...'])
-
-      const res = await fetch('/api/kyic/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          templatePath,
-          templateName: templateFile.name,
-          docPaths,
-          zipPath,
-          zipName: zipFile?.name,
-          namaEntitas: namaEntitas.trim(),
-          periode: periode.trim(),
-          catatanPengawas: catatanPengawas.trim(),
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Terjadi kesalahan')
-      setProgressLog(prev => [...prev, 'Analisis berjalan di server — aman untuk pindah halaman, hasil tersimpan di Riwayat.'])
-      setPollingId(data.sessionId)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Gagal menganalisis')
-      setStep('upload')
-    }
+  async function uploadTemplate(sessionId: string, file: File) {
+    setUploadingTemplate(true)
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch(`/api/kyic/v2/session/${sessionId}/upload-template`, { method: 'POST', body: fd })
+    if (!res.ok) setError('Gagal upload template')
+    else await loadDetail(sessionId)
+    setUploadingTemplate(false)
   }
 
-  async function handleSimpan() {
-    if (!result?.sessionId) return
-    setSaveState('saving')
-    try {
-      const res = await fetch(`/api/sessions/${result.sessionId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hasil: result }),
-      })
-      if (!res.ok) throw new Error()
-      setSaveState('saved')
-      fetch('/api/sessions?modul=kyic').then(r => r.json()).then(d => { if (Array.isArray(d)) setRiwayat(d) }).catch(() => {})
-    } catch {
-      setSaveState('error')
-    }
+  async function uploadBabDocs(sessionId: string, babId: BabId, files: File[]) {
+    if (!files.length) return
+    setUploadingBab(true)
+    const fd = new FormData()
+    files.forEach(f => fd.append('file', f))
+    await fetch(`/api/kyic/v2/session/${sessionId}/bab/${babId}/upload`, { method: 'POST', body: fd })
+    await loadDetail(sessionId)
+    setBabFiles([])
+    setUploadingBab(false)
   }
 
-  return (
-    <>
-      <style jsx>{`
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px 24px 64px; }
-        .title { font-size: 26px; font-weight: 500; color: #eef2ef; }
-        .title span { color: #45e661; }
-        .subtitle { color: #aab4bc; font-size: 12.5px; margin: 8px 0 0; margin-bottom: 0; }
+  async function deleteBabDoc(sessionId: string, babId: BabId, dokId: string) {
+    await fetch(`/api/kyic/v2/session/${sessionId}/bab/${babId}/upload`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dokId }),
+    })
+    await loadDetail(sessionId)
+  }
 
-        .card { background: rgba(8,12,18,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; padding: 28px; margin-bottom: 16px; }
-        .card-title { font-size: 14px; font-weight: 500; color: #eef2ef; margin-bottom: 16px; }
+  async function analyzeBab(sessionId: string, babId: BabId) {
+    setAnalyzingBab(babId)
+    const res = await fetch(`/api/kyic/v2/session/${sessionId}/bab/${babId}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ catatan_pengawas: babCatatan[babId] ?? '' }),
+    })
+    if (!res.ok) { setError('Gagal memulai analisis'); setAnalyzingBab(null); return }
+    await loadDetail(sessionId)
+    setAnalyzingBab(null)
+  }
 
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-        label { display: block; font-size: 12px; color: #aab4bc; margin-bottom: 6px; }
-        input[type="text"] { width: 100%; background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.15); padding: 8px 0; color: #eef2ef; font-size: 13.5px; outline: none; box-sizing: border-box; font-family: inherit; }
-        input[type="text"]:focus { border-bottom-color: #45e661; }
+  // ─── Helpers ───────────────────────────────────────────────────────────
 
-        .upload-zone { border: 1px dashed rgba(69,230,97,0.45); border-radius: 18px; padding: 24px; text-align: center; cursor: pointer; }
-        .upload-icon { font-size: 1.8rem; margin-bottom: 8px; }
-        .upload-hint { color: #828d96; font-size: 11.5px; margin-top: 5px; }
-        .file-chip { display: inline-flex; align-items: center; gap: 6px; background: rgba(8,12,18,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; padding: 4px 12px; font-size: 11.5px; color: #aab4bc; margin: 3px; }
-        .file-chip button { background: none; border: none; color: #828d96; cursor: pointer; padding: 0; font-size: 13px; line-height: 1; }
-        .file-chip button:hover { color: #ff6f61; }
+  function getBabStatus(babId: BabId): KyAnalisis['status'] {
+    return detail?.analisis.find(a => a.bab_id === babId)?.status ?? 'pending'
+  }
 
-        .btn { padding: 12px 28px; border-radius: 999px; border: none; cursor: pointer; font-weight: 600; font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; font-family: inherit; }
-        .btn-primary { background: #45e661; color: #04120a; }
-        .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-success { background: #45e661; color: #04120a; }
-        .btn-outline { background: transparent; color: #aab4bc; border: 1px solid rgba(255,255,255,0.15); }
+  function getBabAnalisis(babId: BabId): KyAnalisis | undefined {
+    return detail?.analisis.find(a => a.bab_id === babId)
+  }
 
-        .error-box { background: rgba(255,111,97,0.08); border: 1px solid rgba(255,111,97,0.3); border-radius: 12px; padding: 12px 16px; color: #ff6f61; font-size: 12.5px; margin-bottom: 16px; }
+  function getBabDokumen(babId: BabId): KyDokumen[] {
+    return detail?.dokumen.filter(d => d.bab_id === babId) ?? []
+  }
 
-        /* Hasil */
-        .hasil-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
-        .section-label { font-size: 10.5px; font-weight: 500; color: #828d96; text-transform: uppercase; letter-spacing: 0.12em; margin: 24px 0 12px; }
-        .narasi-box { background: rgba(8,12,18,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 20px 24px; color: #b7c0c6; font-size: 13.5px; line-height: 1.9; white-space: pre-wrap; }
+  const doneCount = detail ? KYIC_BABS.filter(b => getBabStatus(b.id) === 'done').length : 0
+  const currentBab = KYIC_BABS.find(b => b.id === activeBab)!
+  const currentAnalisis = getBabAnalisis(activeBab)
+  const currentDokumen = getBabDokumen(activeBab)
+  const currentStatus = getBabStatus(activeBab)
+  const baselineText = detail?.session.template_sections?.[activeBab] ?? null
 
-        /* Risk matrix */
-        .risk-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-        .risk-table th { background: rgba(8,12,18,0.8); color: #aab4bc; font-weight: 500; padding: 10px 12px; text-align: center; border: 1px solid rgba(255,255,255,0.07); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; }
-        .risk-table th:first-child { text-align: left; }
-        .risk-table td { padding: 9px 12px; border: 1px solid rgba(255,255,255,0.05); text-align: center; vertical-align: middle; color: #b7c0c6; }
-        .risk-table tr:nth-child(even) td { background: rgba(255,255,255,0.01); }
-        .risk-table td:first-child { text-align: left; color: #aab4bc; cursor: pointer; }
-        .risk-table td:first-child:hover { color: #45e661; }
-        .risk-table tr.selected td { background: rgba(69,230,97,0.06); }
+  // ─── Render: Session List ───────────────────────────────────────────────
 
-        .analisis-panel { background: rgba(8,12,18,0.6); border: 1px solid rgba(69,230,97,0.2); border-radius: 16px; padding: 16px 20px; margin-top: 12px; color: #b7c0c6; font-size: 13px; line-height: 1.7; }
-        .analisis-label { font-size: 10.5px; font-weight: 500; color: #45e661; margin-bottom: 6px; letter-spacing: 0.08em; text-transform: uppercase; }
-
-        .composite-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
-        .composite-item { flex: 1; min-width: 140px; background: rgba(8,12,18,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 14px 16px; text-align: center; }
-        .composite-label { font-size: 11px; color: #aab4bc; margin-bottom: 6px; }
-        .composite-value { font-size: 18px; font-weight: 500; }
-      `}</style>
-
-      <div className="container">
-        <Navbar simple />
-        <div style={{ marginBottom: 26 }}>
-          <div className="title"><span>KYIC/KYNBFI</span> — know your insurance company</div>
-          <div className="subtitle">Upload template KYIC + dokumen pendukung — AI mengisi profil risiko secara otomatis.</div>
+  if (view === 'list') return (
+    <div style={{ minHeight: '100vh', background: '#080c12', color: '#eef2ef', fontFamily: 'var(--font-sans, system-ui)' }}>
+      <Navbar />
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '40px 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>KYIC — Know Your Insurance Company</h1>
+            <p style={{ color: '#828d96', fontSize: 13 }}>Analisis per-BAB berbasis dokumen & catatan pengawas</p>
+          </div>
+          <button onClick={() => { setView('new'); setError(null) }}
+            style={{ padding: '10px 20px', background: 'rgba(69,230,97,0.12)', color: '#45e661', border: '1px solid rgba(69,230,97,0.3)', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600 }}>
+            + Sesi Baru
+          </button>
         </div>
 
-        {/* Two-column: main + riwayat sidebar */}
-        <div style={{ display: 'flex', gap: 40, alignItems: 'flex-start' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-
-        <StepIndicator
-          steps={['Upload File', 'Analisis AI', 'Hasil KYIC']}
-          currentIndex={step === 'upload' ? 0 : step === 'processing' ? 1 : 2}
-        />
-
-        {/* ── Upload ── */}
-        {step === 'upload' && (
-          <div>
-            {error && <div className="error-box">{error}</div>}
-
-            {/* Metadata */}
-            <div className="card">
-              <div className="card-title">Informasi Umum</div>
-              <div className="form-grid">
-                <div>
-                  <label>Nama Perusahaan</label>
-                  <input type="text" value={namaEntitas} onChange={(e) => setNamaEntitas(e.target.value)} placeholder="PT Asuransi ..." />
-                </div>
-                <div>
-                  <label>Periode Penilaian</label>
-                  <input type="text" value={periode} onChange={(e) => setPeriode(e.target.value)} placeholder="31 Desember 2025" />
-                </div>
-              </div>
+        {sessions.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: '#828d96' }}>
+            <p style={{ fontSize: 15, marginBottom: 8 }}>Belum ada sesi KYIC</p>
+            <p style={{ fontSize: 13 }}>Buat sesi baru untuk mulai analisis</p>
+          </div>
+        ) : sessions.map(s => (
+          <div key={s.id} onClick={async () => { await loadDetail(s.id); setActiveBab(KYIC_BABS[0].id); setView('detail') }}
+            style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '16px 20px', marginBottom: 12, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)')}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}>
+            <div>
+              <p style={{ fontWeight: 600, marginBottom: 4 }}>{s.nama_entitas}</p>
+              <p style={{ fontSize: 12, color: '#828d96' }}>{s.kode} · {s.periode} · {s.jenis_usaha}</p>
             </div>
+            <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#aab4bc' }}>
+              {s.status}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 
-            {/* Template KYIC */}
-            <div className="card">
-              <div className="card-title">Template KYIC Tahun Sebelumnya <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>*wajib</span></div>
-              <div
-                className={`upload-zone ${templateFile ? 'active' : ''}`}
-                onClick={() => templateRef.current?.click()}
-              >
-                <div className="upload-icon">📋</div>
-                {templateFile ? (
-                  <>
-                    <div style={{ color: '#93c5fd', fontWeight: 500 }}>{templateFile.name}</div>
-                    <div className="upload-hint">{(templateFile.size / 1024 / 1024).toFixed(1)} MB — klik untuk ganti</div>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ color: '#94a3b8', fontWeight: 500 }}>Klik untuk upload template KYIC</div>
-                    <div className="upload-hint">Format: .docx · Maks. 20 MB</div>
-                  </>
-                )}
-                <input ref={templateRef} type="file" accept=".docx" style={{ display: 'none' }}
-                  onChange={(e) => setTemplateFile(e.target.files?.[0] ?? null)} />
-              </div>
+  // ─── Render: Form Sesi Baru ─────────────────────────────────────────────
+
+  if (view === 'new') return (
+    <div style={{ minHeight: '100vh', background: '#080c12', color: '#eef2ef', fontFamily: 'var(--font-sans, system-ui)' }}>
+      <Navbar />
+      <div style={{ maxWidth: 560, margin: '0 auto', padding: '40px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
+          <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', color: '#828d96', cursor: 'pointer', fontSize: 13, padding: 0 }}>← Kembali</button>
+          <h2 style={{ fontSize: 18, fontWeight: 700 }}>Sesi KYIC Baru</h2>
+        </div>
+
+        {error && <div style={{ background: 'rgba(255,111,97,0.1)', border: '1px solid rgba(255,111,97,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13, color: '#ff6f61' }}>{error}</div>}
+
+        {[
+          { label: 'Kode Pemeriksaan', value: formKode, set: setFormKode, placeholder: 'cth: ASYKI-2025', hint: 'Kode unik sesi ini' },
+          { label: 'Nama Entitas', value: formNama, set: setFormNama, placeholder: 'cth: PT Asuransi Syariah Keluarga Indonesia', hint: '' },
+          { label: 'Jenis Usaha', value: formJenis, set: setFormJenis, placeholder: 'cth: Asuransi Jiwa Syariah', hint: 'Akan menentukan POJK yang digunakan' },
+          { label: 'Periode Penilaian', value: formPeriode, set: setFormPeriode, placeholder: 'cth: 31 Desember 2025', hint: '' },
+        ].map(f => (
+          <div key={f.label} style={{ marginBottom: 18 }}>
+            <label style={{ fontSize: 12, color: '#aab4bc', display: 'block', marginBottom: 6 }}>{f.label}</label>
+            <input value={f.value} onChange={e => f.set(e.target.value)}
+              placeholder={f.placeholder}
+              style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '10px 12px', color: '#eef2ef', fontSize: 13, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+            {f.hint && <p style={{ fontSize: 11, color: '#828d96', marginTop: 4 }}>{f.hint}</p>}
+          </div>
+        ))}
+
+        <button onClick={createSession} disabled={loading}
+          style={{ width: '100%', padding: '12px 0', background: loading ? 'rgba(69,230,97,0.06)' : 'rgba(69,230,97,0.12)', color: '#45e661', border: '1px solid rgba(69,230,97,0.3)', borderRadius: 10, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, marginTop: 8 }}>
+          {loading ? 'Membuat...' : 'Buat Sesi'}
+        </button>
+      </div>
+    </div>
+  )
+
+  // ─── Render: Detail Sesi ────────────────────────────────────────────────
+
+  if (!detail) return null
+
+  const hasilJson = currentAnalisis?.hasil_json as Record<string, unknown> | null
+  const findings = Array.isArray(hasilJson?.findings) ? (hasilJson!.findings as {judul:string;uraian:string;urgensi:string}[]) : []
+  const subSections = hasilJson?.sub_sections as Record<string, string> | undefined
+  const ringkasan = hasilJson?.ringkasan ? String(hasilJson.ringkasan) : null
+  const perubahan = hasilJson?.perubahan_vs_T1 ? String(hasilJson.perubahan_vs_T1) : null
+  const rekomendasi = hasilJson?.rekomendasi ? String(hasilJson.rekomendasi) : null
+  const draftTeks = hasilJson?.draft_teks ? String(hasilJson.draft_teks) : null
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#080c12', color: '#eef2ef', fontFamily: 'var(--font-sans, system-ui)' }}>
+      <Navbar />
+      <div style={{ display: 'flex', maxWidth: 1280, margin: '0 auto' }}>
+
+        {/* ─── Sidebar BAB Navigator ─── */}
+        <div style={{ width: 260, flexShrink: 0, padding: '24px 0 24px 20px', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+          <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', color: '#828d96', cursor: 'pointer', fontSize: 12, padding: 0, marginBottom: 16 }}>← Semua Sesi</button>
+          <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{detail.session.nama_entitas}</p>
+          <p style={{ fontSize: 11, color: '#828d96', marginBottom: 4 }}>{detail.session.kode} · {detail.session.periode}</p>
+
+          {/* Progress bar */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#828d96', marginBottom: 4 }}>
+              <span>Progress</span><span>{doneCount}/{KYIC_BABS.length} BAB</span>
             </div>
-
-            {/* Dokumen pendukung */}
-            <div className="card">
-              <div className="card-title">Dokumen Pendukung</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                {/* Multi-file */}
-                <div>
-                  <label>Upload file langsung (bisa banyak)</label>
-                  <div
-                    className="upload-zone"
-                    onClick={() => dokRef.current?.click()}
-                    onDrop={(e) => { e.preventDefault(); handleDokFiles(e.dataTransfer.files) }}
-                    onDragOver={(e) => e.preventDefault()}
-                  >
-                    <div className="upload-icon">📁</div>
-                    <div style={{ color: '#94a3b8', fontWeight: 500, fontSize: '0.9rem' }}>Klik atau drag file di sini</div>
-                    <div className="upload-hint">PDF, Word, Excel, JPG/PNG</div>
-                    <input ref={dokRef} type="file" accept=".pdf,.docx,.doc,.xlsx,.xls,.xlsm,.png,.jpg,.jpeg"
-                      multiple style={{ display: 'none' }}
-                      onChange={(e) => handleDokFiles(e.target.files)} />
-                  </div>
-                </div>
-
-                {/* ZIP */}
-                <div>
-                  <label>Atau upload sebagai ZIP</label>
-                  <div
-                    className={`upload-zone ${zipFile ? 'active' : ''}`}
-                    onClick={() => zipRef.current?.click()}
-                  >
-                    <div className="upload-icon">🗜️</div>
-                    {zipFile ? (
-                      <>
-                        <div style={{ color: '#93c5fd', fontWeight: 500, fontSize: '0.9rem' }}>{zipFile.name}</div>
-                        <div className="upload-hint">{(zipFile.size / 1024 / 1024).toFixed(1)} MB</div>
-                      </>
-                    ) : (
-                      <>
-                        <div style={{ color: '#94a3b8', fontWeight: 500, fontSize: '0.9rem' }}>Upload file ZIP</div>
-                        <div className="upload-hint">Akan diekstrak otomatis</div>
-                      </>
-                    )}
-                    <input ref={zipRef} type="file" accept=".zip" style={{ display: 'none' }}
-                      onChange={(e) => setZipFile(e.target.files?.[0] ?? null)} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Daftar file */}
-              {dokFiles.length > 0 && (
-                <div style={{ marginTop: '1rem' }}>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '0.4rem' }}>
-                    {dokFiles.length} file dipilih:
-                  </div>
-                  <div>
-                    {dokFiles.map((f) => (
-                      <span key={f.name} className="file-chip">
-                        {f.name.endsWith('.pdf') ? '📄' : f.name.match(/xlsx?|xlsm/i) ? '📊' : f.name.match(/docx?/i) ? '📝' : '🖼️'}
-                        {' '}{f.name}
-                        <button onClick={() => removeDok(f.name)}>✕</button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Catatan / update teks dari pengawas */}
-            <div className="card">
-              <div className="card-title">
-                Catatan / Update Pengawas
-                <span style={{ fontWeight: 400, color: '#475569', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
-                  (opsional)
-                </span>
-              </div>
-              <div style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '0.75rem' }}>
-                Sampaikan perkembangan terbaru, hasil pertemuan, temuan baru, atau konteks tambahan yang belum tercantum dalam dokumen. AI akan memasukkannya ke dalam analisis.
-              </div>
-              <textarea
-                value={catatanPengawas}
-                onChange={(e) => setCatatanPengawas(e.target.value)}
-                placeholder={`Contoh:\n- RBC Dana Tabarru per Maret 2026 turun ke 105%, di bawah threshold minimum.\n- Perusahaan telah menyampaikan rencana aksi permodalan kepada OJK pada 15 April 2026.\n- Direktur Keuangan definitif baru dilantik pada 30 April 2026 atas nama Budi Santoso.`}
-                rows={7}
-                style={{
-                  width: '100%', boxSizing: 'border-box',
-                  background: '#1e293b', border: '1px solid #334155',
-                  borderRadius: '0.5rem', padding: '0.75rem', color: '#f1f5f9',
-                  fontSize: '0.875rem', lineHeight: 1.7, outline: 'none',
-                  resize: 'vertical', fontFamily: 'inherit',
-                }}
-                onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                onBlur={(e) => e.target.style.borderColor = '#334155'}
-              />
-              {catatanPengawas.trim() && (
-                <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.4rem', textAlign: 'right' }}>
-                  {catatanPengawas.length} karakter
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                className="btn btn-primary"
-                onClick={handleAnalyze}
-                disabled={!templateFile || !namaEntitas || !periode}
-              >
-                Mulai Analisis →
-              </button>
+            <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }}>
+              <div style={{ height: 4, background: '#45e661', borderRadius: 2, width: `${(doneCount / KYIC_BABS.length) * 100}%`, transition: 'width 0.3s' }} />
             </div>
           </div>
-        )}
 
-        {/* placeholder - riwayat moved to sidebar */}
+          {/* Template KYIC T-1 */}
+          <div style={{ marginBottom: 20, padding: '10px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
+            <p style={{ fontSize: 11, color: '#aab4bc', marginBottom: 8 }}>KYIC Template (T-1)</p>
+            {detail.session.template_nama ? (
+              <p style={{ fontSize: 11, color: '#45e661' }}>✓ {detail.session.template_nama}</p>
+            ) : (
+              <label style={{ cursor: 'pointer' }}>
+                <input type="file" accept=".docx,.pdf" style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) { setTemplateFile(f); uploadTemplate(detail.session.id, f) } }} />
+                <span style={{ fontSize: 11, color: uploadingTemplate ? '#828d96' : '#ffbe50', cursor: 'pointer' }}>
+                  {uploadingTemplate ? '⏳ Mengupload...' : '⚠ Upload template KYIC T-1'}
+                </span>
+              </label>
+            )}
+          </div>
 
-        {/* ── Processing ── */}
-        {step === 'processing' && (
-          <ProgressLog
-            title="AI sedang menganalisis dokumen dan mengisi KYIC..."
-            hint="Proses ini membutuhkan waktu 3–8 menit (analisis 9 jenis risiko + narratif)"
-            logs={progressLog}
-          />
-        )}
-
-        {/* ── Hasil ── */}
-        {step === 'hasil' && result && (
-          <div>
-            {/* Header */}
-            <div className="card">
-              <div className="hasil-header">
-                <div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f1f5f9' }}>
-                    KYIC — {result.nama_perusahaan}
-                  </div>
-                  <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '0.2rem' }}>
-                    Periode: {result.periode}
-                  </div>
-                  <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                    {result.sections_updated.map((s) => (
-                      <span key={s} style={{ background: '#16a34a22', color: '#86efac', border: '1px solid #16a34a44', borderRadius: '0.3rem', padding: '0.15rem 0.5rem', fontSize: '0.75rem' }}>
-                        ✓ {s}
-                      </span>
-                    ))}
+          {/* BAB list */}
+          {KYIC_BABS.map(bab => {
+            const status = getBabStatus(bab.id)
+            const hasBaseline = !!detail?.session.template_sections?.[bab.id]
+            const isActive = activeBab === bab.id
+            return (
+              <button key={bab.id} onClick={() => { setActiveBab(bab.id); setBabFiles([]); setExpandedFinding(null); setShowBaseline(true) }}
+                style={{
+                  width: '100%', textAlign: 'left', padding: '10px 12px', marginBottom: 4,
+                  background: isActive ? 'rgba(69,230,97,0.08)' : 'transparent',
+                  border: isActive ? '1px solid rgba(69,230,97,0.2)' : '1px solid transparent',
+                  borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? '#eef2ef' : '#aab4bc' }}>
+                    {bab.nomor}. {bab.judul.length > 28 ? bab.judul.slice(0, 28) + '…' : bab.judul}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginLeft: 6 }}>
+                    {hasBaseline && status === 'pending' && (
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(255,190,80,0.6)' }} title="Ada data T-1" />
+                    )}
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLORS[status] }} />
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0, alignItems: 'center' }}>
-                  <button className="btn btn-outline" onClick={() => { setStep('upload'); setResult(null) }}>← Baru</button>
-                  {saveState === 'saved'
-                    ? <span style={{ fontSize: '0.85rem', color: '#86efac' }}>✓ Tersimpan</span>
-                    : <button className="btn btn-outline" onClick={handleSimpan} disabled={saveState === 'saving'}>
-                        {saveState === 'saving' ? '⏳ Menyimpan...' : saveState === 'error' ? '⚠ Coba Lagi' : '💾 Simpan'}
-                      </button>
-                  }
-                  <button className="btn btn-success" onClick={() => window.open(`/api/kyic/download/${result.sessionId}`, '_blank')}>
-                    ⬇ Unduh KYIC (.docx)
+              </button>
+            )
+          })}
+        </div>
+
+        {/* ─── Main Content ─── */}
+        <div style={{ flex: 1, padding: '24px 20px 60px 24px', minWidth: 0 }}>
+
+          {/* BAB Header */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700 }}>BAB {currentBab.nomor} — {currentBab.judul}</h2>
+              <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 999, background: `${STATUS_COLORS[currentStatus]}18`, color: STATUS_COLORS[currentStatus], border: `1px solid ${STATUS_COLORS[currentStatus]}40` }}>
+                {STATUS_LABELS[currentStatus]}
+              </span>
+            </div>
+            <p style={{ fontSize: 13, color: '#828d96' }}>{currentBab.deskripsi}</p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+
+            {/* ─── Upload Dokumen Pendukung ─── */}
+            <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16 }}>
+              <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Dokumen Pendukung</p>
+
+              {/* Drag & drop zone */}
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={e => { e.preventDefault(); setDragOver(false); setBabFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)]) }}
+                style={{ border: `2px dashed ${dragOver ? 'rgba(69,230,97,0.5)' : 'rgba(255,255,255,0.12)'}`, borderRadius: 10, padding: '14px 12px', textAlign: 'center', marginBottom: 12, transition: 'border-color 0.2s', background: dragOver ? 'rgba(69,230,97,0.04)' : 'transparent', cursor: 'pointer' }}>
+                <label style={{ cursor: 'pointer' }}>
+                  <input type="file" multiple accept=".pdf,.docx,.doc,.xlsx,.xls,.xlsm,.pptx,.png,.jpg,.jpeg"
+                    style={{ display: 'none' }}
+                    onChange={e => setBabFiles(prev => [...prev, ...Array.from(e.target.files ?? [])])} />
+                  <p style={{ fontSize: 12, color: '#aab4bc' }}>Drop files atau <span style={{ color: '#45e661' }}>browse</span></p>
+                  <p style={{ fontSize: 11, color: '#828d96', marginTop: 4 }}>PDF, Word, Excel, PPT, gambar</p>
+                </label>
+              </div>
+
+              {/* Files yang sudah dipilih tapi belum diupload */}
+              {babFiles.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  {babFiles.map((f, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: '#aab4bc', padding: '4px 0' }}>
+                      <span>📄 {f.name}</span>
+                      <button onClick={() => setBabFiles(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#ff6f61', cursor: 'pointer', fontSize: 11 }}>✕</button>
+                    </div>
+                  ))}
+                  <button onClick={() => uploadBabDocs(detail.session.id, activeBab, babFiles)} disabled={uploadingBab}
+                    style={{ marginTop: 8, width: '100%', padding: '7px 0', background: 'rgba(69,230,97,0.1)', color: '#45e661', border: '1px solid rgba(69,230,97,0.25)', borderRadius: 7, cursor: uploadingBab ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: 12 }}>
+                    {uploadingBab ? 'Mengupload...' : `Upload ${babFiles.length} file`}
                   </button>
                 </div>
-              </div>
+              )}
+
+              {/* Files yang sudah terupload */}
+              {currentDokumen.length > 0 && (
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
+                  <p style={{ fontSize: 11, color: '#828d96', marginBottom: 6 }}>Terupload ({currentDokumen.length})</p>
+                  {currentDokumen.map(d => (
+                    <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: '#aab4bc', padding: '3px 0' }}>
+                      <span>✓ {d.nama_file}</span>
+                      <button onClick={() => deleteBabDoc(detail.session.id, activeBab, d.id)} style={{ background: 'none', border: 'none', color: '#828d96', cursor: 'pointer', fontSize: 11 }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Risk Matrix */}
-            <div className="card">
-              <div className="card-title">Profil Risiko & Penilaian Tingkat Kesehatan</div>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="risk-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: '180px' }}>Jenis Risiko</th>
-                      <th>Inheren</th>
-                      <th>KPMR</th>
-                      <th>Net Risk</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.risk_matrix.map((r) => (
-                      <>
-                        <tr
-                          key={r.jenis}
-                          className={activeRisk === r.jenis ? 'selected' : ''}
-                          onClick={() => setActiveRisk(activeRisk === r.jenis ? null : r.jenis)}
-                        >
-                          <td title="Klik untuk lihat analisis">
-                            {r.jenis} {activeRisk === r.jenis ? '▴' : '▾'}
-                          </td>
-                          <td><RatingBadge value={r.inheren} /></td>
-                          <td><RatingBadge value={r.kpmr} /></td>
-                          <td><RatingBadge value={r.net_risk} /></td>
-                        </tr>
-                        {activeRisk === r.jenis && (
-                          <tr key={`${r.jenis}-analisis`}>
-                            <td colSpan={4} style={{ padding: 0, border: 'none' }}>
-                              <div className="analisis-panel">
-                                <div className="analisis-label">Analisis {r.jenis}</div>
-                                {r.analisis}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Komposit */}
-              <div className="composite-row">
-                {([
-                  { label: 'GCG', value: result.gcg, analisis: result.gcg_analisis },
-                  { label: 'Rentabilitas', value: result.rentabilitas, analisis: result.rentabilitas_analisis },
-                  { label: 'Permodalan', value: result.permodalan, analisis: result.permodalan_analisis },
-                  { label: 'Peringkat Komposit', value: result.peringkat_komposit, analisis: result.peringkat_komposit_analisis },
-                ] as { label: string; value: RiskLevel; analisis: string }[]).map((item) => (
-                  <div key={item.label}
-                    className="composite-item"
-                    onClick={() => setActiveComposit(activeComposit === item.label ? null : item.label)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <div className="composite-label">
-                      {item.label}
-                      <span style={{ fontSize: '0.6rem', color: '#64748b', marginLeft: '0.3rem' }}>
-                        {activeComposit === item.label ? '▲' : '▼'}
+            {/* ─── Hint Dokumen Pendukung ─── */}
+            <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16 }}>
+              <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>💡 Dokumen Disarankan</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {currentBab.doc_hints.map((hint, i) => (
+                  <div key={i} style={{ padding: '8px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, borderLeft: `3px solid ${PRIORITAS_COLORS[hint.prioritas]}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <p style={{ fontSize: 12, fontWeight: 500, color: '#eef2ef', margin: 0 }}>{hint.nama}</p>
+                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 999, background: `${PRIORITAS_COLORS[hint.prioritas]}18`, color: PRIORITAS_COLORS[hint.prioritas], whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        {hint.prioritas}
                       </span>
                     </div>
-                    <div className="composite-value" style={{ color: RATING_COLORS[item.value] }}>
-                      {item.value}
-                      <span style={{ fontSize: '0.65rem', fontWeight: 400, color: '#64748b', marginLeft: '0.4rem' }}>
-                        {RATING_LABELS[item.value]}
-                      </span>
-                    </div>
+                    <p style={{ fontSize: 11, color: '#828d96', margin: '3px 0 0 0' }}>{hint.keterangan}</p>
                   </div>
                 ))}
               </div>
-              {/* Panel analisis komposit */}
-              {activeComposit && (() => {
-                const map: Record<string, string> = {
-                  'GCG': result.gcg_analisis,
-                  'Rentabilitas': result.rentabilitas_analisis,
-                  'Permodalan': result.permodalan_analisis,
-                  'Peringkat Komposit': result.peringkat_komposit_analisis,
-                }
-                const analisis = map[activeComposit]
-                if (!analisis) return null
-                return (
-                  <div style={{
-                    margin: '0.5rem 0 0',
-                    padding: '0.75rem 1rem',
-                    background: '#0f172a',
-                    borderRadius: 8,
-                    borderLeft: `3px solid ${RATING_COLORS[({
-                      'GCG': result.gcg,
-                      'Rentabilitas': result.rentabilitas,
-                      'Permodalan': result.permodalan,
-                      'Peringkat Komposit': result.peringkat_komposit,
-                    } as Record<string, RiskLevel>)[activeComposit]]}`,
-                  }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Analisis {activeComposit}
-                    </div>
-                    <div style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: 1.6 }}>{analisis}</div>
-                  </div>
-                )
-              })()}
-            </div>
-
-            {/* Narratif sections */}
-            <div className="card">
-              <div className="card-title">Supervisory Concern</div>
-              <div className="narasi-box">{result.supervisory_concern}</div>
-
-              <div className="section-label" style={{ marginTop: '1.5rem' }}>Analisis Akar Permasalahan</div>
-              <div className="narasi-box">{result.analisis_akar}</div>
-
-              <div className="section-label">Supervisory Action</div>
-              <div className="narasi-box">{result.supervisory_action}</div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', alignItems: 'center' }}>
-              {saveState !== 'saved' && (
-                <button className="btn btn-outline" onClick={handleSimpan} disabled={saveState === 'saving'}>
-                  {saveState === 'saving' ? '⏳ Menyimpan...' : saveState === 'error' ? '⚠ Coba Lagi Simpan' : '💾 Simpan Analisis'}
-                </button>
-              )}
-              {saveState === 'saved' && <span style={{ fontSize: '0.85rem', color: '#86efac' }}>✓ Tersimpan</span>}
-              <button className="btn btn-success" onClick={() => window.open(`/api/kyic/download/${result.sessionId}`, '_blank')}>
-                ⬇ Unduh KYIC (.docx)
-              </button>
             </div>
           </div>
-        )}
 
-        </div>{/* end flex-1 */}
+          {/* ─── Catatan Pengawas ─── */}
+          <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16, marginBottom: 16 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Catatan Pengawas <span style={{ fontSize: 11, color: '#828d96', fontWeight: 400 }}>(untuk mempertajam analisis AI)</span></p>
+            <textarea
+              rows={4}
+              value={babCatatan[activeBab] ?? currentAnalisis?.catatan_pengawas ?? ''}
+              onChange={e => setBabCatatan(prev => ({ ...prev, [activeBab]: e.target.value }))}
+              placeholder={`Tambahkan konteks khusus untuk BAB ${currentBab.nomor} ini...\nContoh: "Komisaris X baru bergabung Maret 2025", "Komite Investasi belum pernah rapat sepanjang 2024"`}
+              style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#eef2ef', padding: '8px 0', fontSize: 12, outline: 'none', fontFamily: 'inherit', resize: 'none', boxSizing: 'border-box', lineHeight: 1.6 }}
+            />
+          </div>
 
-        {/* Riwayat sidebar */}
-        <div style={{ width: 280, flexShrink: 0 }}>
-          <div style={{ fontSize: 10, letterSpacing: '0.15em', color: '#828d96', marginBottom: 16 }}>RIWAYAT ANALISIS</div>
-          {riwayat.length === 0 ? (
-            <p style={{ fontSize: 12, color: '#828d96' }}>Belum ada analisis tersimpan.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {riwayat.map(item => (
-                <div key={item.id} style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nama_entitas}</div>
-                  <div style={{ fontSize: 11, color: '#aab4bc', marginTop: 3 }}>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                    <button onClick={async () => {
-                      const r = await fetch(`/api/sessions?modul=kyic`).then(x => x.json())
-                      const found = Array.isArray(r) ? r.find((s: {id: string; hasil: KyicResult}) => s.id === item.id) : null
-                      if (found?.hasil) { setResult({ ...found.hasil, sessionId: found.id }); setSaveState('saved'); setStep('hasil') }
-                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '4px 10px', fontSize: 10.5, color: '#aab4bc', cursor: 'pointer', fontFamily: 'inherit' }}>Lihat</button>
-                    <button onClick={async () => {
-                      if (!confirm(`Hapus analisis "${item.nama_entitas}"?`)) return
-                      await fetch(`/api/sessions/${item.id}`, { method: 'DELETE' })
-                      setRiwayat(prev => prev.filter(r => r.id !== item.id))
-                    }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 999, padding: '4px 8px', fontSize: 10.5, color: '#828d96', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
+          {/* ─── Baseline T-1 ─── */}
+          {baselineText && (
+            <div style={{ background: 'rgba(255,190,80,0.04)', border: '1px solid rgba(255,190,80,0.18)', borderRadius: 14, marginBottom: 16, overflow: 'hidden' }}>
+              <button
+                onClick={() => setShowBaseline(v => !v)}
+                style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(255,190,80,0.15)', color: '#ffbe50', border: '1px solid rgba(255,190,80,0.3)', fontWeight: 600 }}>T-1</span>
+                  <span style={{ fontSize: 13, color: '#ffbe50', fontWeight: 600 }}>Data KYIC Periode Lalu</span>
+                  <span style={{ fontSize: 11, color: '#828d96' }}>— sebagai baseline analisis baru</span>
+                </div>
+                <span style={{ fontSize: 12, color: '#828d96' }}>{showBaseline ? '▲ Sembunyikan' : '▼ Tampilkan'}</span>
+              </button>
+              {showBaseline && (
+                <div style={{ padding: '0 16px 16px' }}>
+                  <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: '12px 14px', maxHeight: 320, overflowY: 'auto' }}>
+                    <pre style={{ fontSize: 12, color: '#aab4bc', lineHeight: 1.7, whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: 0 }}>
+                      {baselineText}
+                    </pre>
+                  </div>
+                  <p style={{ fontSize: 11, color: '#828d96', marginTop: 8 }}>
+                    💡 Upload dokumen baru dan/atau isi catatan pengawas di atas, lalu klik Analisis untuk memperbarui bagian ini.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── Tombol Analisis ─── */}
+          <div style={{ marginBottom: 24 }}>
+            <button
+              onClick={() => analyzeBab(detail.session.id, activeBab)}
+              disabled={currentStatus === 'analyzing' || analyzingBab === activeBab || !detail.session.template_text}
+              style={{
+                padding: '12px 28px', borderRadius: 10, fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                background: !detail.session.template_text ? 'rgba(255,255,255,0.04)' : currentStatus === 'analyzing' ? 'rgba(69,230,97,0.06)' : 'rgba(69,230,97,0.12)',
+                color: !detail.session.template_text ? '#828d96' : '#45e661',
+                border: !detail.session.template_text ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(69,230,97,0.3)',
+              }}>
+              {!detail.session.template_text ? '⚠ Upload KYIC T-1 dulu' : currentStatus === 'analyzing' ? '⏳ Sedang Menganalisis...' : currentStatus === 'done' ? '🔄 Analisis Ulang' : '▶ Analisis BAB Ini'}
+            </button>
+            {currentStatus === 'analyzing' && (
+              <span style={{ marginLeft: 12, fontSize: 12, color: '#828d96' }}>Proses berjalan di background, halaman akan otomatis update...</span>
+            )}
+          </div>
+
+          {/* ─── Hasil Analisis ─── */}
+          {currentAnalisis?.status === 'done' && hasilJson && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+              {/* Ringkasan */}
+              {ringkasan && (
+                <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16 }}>
+                  <p style={{ fontSize: 12, color: '#828d96', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>Ringkasan</p>
+                  <p style={{ fontSize: 14, lineHeight: 1.7, color: '#eef2ef' }}>{ringkasan}</p>
+                  {perubahan && (
+                    <p style={{ fontSize: 12, color: '#aab4bc', marginTop: 8, fontStyle: 'italic', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8 }}>
+                      Perubahan vs T-1: {perubahan}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Sub-sections */}
+              {subSections && Object.keys(subSections).length > 0 && (
+                <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16 }}>
+                  <p style={{ fontSize: 12, color: '#828d96', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Detail per Sub-Section</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {Object.entries(subSections).map(([key, val]) => (
+                      <div key={key} style={{ borderLeft: '2px solid rgba(255,255,255,0.12)', paddingLeft: 12 }}>
+                        <p style={{ fontSize: 12, color: '#aab4bc', marginBottom: 4, fontWeight: 600 }}>{key}</p>
+                        <p style={{ fontSize: 13, color: '#eef2ef', lineHeight: 1.65 }}>{val}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* Findings */}
+              {findings.length > 0 && (
+                <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16 }}>
+                  <p style={{ fontSize: 12, color: '#828d96', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Findings ({findings.length})</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {findings.map((f, i) => (
+                      <div key={i}
+                        onClick={() => setExpandedFinding(expandedFinding === i ? null : i)}
+                        style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 10, cursor: 'pointer', border: `1px solid ${f.urgensi === 'tinggi' ? 'rgba(255,111,97,0.25)' : f.urgensi === 'sedang' ? 'rgba(255,190,80,0.2)' : 'rgba(255,255,255,0.07)'}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <p style={{ fontSize: 13, fontWeight: 500 }}>{f.judul}</p>
+                          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 999, background: `${f.urgensi === 'tinggi' ? 'rgba(255,111,97,0.15)' : f.urgensi === 'sedang' ? 'rgba(255,190,80,0.12)' : 'rgba(255,255,255,0.06)'}`, color: f.urgensi === 'tinggi' ? '#ff6f61' : f.urgensi === 'sedang' ? '#ffbe50' : '#aab4bc' }}>
+                            {f.urgensi}
+                          </span>
+                        </div>
+                        {expandedFinding === i && (
+                          <p style={{ fontSize: 12, color: '#aab4bc', marginTop: 8, lineHeight: 1.65 }}>{f.uraian}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Rekomendasi */}
+              {rekomendasi && (
+                <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(69,230,97,0.15)', borderRadius: 14, padding: 16 }}>
+                  <p style={{ fontSize: 12, color: '#45e661', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Rekomendasi</p>
+                  <p style={{ fontSize: 13, lineHeight: 1.7, color: '#eef2ef' }}>{rekomendasi}</p>
+                </div>
+              )}
+
+              {/* Draft Teks */}
+              {draftTeks && (
+                <div style={{ background: 'rgba(8,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <p style={{ fontSize: 12, color: '#828d96', textTransform: 'uppercase', letterSpacing: 1 }}>Draft Teks KYIC</p>
+                    <button onClick={() => navigator.clipboard.writeText(draftTeks)}
+                      style={{ fontSize: 11, padding: '4px 10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#aab4bc', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      Salin
+                    </button>
+                  </div>
+                  <p style={{ fontSize: 13, lineHeight: 1.75, color: '#eef2ef', whiteSpace: 'pre-wrap' }}>{draftTeks}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {currentAnalisis?.status === 'error' && (
+            <div style={{ background: 'rgba(255,111,97,0.08)', border: '1px solid rgba(255,111,97,0.25)', borderRadius: 12, padding: 16, color: '#ff6f61', fontSize: 13 }}>
+              Analisis gagal. Coba klik "Analisis BAB Ini" kembali.
             </div>
           )}
         </div>
-
-        </div>{/* end two-column */}
       </div>
-    </>
+    </div>
   )
 }

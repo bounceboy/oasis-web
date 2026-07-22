@@ -18,7 +18,7 @@ export default function Navbar({ userName, userRole, showAdmin, simple }: Navbar
 
   const isDashboard = pathname === '/dashboard'
   const isOnsite = pathname.startsWith('/pemeriksaan')
-  const isOffsite = ['/psak117', '/lhptl', '/kyic', '/renbis', '/kyic-v2'].some(p => pathname.startsWith(p))
+  const isOffsite = ['/psak117', '/lhptl', '/kyic', '/renbis'].some(p => pathname.startsWith(p))
   const isAdmin = pathname.startsWith('/admin')
 
   const navBtn = (active: boolean) => ({
@@ -42,7 +42,7 @@ export default function Navbar({ userName, userRole, showAdmin, simple }: Navbar
   const offsiteItems = [
     { label: 'PSAK 117', href: '/psak117' },
     { label: 'LHPTL', href: '/lhptl' },
-    { label: 'KYIC / KYNBFI', href: '/kyic-v2' },
+    { label: 'KYIC / KYNBFI', href: '/kyic' },
     { label: 'Renbis', href: '/renbis' },
   ]
 
