@@ -81,11 +81,6 @@ function getField(
   return { CY: cy !== null && !isNaN(cy) ? cy : null, PY: py !== null && !isNaN(py!) ? py : null, PPY: null }
 }
 
-/** Deteksi apakah workbook adalah format Jiwa (LJP prefix) atau Umum (LUP prefix) */
-function detectJenis(sheetNames: string[]): 'Jiwa' | 'Umum' {
-  const hasLJP = sheetNames.some(n => n.startsWith('LJP'))
-  return hasLJP ? 'Jiwa' : 'Umum'
-}
 
 /** Field SFP yang sama untuk Umum dan Jiwa */
 function parseSFP(sfp: Array<{ label: string; cols: (number | null)[] }>, result: ParsedFields) {
@@ -204,14 +199,12 @@ function parseAKD(akd: Array<{ label: string; cols: (number | null)[] }>, result
 }
 
 /**
- * Parse OJK PSAK 117 Excel template — Asuransi Umum (LUP prefix sheets).
- * Mengembalikan partial record yang bisa di-merge ke template_data.values.
+ * Parse OJK PSAK 117 Excel template.
+ * jenis harus sesuai dengan jenis_usaha sesi (Umum → LUP sheets, Jiwa → LJP sheets).
  */
-export function parseOjkExcel(buffer: Buffer): ParsedFields {
+export function parseOjkExcel(buffer: Buffer, jenis: 'Umum' | 'Jiwa' = 'Umum'): ParsedFields {
   const wb = XLSX.read(buffer, { type: 'buffer' })
   const result: ParsedFields = {}
-
-  const jenis = detectJenis(wb.SheetNames as string[])
 
   const sheet = (name: string) => {
     if (wb.Sheets[name]) return readSheet(wb.Sheets[name])

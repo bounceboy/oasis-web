@@ -13,7 +13,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: sess } = await db()
     .from('psak_session')
-    .select('user_id, template_data, status')
+    .select('user_id, template_data, status, jenis_usaha')
     .eq('id', id)
     .single()
 
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   let excelFields: ReturnType<typeof parseOjkExcel>
   try {
-    excelFields = parseOjkExcel(buf)
+    excelFields = parseOjkExcel(buf, (sess.jenis_usaha as 'Umum' | 'Jiwa') ?? 'Umum')
   } catch (err) {
     console.error('[psak] excel parse error:', err)
     return NextResponse.json({
