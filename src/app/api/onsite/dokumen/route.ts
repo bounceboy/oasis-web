@@ -26,12 +26,13 @@ async function extractText(buf: Buffer, filename: string): Promise<string> {
   return buf.toString('utf-8').slice(0, 50000)
 }
 
-async function runAnalysis(dokId: string, kode: string, departemen: string, fokus: string, teks: string, namaFile: string) {
+async function runAnalysis(dokId: string, kode: string, departemen: string, fokus: string, teks: string, namaFile: string, jenisUsaha = '') {
   try {
-    const pojkRef = await searchRelevantPojk(`${departemen} pemeriksaan asuransi ${fokus}`)
+    const pojkRef = await searchRelevantPojk(`${departemen} pemeriksaan asuransi ${fokus}`, 10, jenisUsaha)
     const instruksi = fokus ? `Fokus khusus dari pengawas: ${fokus}` : 'Lakukan analisis menyeluruh atas dokumen ini.'
 
     const prompt = `Anda adalah pengawas OJK senior yang melakukan pemeriksaan onsite perusahaan asuransi.
+Jenis Usaha: ${jenisUsaha || 'Perusahaan Asuransi'}
 Departemen: ${departemen}
 ${instruksi}
 
@@ -142,8 +143,9 @@ export async function POST(req: NextRequest) {
   if (!kode || !departemen || !file)
     return NextResponse.json({ error: 'kode, departemen, dan file wajib diisi' }, { status: 400 })
 
-  const { data: session } = await db().from('onsite_sessions').select('kode').eq('kode', kode).single()
+  const { data: session } = await db().from('onsite_sessions').select('kode, jenis_usaha').eq('kode', kode).single()
   if (!session) return NextResponse.json({ error: 'Kode pemeriksaan tidak valid' }, { status: 404 })
+  const jenisUsaha: string = session.jenis_usaha ?? ''
 
   const { data: dokRec, error: insErr } = await db()
     .from('onsite_dokumen')
@@ -163,7 +165,7 @@ export async function POST(req: NextRequest) {
 
   // Proses AI di background — respons langsung kembali
   after(async () => {
-    await runAnalysis(dokRec.id, kode, departemen, fokus, teks, file.name)
+    await runAnalysis(dokRec.id, kode, departemen, fokus, teks, file.name, jenisUsaha)
   })
 
   return NextResponse.json({ id: dokRec.id, analyzing: true })

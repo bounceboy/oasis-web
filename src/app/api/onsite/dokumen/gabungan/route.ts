@@ -39,8 +39,9 @@ export async function POST(req: NextRequest) {
   if (!kode || !departemen || files.length === 0)
     return NextResponse.json({ error: 'kode, departemen, dan file wajib diisi' }, { status: 400 })
 
-  const { data: session } = await db().from('onsite_sessions').select('kode').eq('kode', kode).single()
+  const { data: session } = await db().from('onsite_sessions').select('kode, jenis_usaha').eq('kode', kode).single()
   if (!session) return NextResponse.json({ error: 'Kode pemeriksaan tidak valid' }, { status: 404 })
+  const jenisUsaha: string = session.jenis_usaha ?? ''
 
   const namaGabungan = files.length === 1 ? files[0].name : `Gabungan (${files.length} file)`
 
@@ -67,10 +68,11 @@ export async function POST(req: NextRequest) {
 
   after(async () => {
     try {
-      const pojkRef = await searchRelevantPojk(`${departemen} pemeriksaan asuransi ${fokus}`)
+      const pojkRef = await searchRelevantPojk(`${departemen} pemeriksaan asuransi ${fokus}`, 10, jenisUsaha)
       const instruksi = fokus ? `Fokus khusus dari pengawas: ${fokus}` : 'Lakukan analisis menyeluruh atas semua dokumen ini secara terpadu.'
 
       const prompt = `Anda adalah pengawas OJK senior yang melakukan pemeriksaan onsite perusahaan asuransi.
+Jenis Usaha: ${jenisUsaha || 'Perusahaan Asuransi'}
 Departemen: ${departemen}
 ${instruksi}
 File dianalisis (${files.length}): ${files.map(f => f.name).join(', ')}

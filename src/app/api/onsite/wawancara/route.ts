@@ -34,12 +34,13 @@ async function extractText(buf: Buffer, filename: string): Promise<string> {
   return buf.toString('utf-8').slice(0, 50000)
 }
 
-async function runAnalysis(wawId: string, kode: string, departemen: string, fokus: string, teks: string, namaFile: string) {
+async function runAnalysis(wawId: string, kode: string, departemen: string, fokus: string, teks: string, namaFile: string, jenisUsaha = '') {
   try {
-    const pojkRef = await searchRelevantPojk(`${departemen} wawancara pemeriksaan asuransi ${fokus}`)
+    const pojkRef = await searchRelevantPojk(`${departemen} wawancara pemeriksaan asuransi ${fokus}`, 10, jenisUsaha)
     const instruksi = fokus ? `Fokus khusus dari pengawas: ${fokus}` : 'Analisis catatan wawancara ini secara menyeluruh untuk mengidentifikasi potensi temuan.'
 
     const prompt = `Anda adalah pengawas OJK senior yang menganalisis catatan/bahan tayang wawancara pemeriksaan onsite.
+Jenis Usaha: ${jenisUsaha || 'Perusahaan Asuransi'}
 Departemen yang diwawancara: ${departemen}
 ${instruksi}
 
@@ -143,8 +144,9 @@ export async function POST(req: NextRequest) {
   if (!kode || !departemen || !file)
     return NextResponse.json({ error: 'kode, departemen, dan file wajib diisi' }, { status: 400 })
 
-  const { data: session } = await db().from('onsite_sessions').select('kode').eq('kode', kode).single()
+  const { data: session } = await db().from('onsite_sessions').select('kode, jenis_usaha').eq('kode', kode).single()
   if (!session) return NextResponse.json({ error: 'Kode pemeriksaan tidak valid' }, { status: 404 })
+  const jenisUsaha: string = session.jenis_usaha ?? ''
 
   const { data: wawRec, error: insErr } = await db()
     .from('onsite_wawancara')
@@ -164,7 +166,7 @@ export async function POST(req: NextRequest) {
 
   // Proses AI di background — respons langsung kembali
   after(async () => {
-    await runAnalysis(wawRec.id, kode, departemen, fokus, teks, file.name)
+    await runAnalysis(wawRec.id, kode, departemen, fokus, teks, file.name, jenisUsaha)
   })
 
   return NextResponse.json({ id: wawRec.id, analyzing: true })
