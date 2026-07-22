@@ -70,10 +70,10 @@ export async function POST(req: NextRequest) {
       const pojkRef = await searchRelevantPojk(`${departemen} pemeriksaan asuransi ${fokus}`)
       const instruksi = fokus ? `Fokus khusus dari pengawas: ${fokus}` : 'Lakukan analisis menyeluruh atas semua dokumen ini secara terpadu.'
 
-      const prompt = `Anda adalah pengawas OJK yang sedang melakukan pemeriksaan onsite perusahaan asuransi.
-Departemen yang diperiksa: ${departemen}
+      const prompt = `Anda adalah pengawas OJK senior yang melakukan pemeriksaan onsite perusahaan asuransi.
+Departemen: ${departemen}
 ${instruksi}
-Jumlah file: ${files.length} (${files.map(f => f.name).join(', ')})
+File dianalisis (${files.length}): ${files.map(f => f.name).join(', ')}
 
 === REFERENSI POJK ===
 ${pojkRef}
@@ -81,21 +81,61 @@ ${pojkRef}
 === ISI DOKUMEN-DOKUMEN ===
 ${kombinasiTeks}
 
-Kluster: A=Risiko Asuransi, B=SDM & Kelembagaan, C=Pemasaran & Keagenan, D=Keuangan, E=Tata Kelola (GCG), F=APU-PPT, G=Investasi, H=MRTI (TI)
+=== TUGAS ===
+Analisis TERPADU semua dokumen dan hasilkan JSON dengan struktur PERSIS seperti contoh di bawah.
 
-Tugas Anda (analisis TERPADU dari semua dokumen):
-1. Buat ringkasan singkat mencakup gambaran keseluruhan dari semua dokumen (2-4 kalimat)
-2. Identifikasi temuan RISK-BASED lintas dokumen: pola kelemahan, risiko operasional, tata kelola — (pasal_terkait boleh kosong [])
-3. Identifikasi temuan COMPLIANCE: pelanggaran atau potensi pelanggaran ketentuan POJK — WAJIB cantumkan pasal_terkait
+PENTING:
+- risk_based: temuan lintas dokumen tentang kelemahan tata kelola, kontrol internal, risiko (pasal_terkait boleh kosong)
+- compliance: pelanggaran POJK yang terindikasi (pasal_terkait WAJIB diisi)
+- kluster: A(Risiko Asuransi) B(SDM) C(Pemasaran) D(Keuangan) E(GCG) F(APU-PPT) G(Investasi) H(TI)
+- urgensi: "kritis" atau "signifikan" atau "perlu_perhatian"
+- sifat: "pelanggaran_ketentuan" atau "potensi_pelanggaran" atau "perlu_perbaikan"
 
-Balas HANYA dalam JSON:
-{"ringkasan":"...","risk_based":${TEMUAN_SCHEMA},"compliance":${TEMUAN_SCHEMA}}`
+Balas HANYA dengan JSON (tanpa teks lain, tanpa markdown):
+{
+  "ringkasan": "Ringkasan terpadu 2-4 kalimat dari semua dokumen.",
+  "risk_based": [
+    {
+      "judul": "Judul singkat temuan",
+      "uraian": "Penjelasan detail dan dampak",
+      "urgensi": "signifikan",
+      "sifat": "perlu_perbaikan",
+      "kluster": "E",
+      "pasal_terkait": [],
+      "rekomendasi": "Rekomendasi konkret"
+    }
+  ],
+  "compliance": [
+    {
+      "judul": "Judul singkat temuan",
+      "uraian": "Penjelasan pelanggaran",
+      "urgensi": "kritis",
+      "sifat": "pelanggaran_ketentuan",
+      "kluster": "E",
+      "pasal_terkait": ["Pasal X POJK No. Y"],
+      "rekomendasi": "Rekomendasi konkret"
+    }
+  ]
+}`
 
       type TemuanItem = { judul: string; uraian: string; urgensi: string; sifat: string; kluster: string; pasal_terkait: string[]; rekomendasi: string }
-      const aiResp = await callOpenRouter('Anda adalah pengawas OJK yang menganalisis dokumen pemeriksaan onsite. Balas HANYA dalam format JSON yang diminta.', prompt, 6000)
-      const jsonMatch = aiResp.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) throw new Error('No JSON in response')
-      const json = JSON.parse(jsonMatch[0])
+      const aiResp = await callOpenRouter(
+        'Anda adalah pengawas OJK senior. Balas HANYA dengan JSON valid tanpa markdown, tanpa teks tambahan.',
+        prompt,
+        8000
+      )
+      console.log('[onsite/gabungan] raw (200):', aiResp.slice(0, 200))
+
+      let json: { ringkasan?: string; risk_based?: TemuanItem[]; compliance?: TemuanItem[] } = {}
+      const cleaned = aiResp.replace(/^```[a-z]*\n?/gm, '').replace(/^```$/gm, '').trim()
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        try { json = JSON.parse(jsonMatch[0]) } catch { /* ignore */ }
+      }
+      if (!json.ringkasan) {
+        try { json = JSON.parse(cleaned) } catch { /* ignore */ }
+      }
+
       const ringkasan: string = json.ringkasan ?? ''
       const riskList: TemuanItem[] = Array.isArray(json.risk_based) ? json.risk_based : []
       const complianceList: TemuanItem[] = Array.isArray(json.compliance) ? json.compliance : []

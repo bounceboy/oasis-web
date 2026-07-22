@@ -39,7 +39,7 @@ async function runAnalysis(wawId: string, kode: string, departemen: string, foku
     const pojkRef = await searchRelevantPojk(`${departemen} wawancara pemeriksaan asuransi ${fokus}`)
     const instruksi = fokus ? `Fokus khusus dari pengawas: ${fokus}` : 'Analisis catatan wawancara ini secara menyeluruh untuk mengidentifikasi potensi temuan.'
 
-    const prompt = `Anda adalah pengawas OJK yang menganalisis catatan/bahan tayang wawancara pemeriksaan onsite.
+    const prompt = `Anda adalah pengawas OJK senior yang menganalisis catatan/bahan tayang wawancara pemeriksaan onsite.
 Departemen yang diwawancara: ${departemen}
 ${instruksi}
 
@@ -47,23 +47,62 @@ ${instruksi}
 ${pojkRef}
 
 === FILE: ${namaFile} ===
-${teks.slice(0, 20000)}
+${teks.slice(0, 18000)}
 
-Tugas Anda:
-1. Buat ringkasan singkat isi wawancara/paparan (2-3 kalimat)
-2. Identifikasi temuan RISK-BASED: kelemahan kontrol internal, risiko operasional, tata kelola, praktik yang berisiko — TANPA harus mengacu ke pasal POJK (pasal_terkait boleh kosong [])
-3. Identifikasi temuan COMPLIANCE: pelanggaran atau potensi pelanggaran ketentuan POJK dari referensi di atas — WAJIB cantumkan pasal_terkait
+=== TUGAS ===
+Analisis isi wawancara/paparan di atas dan hasilkan JSON dengan struktur PERSIS seperti contoh di bawah.
 
-Kluster: A=Risiko Asuransi, B=SDM & Kelembagaan, C=Pemasaran & Keagenan, D=Keuangan, E=Tata Kelola (GCG), F=APU-PPT, G=Investasi, H=MRTI (TI)
+PENTING:
+- risk_based: temuan kelemahan tata kelola, kontrol internal, risiko operasional dari wawancara (pasal_terkait boleh kosong)
+- compliance: pelanggaran POJK yang terindikasi dari wawancara (pasal_terkait WAJIB diisi)
+- kluster: A(Risiko Asuransi) B(SDM) C(Pemasaran) D(Keuangan) E(GCG) F(APU-PPT) G(Investasi) H(TI)
+- urgensi: "kritis" atau "signifikan" atau "perlu_perhatian"
+- sifat: "pelanggaran_ketentuan" atau "potensi_pelanggaran" atau "perlu_perbaikan"
 
-Balas HANYA dalam JSON:
-{"ringkasan":"...","risk_based":${TEMUAN_SCHEMA},"compliance":${TEMUAN_SCHEMA}}`
+Balas HANYA dengan JSON (tanpa teks lain, tanpa markdown):
+{
+  "ringkasan": "Ringkasan 2-3 kalimat isi wawancara.",
+  "risk_based": [
+    {
+      "judul": "Judul singkat temuan",
+      "uraian": "Penjelasan detail temuan dari wawancara",
+      "urgensi": "signifikan",
+      "sifat": "perlu_perbaikan",
+      "kluster": "E",
+      "pasal_terkait": [],
+      "rekomendasi": "Rekomendasi konkret"
+    }
+  ],
+  "compliance": [
+    {
+      "judul": "Judul singkat temuan",
+      "uraian": "Penjelasan pelanggaran",
+      "urgensi": "kritis",
+      "sifat": "pelanggaran_ketentuan",
+      "kluster": "E",
+      "pasal_terkait": ["Pasal X POJK No. Y"],
+      "rekomendasi": "Rekomendasi konkret"
+    }
+  ]
+}`
 
     type TemuanItem = { judul: string; uraian: string; urgensi: string; sifat: string; kluster: string; pasal_terkait: string[]; rekomendasi: string }
-    const aiResp = await callOpenRouter('Anda adalah pengawas OJK yang menganalisis catatan/bahan tayang wawancara pemeriksaan onsite. Balas HANYA dalam format JSON yang diminta.', prompt, 4000)
-    const jsonMatch = aiResp.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error('No JSON in response')
-    const json = JSON.parse(jsonMatch[0])
+    const aiResp = await callOpenRouter(
+      'Anda adalah pengawas OJK senior. Balas HANYA dengan JSON valid tanpa markdown, tanpa teks tambahan.',
+      prompt,
+      6000
+    )
+
+    let json: { ringkasan?: string; risk_based?: TemuanItem[]; compliance?: TemuanItem[] } = {}
+    const cleaned = aiResp.replace(/^```[a-z]*\n?/gm, '').replace(/^```$/gm, '').trim()
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      try { json = JSON.parse(jsonMatch[0]) } catch { /* ignore */ }
+    }
+    if (!json.ringkasan) {
+      try { json = JSON.parse(cleaned) } catch { /* ignore */ }
+    }
+
     const ringkasan: string = json.ringkasan ?? ''
     const riskList: TemuanItem[] = Array.isArray(json.risk_based) ? json.risk_based : []
     const complianceList: TemuanItem[] = Array.isArray(json.compliance) ? json.compliance : []
