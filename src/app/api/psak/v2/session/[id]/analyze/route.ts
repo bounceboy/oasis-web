@@ -229,7 +229,7 @@ async function doAnalyze(sessionId: string) {
     const text = await callOpenRouter(
       'Kamu adalah pengawas OJK senior ahli PSAK 117 dan PSAK 109. Tulis analisis komprehensif dalam bahasa Indonesia formal.',
       prompt,
-      8000
+      16000
     )
 
     await db()

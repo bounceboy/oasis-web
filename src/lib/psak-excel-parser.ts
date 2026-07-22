@@ -166,30 +166,64 @@ function parseCRF(crf: Array<{ label: string; cols: (number | null)[] }>, result
   if (csmClose.CY != null) result['I17_CSM_CLOSE'] = csmClose
 }
 
-/** Rekonsiliasi GMM — sama kolom untuk Umum (LUPSAGP) dan Jiwa (LJPSAGP):
- *  col4=LRC diluar LC, col5=LC/LRC termasuk LC, col6=LIC, col7=RA */
-function parseSAGP(agp: Array<{ label: string; cols: (number | null)[] }>, result: ParsedFields) {
-  const closing = findRow(agp, ['saldo bersih kontrak asuransi (saldo akhir)', 'liabilitas kontrak asuransi (saldo akhir)'])
-  if (closing) {
-    const lrc = closing.cols[4]
-    const lc = closing.cols[5]
-    const ra = closing.cols[7]
-    if (lrc != null && !isNaN(lrc)) result['I17_LRC'] = makeField(lrc)
-    if (lc != null && !isNaN(lc)) result['I17_LOSS_COMP'] = makeField(lc)
-    if (ra != null && !isNaN(ra)) result['I17_RA'] = makeField(ra)
+/**
+ * Rekonsiliasi kontrak asuransi — satu sheet (PAA atau GMM/VFA).
+ * col4=LRC diluar LC, col5=LC, col6=LIC Estimasi, col7=RA
+ * Kembalikan nilai mentah supaya bisa dijumlah lintas sheet.
+ */
+function extractSAGPValues(rows: Array<{ label: string; cols: (number | null)[] }>): {
+  lrc: number | null; lc: number | null; lic: number | null; ra: number | null; raOpen: number | null
+} {
+  const closing = findRow(rows, ['saldo bersih kontrak asuransi (saldo akhir)', 'liabilitas kontrak asuransi (saldo akhir)'])
+  const opening = findRow(rows, ['saldo bersih kontrak asuransi', 'liabilitas kontrak asuransi (saldo awal)'])
+
+  const n = (v: number | null | undefined) => (v != null && !isNaN(v) ? v : null)
+
+  return {
+    lrc:    closing ? n(closing.cols[4]) : null,
+    lc:     closing ? n(closing.cols[5]) : null,
+    lic:    closing ? n(closing.cols[6]) : null,
+    ra:     closing ? n(closing.cols[7]) : null,
+    raOpen: opening ? n(opening.cols[7]) : null,
   }
+}
 
-  const opening = findRow(agp, ['saldo bersih kontrak asuransi', 'liabilitas kontrak asuransi (saldo awal)'])
-  if (opening) {
-    const raOpen = opening.cols[7]
-    if (raOpen != null && !isNaN(raOpen)) result['I17_RA_OPEN'] = makeField(raOpen)
+/** Jumlah dua nilai nullable: null jika keduanya null, angka jika salah satu ada */
+function addNullable(a: number | null, b: number | null): number | null {
+  if (a == null && b == null) return null
+  return (a ?? 0) + (b ?? 0)
+}
+
+/**
+ * Gabungkan PAA (LUPSAP/LJPSAP) + GMM (LUPSAGP/LJPSAGP) lalu tulis ke result.
+ * Perusahaan bisa pakai PAA saja, GMM saja, atau keduanya — nilai dijumlah.
+ */
+function parseSAGP(
+  agp: Array<{ label: string; cols: (number | null)[] }> | null,
+  sap: Array<{ label: string; cols: (number | null)[] }> | null,
+  result: ParsedFields,
+) {
+  const gmm = agp ? extractSAGPValues(agp) : { lrc: null, lc: null, lic: null, ra: null, raOpen: null }
+  const paa = sap ? extractSAGPValues(sap) : { lrc: null, lc: null, lic: null, ra: null, raOpen: null }
+
+  const lrc    = addNullable(gmm.lrc, paa.lrc)
+  const lc     = addNullable(gmm.lc, paa.lc)
+  const ra     = addNullable(gmm.ra, paa.ra)
+  const raOpen = addNullable(gmm.raOpen, paa.raOpen)
+
+  if (lrc    != null) result['I17_LRC']      = makeField(lrc)
+  if (lc     != null) result['I17_LOSS_COMP'] = makeField(lc)
+  if (ra     != null) result['I17_RA']        = makeField(ra)
+  if (raOpen != null) result['I17_RA_OPEN']   = makeField(raOpen)
+
+  // Akuisisi & onerous dari GMM saja (PAA tidak punya kolom ini)
+  if (agp) {
+    const acqCF = getField(agp, ['amortisasi arus kas akuisisi', 'arus kas akuisisi', 'beban akuisisi'], 4)
+    if (acqCF.CY != null) result['I17_ACQ_CF'] = acqCF
+
+    const onerous = getField(agp, ['kerugian dari kontrak merugi', 'onerous'], 4)
+    if (onerous.CY != null) result['I17_ONEROUS'] = onerous
   }
-
-  const acqCF = getField(agp, ['amortisasi arus kas akuisisi', 'arus kas akuisisi', 'beban akuisisi'], 4)
-  if (acqCF.CY != null) result['I17_ACQ_CF'] = acqCF
-
-  const onerous = getField(agp, ['kerugian dari kontrak merugi', 'onerous'], 4)
-  if (onerous.CY != null) result['I17_ONEROUS'] = onerous
 }
 
 /** LIC dari maturity buckets */
@@ -227,8 +261,8 @@ export function parseOjkExcel(buffer: Buffer, jenis: 'Umum' | 'Jiwa' = 'Umum'): 
     const crf = sheet('LJPCRF')
     if (crf) parseCRF(crf, result)
 
-    const agp = sheet('LJPSAGP')
-    if (agp) parseSAGP(agp, result)
+    // PAA = LJPSAP, GMM/VFA = LJPSAGP — jumlah keduanya
+    parseSAGP(sheet('LJPSAGP'), sheet('LJPSAP'), result)
 
     const akd = sheet('LJPAKD')
     if (akd) parseAKD(akd, result)
@@ -269,8 +303,8 @@ export function parseOjkExcel(buffer: Buffer, jenis: 'Umum' | 'Jiwa' = 'Umum'): 
     const crf = sheet('LUPCRF')
     if (crf) parseCRF(crf, result)
 
-    const agp = sheet('LUPSAGP')
-    if (agp) parseSAGP(agp, result)
+    // PAA = LUPSAP, GMM/VFA = LUPSAGP — jumlah keduanya
+    parseSAGP(sheet('LUPSAGP'), sheet('LUPSAP'), result)
 
     const akd = sheet('LUPAKD')
     if (akd) parseAKD(akd, result)
