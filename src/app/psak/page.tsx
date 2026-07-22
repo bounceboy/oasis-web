@@ -393,7 +393,7 @@ export default function PsakPage() {
         )}
 
         {/* Upload area — dua kolom sejajar */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 16, marginBottom: 24 }}>
 
           {/* PDF upload */}
           <div style={{ background: 'rgba(8,12,18,0.85)', border: `1px solid ${hasLK ? 'rgba(69,230,97,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '24px 24px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -438,7 +438,7 @@ export default function PsakPage() {
               <span style={{ fontSize: 13.5, fontWeight: 500, color: hasExcel ? '#45e661' : '#eef2ef' }}>Excel PSAK 117 (OJK)</span>
             </div>
             <p style={{ fontSize: 11.5, color: '#828d96', margin: 0, lineHeight: 1.5 }}>
-              Template OJK · sheet: LUPSPK, LUPLRG, LUPAKS, LUPCRF, LUPSAGP, LUPAKD, LUPSKV
+              Template OJK PSAK 117 dari portal pelaporan OJK
             </p>
             {uploadingExcel ? (
               <div style={{ border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 14, padding: '28px 16px', textAlign: 'center' }}>
