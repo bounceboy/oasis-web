@@ -12,23 +12,23 @@ const adminClient = createClient(
 
 export const maxDuration = 300
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-const VISION_MODEL = 'anthropic/claude-sonnet-4-5'
+const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages'
+const ANTHROPIC_MODEL = 'claude-sonnet-4-5'
 
-// OCR untuk PDF scan — kirim ke Claude Vision via OpenRouter
+// OCR untuk PDF scan — kirim PDF langsung ke Anthropic API (support document type native)
 async function ocrPdfWithVision(buf: Buffer): Promise<string> {
   const base64 = buf.toString('base64')
 
-  const res = await fetch(OPENROUTER_URL, {
+  const res = await fetch(ANTHROPIC_API, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://oasis-ojk.vercel.app',
-      'X-Title': 'OASIS OJK',
+      'x-api-key': process.env.ANTHROPIC_API_KEY!,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'pdfs-2024-09-25',
+      'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: VISION_MODEL,
+      model: ANTHROPIC_MODEL,
       max_tokens: 16000,
       messages: [{
         role: 'user',
@@ -39,10 +39,11 @@ async function ocrPdfWithVision(buf: Buffer): Promise<string> {
           },
           {
             type: 'text',
-            text: `Ini adalah dokumen KYIC (Know Your Insurance Company) perusahaan asuransi.
-Ekstrak SEMUA teks dari dokumen ini secara lengkap, pertahankan struktur aslinya.
-Perhatikan judul bagian/bab dan isinya. Output dalam format plain text.
-Jangan rangkum — sertakan semua detail angka, nama, dan informasi penting.`,
+            text: `Ini adalah dokumen KYIC (Know Your Insurance Company) perusahaan asuransi Indonesia.
+Ekstrak SEMUA teks dari dokumen ini secara lengkap, pertahankan struktur aslinya termasuk judul BAB/bagian.
+Pastikan semua angka, nama, tabel, dan data penting tercakup.
+Format output: plain text, pisahkan tiap bagian dengan baris kosong.
+Jangan rangkum — tulis semua teks apa adanya.`,
           },
         ],
       }],
@@ -51,11 +52,11 @@ Jangan rangkum — sertakan semua detail angka, nama, dan informasi penting.`,
 
   if (!res.ok) {
     const err = await res.text()
-    throw new Error(`OCR Vision error ${res.status}: ${err.slice(0, 300)}`)
+    throw new Error(`Anthropic OCR error ${res.status}: ${err.slice(0, 300)}`)
   }
 
   const data = await res.json()
-  return data.choices?.[0]?.message?.content || ''
+  return (data.content?.[0]?.text as string) || ''
 }
 
 // Mapping Heading1 titles di dokumen KYIC → bab_id
