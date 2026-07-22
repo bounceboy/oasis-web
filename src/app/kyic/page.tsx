@@ -81,6 +81,8 @@ export default function KyicV2Page() {
   const [formKode, setFormKode] = useState('')
   const [templateFile, setTemplateFile] = useState<File | null>(null)
   const [uploadingTemplate, setUploadingTemplate] = useState(false)
+  const [extractingTemplate, setExtractingTemplate] = useState(false)
+  const extractPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Per-BAB state
   const [babFiles, setBabFiles] = useState<File[]>([])
@@ -149,14 +151,34 @@ export default function KyicV2Page() {
     setLoading(false)
   }
 
+  function startExtractPolling(sessionId: string) {
+    if (extractPollRef.current) clearInterval(extractPollRef.current)
+    setExtractingTemplate(true)
+    extractPollRef.current = setInterval(async () => {
+      const res = await fetch(`/api/kyic/v2/session/${sessionId}`)
+      if (!res.ok) return
+      const data: SessionDetail = await res.json()
+      const sections = data.session.template_sections ?? {}
+      const filled = Object.values(sections).filter(v => typeof v === 'string' && v.length > 50).length
+      const hasError = '_error' in sections
+      if (filled >= 1 || hasError) {
+        clearInterval(extractPollRef.current!)
+        setExtractingTemplate(false)
+        setDetail(data)
+      }
+    }, 4000)
+  }
+
   async function uploadTemplate(sessionId: string, file: File) {
     setUploadingTemplate(true)
     setError(null)
     try {
-      const SIZE_LIMIT = 3 * 1024 * 1024 // 3MB — stay safely under Vercel's 4.5MB body limit
+      const isPdf = file.name.toLowerCase().endsWith('.pdf')
+      const SIZE_LIMIT = 3 * 1024 * 1024
+
+      let uploadOk = false
 
       if (file.size > SIZE_LIMIT) {
-        // Large file: upload directly to Supabase Storage, then call API with path
         const signRes = await fetch(`/api/kyic/v2/session/${sessionId}/upload-signed-url`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -165,7 +187,6 @@ export default function KyicV2Page() {
         if (!signRes.ok) { setError('Gagal mendapatkan upload URL'); return }
         const { signedUrl, storagePath } = await signRes.json()
 
-        // Upload langsung ke Supabase Storage
         const uploadRes = await fetch(signedUrl, {
           method: 'PUT',
           headers: { 'Content-Type': file.type || 'application/octet-stream' },
@@ -173,21 +194,28 @@ export default function KyicV2Page() {
         })
         if (!uploadRes.ok) { setError('Gagal mengupload file ke storage'); return }
 
-        // Minta server proses dari storage
         const processRes = await fetch(`/api/kyic/v2/session/${sessionId}/upload-template`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ storagePath, fileName: file.name }),
         })
-        if (!processRes.ok) setError('Gagal memproses template')
-        else await loadDetail(sessionId)
+        uploadOk = processRes.ok
+        if (!uploadOk) setError('Gagal memproses template')
       } else {
-        // Small file: kirim langsung via FormData
         const fd = new FormData()
         fd.append('file', file)
         const res = await fetch(`/api/kyic/v2/session/${sessionId}/upload-template`, { method: 'POST', body: fd })
-        if (!res.ok) setError('Gagal upload template')
-        else await loadDetail(sessionId)
+        uploadOk = res.ok
+        if (!uploadOk) setError('Gagal upload template')
+      }
+
+      if (uploadOk) {
+        await loadDetail(sessionId)
+        if (isPdf) {
+          // Trigger background extraction per-BAB lalu polling
+          fetch(`/api/kyic/v2/session/${sessionId}/extract-template`, { method: 'POST' })
+          startExtractPolling(sessionId)
+        }
       }
     } finally {
       setUploadingTemplate(false)
@@ -401,6 +429,11 @@ export default function KyicV2Page() {
             <p style={{ fontSize: 11, color: '#aab4bc', marginBottom: 8 }}>KYIC Template (T-1)</p>
             {uploadingTemplate ? (
               <p style={{ fontSize: 11, color: '#828d96' }}>⏳ Menyimpan template...</p>
+            ) : extractingTemplate ? (
+              <div>
+                <p style={{ fontSize: 11, color: '#45e661', marginBottom: 4 }}>✓ {detail.session.template_nama}</p>
+                <p style={{ fontSize: 11, color: '#ffbe50' }}>⏳ Membaca isi T-1... (~60 detik)</p>
+              </div>
             ) : detail.session.template_nama ? (
               <div>
                 <p style={{ fontSize: 11, color: '#45e661', marginBottom: 6 }}>✓ {detail.session.template_nama}</p>
