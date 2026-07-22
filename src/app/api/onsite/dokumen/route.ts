@@ -60,6 +60,7 @@ Balas HANYA dengan JSON (tanpa teks lain, tanpa markdown):
     {
       "judul": "Judul singkat temuan",
       "uraian": "Penjelasan detail temuan dan dampaknya",
+      "kutipan": "Kutipan langsung teks dari dokumen yang menjadi dasar temuan ini (1-3 kalimat)",
       "urgensi": "signifikan",
       "sifat": "perlu_perbaikan",
       "kluster": "E",
@@ -71,6 +72,7 @@ Balas HANYA dengan JSON (tanpa teks lain, tanpa markdown):
     {
       "judul": "Judul singkat temuan",
       "uraian": "Penjelasan pelanggaran dan dasar hukumnya",
+      "kutipan": "Kutipan langsung teks dari dokumen yang menjadi dasar temuan ini (1-3 kalimat)",
       "urgensi": "kritis",
       "sifat": "pelanggaran_ketentuan",
       "kluster": "E",
@@ -80,7 +82,7 @@ Balas HANYA dengan JSON (tanpa teks lain, tanpa markdown):
   ]
 }`
 
-    type TemuanItem = { judul: string; uraian: string; urgensi: string; sifat: string; kluster: string; pasal_terkait: string[]; rekomendasi: string }
+    type TemuanItem = { judul: string; uraian: string; kutipan?: string; urgensi: string; sifat: string; kluster: string; pasal_terkait: string[]; rekomendasi: string }
     const aiResp = await callOpenRouter(
       'Anda adalah pengawas OJK senior. Balas HANYA dengan JSON valid tanpa markdown, tanpa teks tambahan.',
       prompt,
@@ -114,7 +116,7 @@ Balas HANYA dengan JSON (tanpa teks lain, tanpa markdown):
     console.log(`[onsite/dokumen] risk=${riskList.length} compliance=${complianceList.length} total=${toInsert.length}`)
     if (toInsert.length > 0) {
       const rows = toInsert.map(t => ({
-        kode, judul: t.judul, uraian: t.uraian, urgensi: t.urgensi, sifat: t.sifat,
+        kode, judul: t.judul, uraian: t.uraian, kutipan: t.kutipan ?? '', urgensi: t.urgensi, sifat: t.sifat,
         kluster: t.kluster, kluster_nama: KLUSTER[t.kluster] ?? '',
         pasal_terkait: t.pasal_terkait ?? [], rekomendasi: t.rekomendasi,
         tipe_analisis: t.tipe_analisis,

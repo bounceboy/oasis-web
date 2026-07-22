@@ -15,7 +15,7 @@ type Temuan   = {
   urgensi: 'kritis' | 'signifikan' | 'perlu_perhatian'
   sifat: 'pelanggaran_ketentuan' | 'potensi_pelanggaran' | 'perlu_perbaikan'
   kluster: string; kluster_nama: string; pasal_terkait: string[]
-  rekomendasi: string; sumber_tipe: string; sumber_nama: string
+  rekomendasi: string; kutipan?: string; sumber_tipe: string; sumber_nama: string
   tipe_analisis: 'risk_based' | 'compliance'
   status: string; catatan_pengawas: string | null; created_at: string
 }
@@ -620,14 +620,19 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
                           {t.kluster} · {t.kluster_nama}
                         </span>
                       )}
-                      {t.sumber_tipe && (
-                        <span style={{ fontSize: 11, color: '#828d96' }}>dari {t.sumber_tipe}</span>
+                      {(t.sumber_nama || t.sumber_tipe) && (
+                        <span style={{ fontSize: 11, color: '#828d96' }}>dari {t.sumber_nama || t.sumber_tipe}</span>
                       )}
                     </div>
                     <p style={{ fontSize: 13, fontWeight: 500 }}>{t.judul}</p>
                     {expanded === t.id && (
                       <div style={{ marginTop: 12, fontSize: 12, color: '#aab4bc', lineHeight: 1.7 }}>
                         {t.uraian && <p style={{ marginBottom: 8 }}>{t.uraian}</p>}
+                        {t.kutipan && (
+                          <blockquote style={{ margin: '0 0 8px 0', padding: '6px 12px', borderLeft: '3px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.03)', borderRadius: '0 6px 6px 0', fontStyle: 'italic', color: '#aab4bc', fontSize: 11 }}>
+                            {t.kutipan}
+                          </blockquote>
+                        )}
                         {t.pasal_terkait?.length > 0 && (
                           <p style={{ color: '#45e661', marginBottom: 8 }}>Pasal: {t.pasal_terkait.join(', ')}</p>
                         )}
