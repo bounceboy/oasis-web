@@ -10,7 +10,53 @@ const adminClient = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export const maxDuration = 60
+export const maxDuration = 300
+
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
+const VISION_MODEL = 'anthropic/claude-sonnet-4-5'
+
+// OCR untuk PDF scan — kirim ke Claude Vision via OpenRouter
+async function ocrPdfWithVision(buf: Buffer): Promise<string> {
+  const base64 = buf.toString('base64')
+
+  const res = await fetch(OPENROUTER_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://oasis-ojk.vercel.app',
+      'X-Title': 'OASIS OJK',
+    },
+    body: JSON.stringify({
+      model: VISION_MODEL,
+      max_tokens: 16000,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: base64 },
+          },
+          {
+            type: 'text',
+            text: `Ini adalah dokumen KYIC (Know Your Insurance Company) perusahaan asuransi.
+Ekstrak SEMUA teks dari dokumen ini secara lengkap, pertahankan struktur aslinya.
+Perhatikan judul bagian/bab dan isinya. Output dalam format plain text.
+Jangan rangkum — sertakan semua detail angka, nama, dan informasi penting.`,
+          },
+        ],
+      }],
+    }),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`OCR Vision error ${res.status}: ${err.slice(0, 300)}`)
+  }
+
+  const data = await res.json()
+  return data.choices?.[0]?.message?.content || ''
+}
 
 // Mapping Heading1 titles di dokumen KYIC → bab_id
 const HEADING_TO_BAB: [RegExp, BabId][] = [
@@ -124,6 +170,12 @@ async function parseAndSave(id: string, buf: Buffer, fileName: string) {
   if (ext === 'pdf') {
     const pdfParse = require('pdf-parse/lib/pdf-parse')
     fullText = (await pdfParse(buf)).text
+
+    // PDF scan (gambar) — fallback ke OCR via Claude Vision
+    if (fullText.replace(/\s/g, '').length < 500) {
+      fullText = await ocrPdfWithVision(buf)
+    }
+
     templateSections = parseSectionsFromText(fullText)
   } else if (ext === 'docx' || ext === 'doc') {
     templateSections = parseSectionsFromDocx(buf)
