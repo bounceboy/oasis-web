@@ -53,9 +53,11 @@ Balas HANYA dalam JSON:
 
     type TemuanItem = { judul: string; uraian: string; urgensi: string; sifat: string; kluster: string; pasal_terkait: string[]; rekomendasi: string }
     const aiResp = await callOpenRouter('Anda adalah pengawas OJK yang menganalisis dokumen pemeriksaan onsite. Balas HANYA dalam format JSON yang diminta.', prompt, 4000)
+    console.log('[onsite/dokumen] raw response (first 300):', aiResp.slice(0, 300))
     const jsonMatch = aiResp.match(/\{[\s\S]*\}/)
     if (!jsonMatch) throw new Error('No JSON in response')
     const json = JSON.parse(jsonMatch[0])
+    console.log('[onsite/dokumen] parsed keys:', Object.keys(json).join(','), 'risk_based type:', typeof json.risk_based, 'isArray:', Array.isArray(json.risk_based))
     const ringkasan: string = json.ringkasan ?? ''
     const riskList: TemuanItem[] = Array.isArray(json.risk_based) ? json.risk_based : []
     const complianceList: TemuanItem[] = Array.isArray(json.compliance) ? json.compliance : []
