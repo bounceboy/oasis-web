@@ -2,8 +2,8 @@ import { NextRequest, NextResponse, after } from 'next/server'
 export const maxDuration = 300
 import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { extractExcelSheets, type SheetText } from '@/lib/xlsx-extractor'
-import { ekstrakDataLhptl, analisisLhptl } from '@/lib/lhptl'
+import { analisisLhptl } from '@/lib/lhptl'
+import { parseLhptlExcel } from '@/lib/lhptl-excel-parser'
 
 const BUCKET = 'lhptl-uploads'
 
@@ -53,11 +53,10 @@ export async function POST(req: NextRequest) {
   })
 }
 
-async function downloadSheets(path: string, prefix: string): Promise<SheetText[]> {
+async function downloadBuffer(path: string): Promise<Buffer> {
   const { data, error } = await db().storage.from(BUCKET).download(path)
   if (error || !data) throw new Error(`Gagal mengunduh file dari storage (${path}): ${error?.message ?? 'unknown'}`)
-  const buf = Buffer.from(await data.arrayBuffer())
-  return extractExcelSheets(buf).map(s => ({ ...s, name: prefix ? `${prefix}${s.name}` : s.name }))
+  return Buffer.from(await data.arrayBuffer())
 }
 
 async function runLhptlAnalysis(
@@ -72,13 +71,14 @@ async function runLhptlAnalysis(
   const paths = [pathLapkeu, pathGcg, pathLapkeuPrev]
 
   try {
-    const sheetsLapkeu = await downloadSheets(pathLapkeu, '')
-    const sheetsGcg = await downloadSheets(pathGcg, 'GCG_')
-    const sheetsLapkeuPrev = await downloadSheets(pathLapkeuPrev, 'PREV_')
-    const sheets = [...sheetsLapkeu, ...sheetsGcg, ...sheetsLapkeuPrev]
+    const [bufLk, bufTk, bufLkPrev] = await Promise.all([
+      downloadBuffer(pathLapkeu),
+      downloadBuffer(pathGcg),
+      downloadBuffer(pathLapkeuPrev),
+    ])
 
-    // AI extraction
-    const extracted = await ekstrakDataLhptl(sheets, namaEntitas, jenisEntitas, periode)
+    // Deterministic rule-based extraction — no AI involved here
+    const extracted = parseLhptlExcel(bufLk, bufTk, bufLkPrev, namaEntitas, jenisEntitas, periode)
 
     // Rules + AI kesimpulan
     const { hasil, kesimpulan, tindak_lanjut } = await analisisLhptl(extracted)
