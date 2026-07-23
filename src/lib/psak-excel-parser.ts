@@ -172,19 +172,24 @@ function parseCRF(crf: Array<{ label: string; cols: (number | null)[] }>, result
  * Kembalikan nilai mentah supaya bisa dijumlah lintas sheet.
  */
 function extractSAGPValues(rows: Array<{ label: string; cols: (number | null)[] }>): {
-  lrc: number | null; lc: number | null; lic: number | null; ra: number | null; raOpen: number | null
+  lrc: number | null; lc: number | null; lic: number | null
+  ra: number | null; raOpen: number | null; raChange: number | null
 } {
   const closing = findRow(rows, ['saldo bersih kontrak asuransi (saldo akhir)', 'liabilitas kontrak asuransi (saldo akhir)'])
-  const opening = findRow(rows, ['saldo bersih kontrak asuransi', 'liabilitas kontrak asuransi (saldo awal)'])
+  // Gunakan keyword spesifik "(saldo awal)" agar tidak bertabrakan dengan baris saldo akhir
+  const opening = findRow(rows, ['saldo bersih kontrak asuransi (saldo awal)', 'liabilitas kontrak asuransi (saldo awal)'])
+  // Perubahan RA — baris "Perubahan Penyesuaian Risiko" atau "perubahan ra"
+  const raChangeRow = findRow(rows, ['perubahan penyesuaian risiko', 'perubahan ra', 'ra perubahan'])
 
   const n = (v: number | null | undefined) => (v != null && !isNaN(v) ? v : null)
 
   return {
-    lrc:    closing ? n(closing.cols[4]) : null,
-    lc:     closing ? n(closing.cols[5]) : null,
-    lic:    closing ? n(closing.cols[6]) : null,
-    ra:     closing ? n(closing.cols[7]) : null,
-    raOpen: opening ? n(opening.cols[7]) : null,
+    lrc:      closing ? n(closing.cols[4]) : null,
+    lc:       closing ? n(closing.cols[5]) : null,
+    lic:      closing ? n(closing.cols[6]) : null,
+    ra:       closing ? n(closing.cols[7]) : null,
+    raOpen:   opening ? n(opening.cols[7]) : null,
+    raChange: raChangeRow ? n(raChangeRow.cols[7]) : null,
   }
 }
 
@@ -203,25 +208,28 @@ function parseSAGP(
   sap: Array<{ label: string; cols: (number | null)[] }> | null,
   result: ParsedFields,
 ) {
-  const gmm = agp ? extractSAGPValues(agp) : { lrc: null, lc: null, lic: null, ra: null, raOpen: null }
-  const paa = sap ? extractSAGPValues(sap) : { lrc: null, lc: null, lic: null, ra: null, raOpen: null }
+  const empty = { lrc: null, lc: null, lic: null, ra: null, raOpen: null, raChange: null }
+  const gmm = agp ? extractSAGPValues(agp) : { ...empty }
+  const paa = sap ? extractSAGPValues(sap) : { ...empty }
 
-  const lrc    = addNullable(gmm.lrc, paa.lrc)
-  const lc     = addNullable(gmm.lc, paa.lc)
-  const ra     = addNullable(gmm.ra, paa.ra)
-  const raOpen = addNullable(gmm.raOpen, paa.raOpen)
+  const lrc      = addNullable(gmm.lrc, paa.lrc)
+  const lc       = addNullable(gmm.lc, paa.lc)
+  const ra       = addNullable(gmm.ra, paa.ra)
+  const raOpen   = addNullable(gmm.raOpen, paa.raOpen)
+  const raChange = addNullable(gmm.raChange, paa.raChange)
 
   // LIC = Estimasi Arus Kas Mendatang (col6) + Penyesuaian Risiko/RA (col7)
   // dari kolom Liabilitas Klaim, baris Saldo Bersih Kontrak Asuransi (Saldo Akhir)
-  // gabungkan dari LUPSAP (PAA) + LUPSAGP (GMM/VFA)
+  // gabungkan dari LUPSAP/LJPSAP (PAA) + LUPSAGP/LJPSAGP (GMM/VFA)
   const licEstimasi = addNullable(gmm.lic, paa.lic)
   const lic = addNullable(licEstimasi, ra)
 
-  if (lrc    != null) result['I17_LRC']      = makeField(lrc)
-  if (lc     != null) result['I17_LOSS_COMP'] = makeField(lc)
-  if (ra     != null) result['I17_RA']        = makeField(ra)
-  if (raOpen != null) result['I17_RA_OPEN']   = makeField(raOpen)
-  if (lic    != null) result['I17_LIC']       = makeField(lic)
+  if (lrc      != null) result['I17_LRC']       = makeField(lrc)
+  if (lc       != null) result['I17_LOSS_COMP']  = makeField(lc)
+  if (ra       != null) result['I17_RA']         = makeField(ra)
+  if (raOpen   != null) result['I17_RA_OPEN']    = makeField(raOpen)
+  if (raChange != null) result['I17_RA_CHANGE']  = makeField(raChange)
+  if (lic      != null) result['I17_LIC']        = makeField(lic)
 
   // Akuisisi & onerous dari GMM saja (PAA tidak punya kolom ini)
   if (agp) {
@@ -240,7 +248,7 @@ function parseAKD(akd: Array<{ label: string; cols: (number | null)[] }>, result
 }
 
 /**
- * ECL Stage I dari sheet LUPSB / LJPSB.
+ * ECL Stage I dari sheet LUPSKV / LJPSKV.
  * Cari kolom "Penyisihan Akhir Periode Berjalan (Termasuk ECL)" dari header rows,
  * lalu baca nilai dari baris "Total Tahap I".
  */
@@ -336,7 +344,7 @@ export function parseOjkExcel(buffer: Buffer, jenis: 'Umum' | 'Jiwa' = 'Umum'): 
     const akd = sheet('LJPAKD')
     if (akd) parseAKD(akd, result)
 
-    // LJPSKV: col4=AC, col5=FVTPL, col6=FVOCI, col7=Gross Stage I (bukan allowance ECL)
+    // LJPSKV: col4=AC, col5=FVTPL, col6=FVOCI + ECL Stage I dari kolom "Penyisihan Akhir (Termasuk ECL)"
     const skv = sheet('LJPSKV')
     if (skv) {
       const totalRow = findRow(skv, ['total', 'jumlah'])
@@ -344,11 +352,13 @@ export function parseOjkExcel(buffer: Buffer, jenis: 'Umum' | 'Jiwa' = 'Umum'): 
         const ac = totalRow.cols[4]
         const fvtpl = totalRow.cols[5]
         const fvoci = totalRow.cols[6]
-        // col7 = gross exposure Stage I, BUKAN ECL allowance — jangan dipakai sbg I9_S1_ALLOW
         if (ac != null && !isNaN(ac)) { result['I9_AC'] = makeField(ac); result['SFP_AC'] = makeField(ac) }
         if (fvtpl != null && !isNaN(fvtpl)) { result['I9_FVTPL'] = makeField(fvtpl); result['SFP_FVTPL'] = makeField(fvtpl) }
         if (fvoci != null && !isNaN(fvoci)) { result['I9_FVOCI_DEBT'] = makeField(fvoci); result['SFP_FVOCI_DEBT'] = makeField(fvoci) }
       }
+      // ECL Stage I: kolom "Penyisihan Akhir Periode Berjalan (Termasuk ECL)", baris "Total Tahap I"
+      const skvWs = wb.Sheets['LJPSKV'] ?? wb.Sheets[(wb.SheetNames as string[]).find((n: string) => n.toUpperCase().includes('LJPSKV')) ?? '']
+      if (skvWs) parseSB(skvWs, result)
     }
 
     const pkl = sheet('LJPPKL')
@@ -356,10 +366,6 @@ export function parseOjkExcel(buffer: Buffer, jenis: 'Umum' | 'Jiwa' = 'Umum'): 
       const ociTotal = getField(pkl, ['total', 'jumlah', 'fvoci', 'perubahan nilai wajar'], 4)
       if (ociTotal.CY != null) result['OCI_FVOCI'] = ociTotal
     }
-
-    // ECL Stage I dari LJPSB — Penyisihan Akhir Periode (Termasuk ECL), baris Total Tahap I
-    const sbJiwa = wb.Sheets['LJPSB'] ?? wb.Sheets[(wb.SheetNames as string[]).find((n: string) => n.toUpperCase().includes('LJPSB')) ?? '']
-    if (sbJiwa) parseSB(sbJiwa, result)
 
   } else {
     // ── Format Umum: prefix LUP ──────────────────────────────────────────────
@@ -382,7 +388,7 @@ export function parseOjkExcel(buffer: Buffer, jenis: 'Umum' | 'Jiwa' = 'Umum'): 
     const akd = sheet('LUPAKD')
     if (akd) parseAKD(akd, result)
 
-    // LUPSKV: col4=AC, col5=FVTPL, col6=FVOCI (col7 bukan ECL allowance — diambil dari LUPSB)
+    // LUPSKV: col4=AC, col5=FVTPL, col6=FVOCI + ECL Stage I dari kolom "Penyisihan Akhir (Termasuk ECL)"
     const skv = sheet('LUPSKV')
     if (skv) {
       const totalRow = findRow(skv, ['total', 'jumlah'])
@@ -394,11 +400,10 @@ export function parseOjkExcel(buffer: Buffer, jenis: 'Umum' | 'Jiwa' = 'Umum'): 
         if (fvtpl != null && !isNaN(fvtpl)) { result['I9_FVTPL'] = makeField(fvtpl); result['SFP_FVTPL'] = makeField(fvtpl) }
         if (fvoci != null && !isNaN(fvoci)) { result['I9_FVOCI_DEBT'] = makeField(fvoci); result['SFP_FVOCI_DEBT'] = makeField(fvoci) }
       }
+      // ECL Stage I: kolom "Penyisihan Akhir Periode Berjalan (Termasuk ECL)", baris "Total Tahap I"
+      const skvWs = wb.Sheets['LUPSKV'] ?? wb.Sheets[(wb.SheetNames as string[]).find((n: string) => n.toUpperCase().includes('LUPSKV')) ?? '']
+      if (skvWs) parseSB(skvWs, result)
     }
-
-    // ECL Stage I dari LUPSB — Penyisihan Akhir Periode (Termasuk ECL), baris Total Tahap I
-    const sbUmum = wb.Sheets['LUPSB'] ?? wb.Sheets[(wb.SheetNames as string[]).find((n: string) => n.toUpperCase().includes('LUPSB')) ?? '']
-    if (sbUmum) parseSB(sbUmum, result)
 
     const sco = sheet('LUPSCO')
     if (sco) {

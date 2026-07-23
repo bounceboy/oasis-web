@@ -234,6 +234,7 @@ export interface DataKeuangan {
   loss_component?: number
   risk_adjustment?: number
   risk_adjustment_pembuka?: number
+  risk_adjustment_perubahan?: number
   ecl_total?: number
   ecl_base?: number
   arus_kas_operasi?: number
@@ -285,6 +286,7 @@ export function templateDataToDataKeuangan(td: TemplateData): DataKeuangan {
     loss_component: cy('I17_LOSS_COMP') ?? undefined,
     risk_adjustment: cy('I17_RA') ?? undefined,
     risk_adjustment_pembuka: cy('I17_RA_OPEN') ?? undefined,
+    risk_adjustment_perubahan: cy('I17_RA_CHANGE') ?? undefined,
     ecl_total: cy('I9_S1_ALLOW') ?? undefined,
     ecl_base: sumKeys('I9_FVTPL','I9_FVOCI_DEBT','I9_FVOCI_EQ','I9_AC','I9_LOANS') ?? undefined,
     arus_kas_operasi: cy('CF_OP') ?? undefined,
