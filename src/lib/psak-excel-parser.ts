@@ -211,10 +211,17 @@ function parseSAGP(
   const ra     = addNullable(gmm.ra, paa.ra)
   const raOpen = addNullable(gmm.raOpen, paa.raOpen)
 
+  // LIC = Estimasi Arus Kas Mendatang (col6) + Penyesuaian Risiko/RA (col7)
+  // dari kolom Liabilitas Klaim, baris Saldo Bersih Kontrak Asuransi (Saldo Akhir)
+  // gabungkan dari LUPSAP (PAA) + LUPSAGP (GMM/VFA)
+  const licEstimasi = addNullable(gmm.lic, paa.lic)
+  const lic = addNullable(licEstimasi, ra)
+
   if (lrc    != null) result['I17_LRC']      = makeField(lrc)
   if (lc     != null) result['I17_LOSS_COMP'] = makeField(lc)
   if (ra     != null) result['I17_RA']        = makeField(ra)
   if (raOpen != null) result['I17_RA_OPEN']   = makeField(raOpen)
+  if (lic    != null) result['I17_LIC']       = makeField(lic)
 
   // Akuisisi & onerous dari GMM saja (PAA tidak punya kolom ini)
   if (agp) {
@@ -226,10 +233,72 @@ function parseSAGP(
   }
 }
 
-/** LIC dari maturity buckets */
+/** LIC dari maturity buckets — fallback jika parseSAGP tidak menghasilkan LIC */
 function parseAKD(akd: Array<{ label: string; cols: (number | null)[] }>, result: ParsedFields) {
   const lic = getField(akd, ['total', 'jumlah'], 4)
-  if (lic.CY != null) result['I17_LIC'] = lic
+  if (lic.CY != null && result['I17_LIC'] == null) result['I17_LIC'] = lic
+}
+
+/**
+ * ECL Stage I dari sheet LUPSB / LJPSB.
+ * Cari kolom "Penyisihan Akhir Periode Berjalan (Termasuk ECL)" dari header rows,
+ * lalu baca nilai dari baris "Total Tahap I".
+ */
+function parseSB(ws: Record<string, unknown>, result: ParsedFields) {
+  const range = ws['!ref'] as string | undefined
+  if (!range) return
+  const decoded = XLSX.utils.decode_range(range)
+  const maxRow = decoded.e.r
+  const maxCol = Math.min(decoded.e.c, 20)
+
+  // Cari kolom "Penyisihan Akhir Periode Berjalan (Termasuk ECL)" dari baris header (baris 0-5)
+  let eclCol: number | null = null
+  for (let r = 0; r <= Math.min(maxRow, 5); r++) {
+    for (let c = 0; c <= maxCol; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c })
+      const cell = ws[addr] as { v?: unknown } | undefined
+      if (typeof cell?.v === 'string') {
+        const v = cell.v.toLowerCase()
+        if (v.includes('penyisihan akhir') || (v.includes('termasuk') && v.includes('ecl'))) {
+          eclCol = c
+          break
+        }
+      }
+    }
+    if (eclCol != null) break
+  }
+
+  // Fallback: scan header untuk kolom yang mengandung "ecl" saja
+  if (eclCol == null) {
+    for (let r = 0; r <= Math.min(maxRow, 5); r++) {
+      for (let c = 0; c <= maxCol; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c })
+        const cell = ws[addr] as { v?: unknown } | undefined
+        if (typeof cell?.v === 'string' && cell.v.toLowerCase().includes('ecl')) {
+          eclCol = c
+          break
+        }
+      }
+      if (eclCol != null) break
+    }
+  }
+
+  if (eclCol == null) return
+
+  // Cari baris "Total Tahap I" / "Tahap I"
+  for (let r = 0; r <= maxRow; r++) {
+    const labelAddr = XLSX.utils.encode_cell({ r, c: 2 })
+    const labelCell = ws[labelAddr] as { v?: unknown } | undefined
+    const label = typeof labelCell?.v === 'string' ? labelCell.v.toLowerCase().trim() : ''
+    if (label.includes('tahap i') && (label.includes('total') || label.startsWith('tahap'))) {
+      const valAddr = XLSX.utils.encode_cell({ r, c: eclCol })
+      const valCell = ws[valAddr] as { v?: unknown } | undefined
+      if (typeof valCell?.v === 'number' && !isNaN(valCell.v)) {
+        result['I9_S1_ALLOW'] = makeField(Math.abs(valCell.v))
+        return
+      }
+    }
+  }
 }
 
 /**
@@ -288,6 +357,10 @@ export function parseOjkExcel(buffer: Buffer, jenis: 'Umum' | 'Jiwa' = 'Umum'): 
       if (ociTotal.CY != null) result['OCI_FVOCI'] = ociTotal
     }
 
+    // ECL Stage I dari LJPSB — Penyisihan Akhir Periode (Termasuk ECL), baris Total Tahap I
+    const sbJiwa = wb.Sheets['LJPSB'] ?? wb.Sheets[(wb.SheetNames as string[]).find((n: string) => n.toUpperCase().includes('LJPSB')) ?? '']
+    if (sbJiwa) parseSB(sbJiwa, result)
+
   } else {
     // ── Format Umum: prefix LUP ──────────────────────────────────────────────
 
@@ -309,7 +382,7 @@ export function parseOjkExcel(buffer: Buffer, jenis: 'Umum' | 'Jiwa' = 'Umum'): 
     const akd = sheet('LUPAKD')
     if (akd) parseAKD(akd, result)
 
-    // LUPSKV: col4=AC, col5=FVTPL, col6=FVOCI, col7=ECL Tahap I (negatif = cadangan)
+    // LUPSKV: col4=AC, col5=FVTPL, col6=FVOCI (col7 bukan ECL allowance — diambil dari LUPSB)
     const skv = sheet('LUPSKV')
     if (skv) {
       const totalRow = findRow(skv, ['total', 'jumlah'])
@@ -317,13 +390,15 @@ export function parseOjkExcel(buffer: Buffer, jenis: 'Umum' | 'Jiwa' = 'Umum'): 
         const ac = totalRow.cols[4]
         const fvtpl = totalRow.cols[5]
         const fvoci = totalRow.cols[6]
-        const eclS1 = totalRow.cols[7]
         if (ac != null && !isNaN(ac)) { result['I9_AC'] = makeField(ac); result['SFP_AC'] = makeField(ac) }
         if (fvtpl != null && !isNaN(fvtpl)) { result['I9_FVTPL'] = makeField(fvtpl); result['SFP_FVTPL'] = makeField(fvtpl) }
         if (fvoci != null && !isNaN(fvoci)) { result['I9_FVOCI_DEBT'] = makeField(fvoci); result['SFP_FVOCI_DEBT'] = makeField(fvoci) }
-        if (eclS1 != null && !isNaN(eclS1)) result['I9_S1_ALLOW'] = makeField(Math.abs(eclS1))
       }
     }
+
+    // ECL Stage I dari LUPSB — Penyisihan Akhir Periode (Termasuk ECL), baris Total Tahap I
+    const sbUmum = wb.Sheets['LUPSB'] ?? wb.Sheets[(wb.SheetNames as string[]).find((n: string) => n.toUpperCase().includes('LUPSB')) ?? '']
+    if (sbUmum) parseSB(sbUmum, result)
 
     const sco = sheet('LUPSCO')
     if (sco) {
