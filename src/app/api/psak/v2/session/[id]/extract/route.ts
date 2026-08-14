@@ -32,6 +32,7 @@ async function doExtract(
   storagePath: string,
   jenis: JenisUsaha,
   excelOverride: Record<string, { CY: number | null; PY: number | null; PPY: number | null }> | null,
+  apiKey: string,
 ) {
   try {
     const { data, error } = await adminClient.storage.from('psak-uploads').download(storagePath)
@@ -69,7 +70,7 @@ async function doExtract(
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'x-api-key': process.env.ANTHROPIC_API_KEY!,
+        'x-api-key': apiKey || process.env.ANTHROPIC_API_KEY!,
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json',
       },
@@ -158,7 +159,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     .update({ status: 'extracting', error_msg: null, updated_at: new Date().toISOString() })
     .eq('id', id)
 
-  after(() => doExtract(id, sess.lk_storage_path as string, sess.jenis_usaha as JenisUsaha, excelOverride))
+  const apiKey = user.api_key ?? process.env.ANTHROPIC_API_KEY ?? ''
+  after(() => doExtract(id, sess.lk_storage_path as string, sess.jenis_usaha as JenisUsaha, excelOverride, apiKey))
 
   return NextResponse.json({ ok: true, extracting: true })
 }

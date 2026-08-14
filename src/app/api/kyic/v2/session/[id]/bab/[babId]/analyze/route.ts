@@ -15,7 +15,7 @@ const adminClient = createClient(
 )
 
 // Unduh PDF dari storage dan ekstrak teks khusus untuk satu BAB via Anthropic Vision
-async function extractBabFromPdf(storagePath: string, babNomor: number, babJudul: string): Promise<string> {
+async function extractBabFromPdf(storagePath: string, babNomor: number, babJudul: string, apiKey: string): Promise<string> {
   const { data, error } = await adminClient.storage.from('ky-uploads').download(storagePath)
   if (error || !data) throw new Error('Gagal mengunduh PDF template dari storage')
 
@@ -25,7 +25,7 @@ async function extractBabFromPdf(storagePath: string, babNomor: number, babJudul
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
-      'x-api-key': process.env.ANTHROPIC_API_KEY!,
+      'x-api-key': apiKey || process.env.ANTHROPIC_API_KEY!,
       'anthropic-version': '2023-06-01',
       'anthropic-beta': 'pdfs-2024-09-25',
       'content-type': 'application/json',
@@ -249,13 +249,14 @@ export async function POST(
   const babInfo = KYIC_BABS_MAP[babId as BabId]
   const templateTextFromSections = sections[babId] ?? session.template_text ?? ''
 
+  const apiKey = user.api_key ?? process.env.ANTHROPIC_API_KEY ?? ''
   after(async () => {
     let templateText = templateTextFromSections
 
     // PDF scan: ekstrak teks BAB ini dari Anthropic dulu
     if (storagePath && !templateText.trim()) {
       try {
-        templateText = await extractBabFromPdf(storagePath, babInfo?.nomor ?? 0, babInfo?.judul ?? babId)
+        templateText = await extractBabFromPdf(storagePath, babInfo?.nomor ?? 0, babInfo?.judul ?? babId, apiKey)
       } catch (err) {
         console.error(`[kyic/v2] OCR bab=${babId} gagal:`, err)
         templateText = '(Gagal membaca PDF T-1 untuk BAB ini)'

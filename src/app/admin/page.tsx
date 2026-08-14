@@ -1,12 +1,13 @@
 import { redirect } from 'next/navigation'
-import { requireAdmin } from '@/lib/auth'
+import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import Navbar from '@/components/oasis/Navbar'
 
 export default async function AdminPage() {
-  const profile = await requireAdmin()
-  if (!profile) redirect('/dashboard')
+  const profile = await getUser()
+  if (!profile) redirect('/login')
+  const isAdmin = profile.role === 'admin' || profile.direktorat_id === 'DPSS'
 
   const [{ count: totalUsers }, { count: totalSessions }] =
     await Promise.all([
@@ -37,7 +38,7 @@ export default async function AdminPage() {
         <Navbar
           userName={profile.nama_lengkap || profile.username}
           userRole={profile.role}
-          showAdmin={true}
+          showAdmin={isAdmin}
           simple
         />
 

@@ -1,35 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { spawn } from 'child_process'
-import path from 'path'
 import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
-
-const SCRIPT = path.join(process.cwd(), 'scripts', 'lhptl', 'generate.py')
-
-function runPythonGenerator(payload: object): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const py = spawn('python3', [SCRIPT], { stdio: ['pipe', 'pipe', 'pipe'] })
-
-    const chunks: Buffer[] = []
-    const errChunks: Buffer[] = []
-
-    py.stdout.on('data', (chunk: Buffer) => chunks.push(chunk))
-    py.stderr.on('data', (chunk: Buffer) => errChunks.push(chunk))
-
-    py.on('close', (code) => {
-      if (code !== 0) {
-        const stderr = Buffer.concat(errChunks).toString('utf-8')
-        reject(new Error(`generate.py exited ${code}: ${stderr}`))
-      } else {
-        resolve(Buffer.concat(chunks))
-      }
-    })
-
-    py.on('error', reject)
-    py.stdin.write(JSON.stringify(payload))
-    py.stdin.end()
-  })
-}
+import { generateLhptlDocxNode } from '@/lib/lhptl-docx-node'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getUser()
@@ -63,7 +35,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     nama_perusahaan: hasil.nama_perusahaan || data.nama_entitas,
     jenis_entitas: hasil.jenis_entitas || data.jenis_usaha,
     periode: hasil.periode,
-    hasil_pengawasan: hasil.hasil_pengawasan ?? [],
+    hasil_pengawasan: (hasil.hasil_pengawasan ?? []) as { nomor?: number; catatan?: string; tipe?: string }[],
     kesimpulan: hasil.kesimpulan ?? '',
     tindak_lanjut: hasil.tindak_lanjut ?? '',
     raw: hasil.raw ?? {},
@@ -71,9 +43,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   let buf: Buffer
   try {
-    buf = await runPythonGenerator(payload)
+    buf = generateLhptlDocxNode(payload)
   } catch (err) {
-    console.error('[LHPTL download] Python error:', err)
+    console.error('[LHPTL download] DOCX generation error:', err)
     return NextResponse.json({ error: 'Gagal generate dokumen' }, { status: 500 })
   }
 

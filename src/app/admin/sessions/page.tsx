@@ -6,6 +6,7 @@ import Link from 'next/link'
 type OnsiteSession = {
   id: string; kode: string; nama_entitas: string; jenis_usaha: string; created_at: string
 }
+type Me = { role: string; direktorat_id: string | null }
 
 const JENIS_USAHA = [
   'Asuransi Jiwa', 'Asuransi Jiwa Syariah', 'Asuransi Umum',
@@ -17,6 +18,8 @@ const JENIS_USAHA = [
 export default function AdminSessionsPage() {
   const [sessions, setSessions] = useState<OnsiteSession[]>([])
   const [loading, setLoading] = useState(true)
+  const [me, setMe] = useState<Me | null>(null)
+  const isAdmin = me?.role === 'admin' || me?.direktorat_id === 'DPSS'
 
   // Form state
   const [kode, setKode] = useState('')
@@ -26,7 +29,10 @@ export default function AdminSessionsPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  useEffect(() => { loadSessions() }, [])
+  useEffect(() => {
+    fetch('/api/auth/me').then(r => r.json()).then(d => setMe(d)).catch(() => {})
+    loadSessions()
+  }, [])
 
   async function loadSessions() {
     try {
@@ -64,7 +70,8 @@ export default function AdminSessionsPage() {
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
         <h1 className="text-xl font-semibold">Kelola Sesi Pemeriksaan Onsite</h1>
 
-        {/* Form Buat Sesi */}
+        {/* Form Buat Sesi — hanya admin (DPSS) */}
+        {isAdmin ? (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
           <h2 className="font-medium text-sm text-slate-300">Buat Sesi Baru</h2>
 
@@ -98,6 +105,11 @@ export default function AdminSessionsPage() {
             {creating ? 'Membuat...' : '+ Buat Sesi'}
           </button>
         </div>
+        ) : (
+          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 text-center text-slate-500 text-sm">
+            Hanya DPSS (Admin) yang dapat membuat sesi baru. Ajukan permintaan ke admin.
+          </div>
+        )}
 
         {/* List Sesi */}
         <div>

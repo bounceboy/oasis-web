@@ -22,7 +22,7 @@ const KYIC_BAB_IDS = [
   { id: 'fokus_pengawasan', label: 'Penetapan Fokus Pengawasan' },
 ]
 
-async function doExtract(sessionId: string, storagePath: string) {
+async function doExtract(sessionId: string, storagePath: string, apiKey: string) {
   try {
     // Unduh PDF dari storage
     const { data, error } = await adminClient.storage.from('ky-uploads').download(storagePath)
@@ -55,7 +55,7 @@ Perhatikan: bagian-bagian ini mungkin diberi label berbeda (mis. "BAB 1", "A.", 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'x-api-key': process.env.ANTHROPIC_API_KEY!,
+        'x-api-key': apiKey || process.env.ANTHROPIC_API_KEY!,
         'anthropic-version': '2023-06-01',
         'anthropic-beta': 'pdfs-2024-09-25',
         'content-type': 'application/json',
@@ -131,7 +131,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const storagePath = (session as Record<string, unknown>)?.template_storage_path as string | null
   if (!storagePath) return NextResponse.json({ error: 'PDF template belum diupload' }, { status: 400 })
 
-  after(() => doExtract(id, storagePath))
+  const apiKey = user.api_key ?? process.env.ANTHROPIC_API_KEY ?? ''
+  after(() => doExtract(id, storagePath, apiKey))
 
   return NextResponse.json({ ok: true, extracting: true })
 }

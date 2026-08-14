@@ -15,6 +15,7 @@ export type SessionUser = {
   direktorat_id: string | null
   departemen_id: string | null
   status: string
+  api_key?: string
 }
 
 export async function createSession(user: SessionUser): Promise<string> {
