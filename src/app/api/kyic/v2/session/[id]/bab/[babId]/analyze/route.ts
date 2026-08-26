@@ -69,6 +69,7 @@ async function runBabAnalysis(
   dokumenTeks: string,
   catatanPengawas: string,
   prevResults: Record<string, string>,
+  apiKey = ''
 ) {
   const bab = KYIC_BABS_MAP[babId]
   if (!bab) return
@@ -133,7 +134,8 @@ Balas HANYA dengan JSON (tanpa markdown):
     const aiResp = await callOpenRouter(
       'Anda adalah pengawas OJK senior. Balas HANYA dengan JSON valid tanpa markdown.',
       prompt,
-      6000
+      6000,
+      apiKey
     )
 
     let hasil: Record<string, unknown> = {}
@@ -272,6 +274,7 @@ export async function POST(
       dokumenTeks,
       catatanPengawas,
       prevResults,
+      apiKey,
     )
   })
 

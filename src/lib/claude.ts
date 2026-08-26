@@ -1,6 +1,3 @@
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-const MODEL = 'anthropic/claude-sonnet-4-5'
-
 type AnalyzeParams = {
   maskedText: string
   pojkContext: string
@@ -63,30 +60,30 @@ ${maskedText.slice(0, 25000)}`
   return callOpenRouter(systemPrompt, userPrompt)
 }
 
-export async function callOpenRouter(systemPrompt: string, userPrompt: string, maxTokens = 4000): Promise<string> {
-  const res = await fetch(OPENROUTER_URL, {
+export async function callOpenRouter(systemPrompt: string, userPrompt: string, maxTokens = 4000, apiKey = ''): Promise<string> {
+  const key = apiKey || process.env.ANTHROPIC_API_KEY || ''
+  if (!key) throw new Error('Anthropic API key tidak ditemukan. Pastikan API key diisi saat login.')
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://oasis-ojk.vercel.app',
-      'X-Title': 'OASIS OJK',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: 'claude-sonnet-4-5',
       max_tokens: maxTokens,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
     }),
   })
 
   if (!res.ok) {
     const err = await res.text()
-    throw new Error(`OpenRouter error ${res.status}: ${err}`)
+    throw new Error(`Anthropic API error ${res.status}: ${err.slice(0, 300)}`)
   }
 
   const data = await res.json()
-  return data.choices?.[0]?.message?.content || 'Tidak ada hasil.'
+  return (data.content?.[0]?.text as string) || 'Tidak ada hasil.'
 }

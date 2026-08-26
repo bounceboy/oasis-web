@@ -52,8 +52,9 @@ export async function POST(req: NextRequest) {
   // ─── Background job ──────────────────────────────────────────────────────────
   // after() menjaga job tetap hidup setelah response terkirim (wajib di Vercel serverless).
   // Client poll status via GET /api/sessions/{id}
+  const apiKey = user.api_key ?? ''
   after(async () => {
-    await runPsak117Analysis(sessionId, user.id, teksLapkeu, namaEntitas, jenisUsaha, periode).catch(err => {
+    await runPsak117Analysis(sessionId, user.id, teksLapkeu, namaEntitas, jenisUsaha, periode, apiKey).catch(err => {
       console.error(`[PSAK117 ${sessionId}] Background job error:`, err)
     })
   })
@@ -72,11 +73,12 @@ async function runPsak117Analysis(
   teksLapkeu: string,
   namaEntitas: string,
   jenisUsaha: JenisUsaha,
-  periode: string
+  periode: string,
+  apiKey = ''
 ) {
   try {
     // Step 1: Ekstrak data keuangan dari PDF text
-    const dataKeuangan = await ekstrakDataKeuangan(teksLapkeu, namaEntitas, jenisUsaha)
+    const dataKeuangan = await ekstrakDataKeuangan(teksLapkeu, namaEntitas, jenisUsaha, apiKey)
     if (periode) dataKeuangan.periode = periode
 
     // Step 2: Hitung rasio & scorecard
@@ -97,8 +99,8 @@ async function runPsak117Analysis(
     // Step 4: Analisis AI — compliance pakai POJK + Petunjuk Teknis, risiko pakai SEDK
     const combinedPojkContext = `${pojkContext}\n\n---\n\n${psak117Context}`
     const [compliance, pemetaanRisiko] = await Promise.all([
-      analisaCompliance(dataKeuangan, rasio, scorecard, combinedPojkContext, namaEntitas, jenisUsaha),
-      petakanRisiko(dataKeuangan, rasio, sedkContext, namaEntitas, jenisUsaha),
+      analisaCompliance(dataKeuangan, rasio, scorecard, combinedPojkContext, namaEntitas, jenisUsaha, apiKey),
+      petakanRisiko(dataKeuangan, rasio, sedkContext, namaEntitas, jenisUsaha, apiKey),
     ])
 
     const hasil = {

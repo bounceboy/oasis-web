@@ -37,8 +37,9 @@ export async function POST(req: NextRequest) {
 
   // ─── Background job ──────────────────────────────────────────────────────────
   // after() menjaga job tetap hidup setelah response terkirim (wajib di Vercel serverless).
+  const apiKey = user.api_key ?? ''
   after(async () => {
-    await runRenbisAnalysis(sessionId, path, namaEntitas, tahun).catch(err => {
+    await runRenbisAnalysis(sessionId, path, namaEntitas, tahun, apiKey).catch(err => {
       console.error(`[Renbis ${sessionId}] Background job error:`, err)
     })
   })
@@ -55,7 +56,8 @@ async function runRenbisAnalysis(
   sessionId: string,
   path: string,
   namaEntitas: string,
-  tahun: string
+  tahun: string,
+  apiKey = ''
 ) {
   try {
     // 0. Download file dari storage
@@ -71,7 +73,7 @@ async function runRenbisAnalysis(
     const pojkContext = await searchRelevantPojk('rencana bisnis perusahaan asuransi penyampaian', 10)
 
     // 3. AI isi KK
-    const { kk_rows, analisis, kesimpulan } = await isiKkRenbis(teks, namaEntitas, tahun, pojkContext)
+    const { kk_rows, analisis, kesimpulan } = await isiKkRenbis(teks, namaEntitas, tahun, pojkContext, apiKey)
 
     const hasilData = {
       nama_perusahaan: namaEntitas,

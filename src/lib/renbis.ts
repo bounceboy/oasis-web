@@ -77,7 +77,8 @@ export async function isiKkRenbis(
   teksRenbis: string,
   namaPerusahaan: string,
   tahun: string,
-  pojkContext: string
+  pojkContext: string,
+  apiKey = ''
 ): Promise<{ kk_rows: KkRow[]; analisis: string; kesimpulan: string }> {
 
   const templateJson = KK_TEMPLATE.map((r, i) => ({
@@ -117,7 +118,7 @@ Output HARUS berupa JSON valid:
   ]
 }`
 
-  const raw = await callOpenRouter(system, user, 8000)
+  const raw = await callOpenRouter(system, user, 8000, apiKey)
   const greedyMatch = raw.match(/\{[\s\S]*\}/)
   const jsonStr = greedyMatch ? greedyMatch[0] : raw.match(/\{[\s\S]*/)?.at(0)
   if (!jsonStr) throw new Error('AI tidak mengembalikan JSON untuk KK Renbis')

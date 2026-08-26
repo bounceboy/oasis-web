@@ -4,6 +4,13 @@ import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { callOpenRouter } from '@/lib/claude'
 import { searchRelevantPojk } from '@/lib/pojk-search'
+import { createClient } from '@supabase/supabase-js'
+
+const BUCKET = 'waw-uploads'
+const adminClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 const KLUSTER: Record<string, string> = {
   A: 'Risiko Asuransi', B: 'SDM & Kelembagaan', C: 'Pemasaran & Keagenan',
@@ -31,10 +38,25 @@ async function extractText(buf: Buffer, filename: string): Promise<string> {
       .map(e => e.getData().toString('utf-8').replace(/<[^>]+>/g, ' '))
     return slides.join('\n')
   }
+  if (ext === 'xlsx' || ext === 'xls') {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const XLSX = require('xlsx')
+    const wb = XLSX.read(buf, { type: 'buffer' })
+    return wb.SheetNames
+      .map((name: string) => {
+        const ws = wb.Sheets[name]
+        return `=== Sheet: ${name} ===\n` + XLSX.utils.sheet_to_csv(ws)
+      })
+      .join('\n\n')
+      .slice(0, 50000)
+  }
+  if (ext === 'csv') {
+    return buf.toString('utf-8').slice(0, 50000)
+  }
   return buf.toString('utf-8').slice(0, 50000)
 }
 
-async function runAnalysis(wawId: string, kode: string, departemen: string, fokus: string, teks: string, namaFile: string, jenisUsaha = '') {
+async function runAnalysis(wawId: string, kode: string, departemen: string, fokus: string, teks: string, namaFile: string, jenisUsaha = '', apiKey = '') {
   try {
     const pojkRef = await searchRelevantPojk(`${departemen} wawancara pemeriksaan asuransi ${fokus}`, 10, jenisUsaha)
     const instruksi = fokus ? `Fokus khusus dari pengawas: ${fokus}` : 'Analisis catatan wawancara ini secara menyeluruh untuk mengidentifikasi potensi temuan.'
@@ -93,7 +115,8 @@ Balas HANYA dengan JSON (tanpa teks lain, tanpa markdown):
     const aiResp = await callOpenRouter(
       'Anda adalah pengawas OJK senior. Balas HANYA dengan JSON valid tanpa markdown, tanpa teks tambahan.',
       prompt,
-      6000
+      6000,
+      apiKey
     )
 
     let json: { ringkasan?: string; risk_based?: TemuanItem[]; compliance?: TemuanItem[] } = {}
@@ -137,14 +160,36 @@ export async function POST(req: NextRequest) {
   const user = await getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const formData  = await req.formData()
-  const kode      = (formData.get('kode') as string)?.toUpperCase().trim()
-  const departemen = (formData.get('departemen') as string)?.trim()
-  const fokus     = (formData.get('fokus') as string)?.trim() ?? ''
-  const file      = formData.get('file') as File | null
+  const contentType = req.headers.get('content-type') ?? ''
+  let kode: string, departemen: string, fokus: string, namaFile: string, buf: Buffer
 
-  if (!kode || !departemen || !file)
-    return NextResponse.json({ error: 'kode, departemen, dan file wajib diisi' }, { status: 400 })
+  if (contentType.includes('application/json')) {
+    // Path: direct-upload — frontend sudah upload ke Supabase, kirim storage path saja
+    const body = await req.json()
+    kode      = (body.kode as string)?.toUpperCase().trim()
+    departemen = (body.departemen as string)?.trim()
+    fokus     = (body.fokus as string)?.trim() ?? ''
+    namaFile  = (body.namaFile as string)?.trim()
+    const storagePath = body.storagePath as string
+
+    if (!kode || !departemen || !storagePath || !namaFile)
+      return NextResponse.json({ error: 'kode, departemen, storagePath, dan namaFile wajib diisi' }, { status: 400 })
+
+    const { data, error: dlErr } = await adminClient.storage.from(BUCKET).download(storagePath)
+    if (dlErr || !data) return NextResponse.json({ error: 'Gagal mengambil file dari storage' }, { status: 422 })
+    buf = Buffer.from(await data.arrayBuffer())
+  } else {
+    // Fallback: formData (untuk file kecil < 4.5MB)
+    const formData  = await req.formData()
+    kode      = (formData.get('kode') as string)?.toUpperCase().trim()
+    departemen = (formData.get('departemen') as string)?.trim()
+    fokus     = (formData.get('fokus') as string)?.trim() ?? ''
+    const file = formData.get('file') as File | null
+    if (!kode || !departemen || !file)
+      return NextResponse.json({ error: 'kode, departemen, dan file wajib diisi' }, { status: 400 })
+    namaFile = file.name
+    buf = Buffer.from(await file.arrayBuffer())
+  }
 
   const { data: session } = await db().from('onsite_sessions').select('kode, jenis_usaha').eq('kode', kode).single()
   if (!session) return NextResponse.json({ error: 'Kode pemeriksaan tidak valid' }, { status: 404 })
@@ -152,23 +197,22 @@ export async function POST(req: NextRequest) {
 
   const { data: wawRec, error: insErr } = await db()
     .from('onsite_wawancara')
-    .insert({ kode, departemen, nama_file: file.name, fokus, status: 'analyzing', created_by: user.id })
+    .insert({ kode, departemen, nama_file: namaFile, fokus, status: 'analyzing', created_by: user.id })
     .select()
     .single()
   if (insErr || !wawRec) return NextResponse.json({ error: 'Gagal menyimpan' }, { status: 500 })
 
-  const buf = Buffer.from(await file.arrayBuffer())
   let teks: string
   try {
-    teks = await extractText(buf, file.name)
+    teks = await extractText(buf, namaFile)
   } catch {
     await db().from('onsite_wawancara').update({ status: 'error' }).eq('id', wawRec.id)
     return NextResponse.json({ error: 'Gagal mengekstrak teks file' }, { status: 422 })
   }
 
-  // Proses AI di background — respons langsung kembali
+  const apiKey = user.api_key ?? ''
   after(async () => {
-    await runAnalysis(wawRec.id, kode, departemen, fokus, teks, file.name, jenisUsaha)
+    await runAnalysis(wawRec.id, kode, departemen, fokus, teks, namaFile, jenisUsaha, apiKey)
   })
 
   return NextResponse.json({ id: wawRec.id, analyzing: true })

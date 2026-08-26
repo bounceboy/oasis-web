@@ -255,7 +255,7 @@ function TabDokumen({ kode, items, onRefresh }: { kode: string; items: Dokumen[]
               <p style={{ fontSize: 12, color: '#45e661', margin: 0 }}>{files.length} file dipilih — klik untuk tambah</p>
             )}
           </div>
-          <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.txt" multiple style={{ display: 'none' }}
+          <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.pptx,.xlsx,.xls,.csv,.txt" multiple style={{ display: 'none' }}
             onChange={e => { if (e.target.files) addFiles(e.target.files) }} />
 
           {files.length > 0 && (
@@ -375,12 +375,29 @@ function TabWawancara({ kode, items, onRefresh }: { kode: string; items: Wawanca
     if (!file) return
     setUploading(true); setError('')
     try {
-      const fd = new FormData()
-      fd.append('kode', kode)
-      fd.append('departemen', departemen)
-      fd.append('fokus', fokus)
-      fd.append('file', file)
-      const res = await fetch('/api/onsite/wawancara', { method: 'POST', body: fd })
+      // Step 1: get signed upload URL (bypass 4.5MB Vercel body limit)
+      const urlRes = await fetch('/api/onsite/wawancara/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kode, namaFile: file.name }),
+      })
+      if (!urlRes.ok) { const d = await urlRes.json(); setError(d.error ?? 'Gagal mendapatkan URL upload'); return }
+      const { signedUrl, storagePath } = await urlRes.json()
+
+      // Step 2: upload file langsung ke Supabase Storage (tidak lewat Vercel)
+      const uploadRes = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      })
+      if (!uploadRes.ok) { setError('Gagal upload file ke storage'); return }
+
+      // Step 3: POST storage path ke API (body kecil, tidak kena limit)
+      const res = await fetch('/api/onsite/wawancara', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kode, departemen, fokus, storagePath, namaFile: file.name }),
+      })
       if (!res.ok) { const d = await res.json(); setError(d.error); return }
       setFile(null); setFokus('')
       if (fileRef.current) fileRef.current.value = ''
@@ -426,7 +443,7 @@ function TabWawancara({ kode, items, onRefresh }: { kode: string; items: Wawanca
               </p>
             )}
           </div>
-          <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.pptx,.txt" style={{ display: 'none' }}
+          <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.pptx,.xlsx,.xls,.csv,.txt" style={{ display: 'none' }}
             onChange={e => setFile(e.target.files?.[0] ?? null)} />
         </div>
 
@@ -440,7 +457,7 @@ function TabWawancara({ kode, items, onRefresh }: { kode: string; items: Wawanca
 
         <button onClick={handleUpload} disabled={!file || uploading}
           style={{ background: file && !uploading ? '#45e661' : 'rgba(255,255,255,0.06)', color: file && !uploading ? '#04120a' : '#828d96', border: 'none', borderRadius: 999, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: file && !uploading ? 'pointer' : 'default', fontFamily: 'inherit', width: '100%' }}>
-          {uploading ? 'Mengupload...' : 'Mulai Analisis Wawancara'}
+          {uploading ? 'Mengupload file...' : 'Mulai Analisis Wawancara'}
         </button>
       </div>
 

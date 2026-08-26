@@ -181,7 +181,8 @@ async function ekstrakGambar(buf: Buffer, filename: string): Promise<string> {
 export async function analisisRisikoKyic(
   dokumenTeks: string,
   templateTeks: string,
-  onProgress?: (msg: string) => void
+  onProgress?: (msg: string) => void,
+  apiKey = ''
 ): Promise<{
   risk_matrix: RisikoRating[]
   gcg: RiskLevel
@@ -253,7 +254,7 @@ Berikan analisis ${jenis} dan rating dalam format JSON:
   "analisis": "<narasi analisis 3-5 kalimat berdasarkan SEDK dan dokumen>"
 }`
 
-    const raw = await callOpenRouter(system, user, 2000)
+    const raw = await callOpenRouter(system, user, 2000, apiKey)
     const match = raw.match(/\{[\s\S]*\}/)
     if (match) {
       try {
@@ -284,7 +285,8 @@ REFERENSI SEKUNDER (POJK):\n${pojkGcg}
 
 BATASAN: Utamakan SEDK sebagai dasar. Gunakan POJK sebagai pelengkap. Jangan mengarang threshold.`,
     `DOKUMEN PERUSAHAAN:\n${dokumenTeks.slice(0, 60000)}\n\nJSON output (sertakan analisis singkat 2-3 kalimat per komponen):\n{"gcg":<1-5>,"gcg_analisis":"...","rentabilitas":<1-5>,"rentabilitas_analisis":"...","permodalan":<1-5>,"permodalan_analisis":"..."}`,
-    2000
+    2000,
+    apiKey
   )
   const compMatch = compRaw.match(/\{[\s\S]*\}/)
   let gcg: RiskLevel = 3, gcg_analisis = ''
@@ -323,7 +325,8 @@ export async function generateNaratifKyic(
   dokumenTeks: string,
   templateTeks: string,
   riskMatrix: RisikoRating[],
-  onProgress?: (msg: string) => void
+  onProgress?: (msg: string) => void,
+  apiKey = ''
 ): Promise<string> {
   const labels: Record<string, string> = {
     supervisory_concern: 'Supervisory Concern',
@@ -367,7 +370,7 @@ ${dokumenTeks.slice(0, 80000)}
 
 Susun ${labels[section]} yang komprehensif untuk periode baru, mengacu pada format tahun sebelumnya.`
 
-  return callOpenRouter(system, user, 4000)
+  return callOpenRouter(system, user, 4000, apiKey)
 }
 
 // ─── Step 4: Modifikasi XML template dan output docx baru ────────────────────

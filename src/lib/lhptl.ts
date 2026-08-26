@@ -66,7 +66,8 @@ export async function ekstrakDataLhptl(
   sheets: SheetText[],
   namaEntitas: string,
   jenisEntitas: 'pialang_asuransi' | 'pialang_reasuransi',
-  periode: string
+  periode: string,
+  apiKey = ''
 ): Promise<ExtractedLhptlData> {
   const sheetText = sheets.map((s) => `=== SHEET: ${s.name} ===\n${s.text}`).join('\n\n')
 
@@ -171,7 +172,7 @@ Catatan ekstraksi:
 - neraca_laba_rugi: ekstrak SEMUA baris neraca (Aset, Liabilitas, Ekuitas) dan laba rugi (Pendapatan, Beban, Laba/Rugi), sebagai list {label, nilai_ini (dari sheet LK01/LK02 tahun berjalan), nilai_lalu (dari sheet PREV_LK01/PREV_LK02 tahun sebelumnya)}
 - rasio_keuangan_tabel: ekstrak SEMUA rasio keuangan sebagai persentase, {label, nilai_ini (dari sheet OP06 tahun berjalan), nilai_lalu (dari sheet PREV_OP06 tahun sebelumnya jika ada)}`
 
-  const raw = await callOpenRouter(system, user, 8000)
+  const raw = await callOpenRouter(system, user, 8000, apiKey)
   // Coba ambil JSON lengkap (sampai } terakhir), fallback ke repair jika terpotong
   const greedyMatch = raw.match(/\{[\s\S]*\}/)
   const jsonStr = greedyMatch ? greedyMatch[0] : raw.match(/\{[\s\S]*/)?.at(0)
@@ -188,7 +189,8 @@ Catatan ekstraksi:
 // ─── Step 2+3: Rules + AI KESIMPULAN ─────────────────────────────────────────
 
 export async function analisisLhptl(
-  data: ExtractedLhptlData
+  data: ExtractedLhptlData,
+  apiKey = ''
 ): Promise<{ hasil: HasilPengawasan[]; kesimpulan: string; tindak_lanjut: string }> {
   const hasil = jalankanRules(data)
 
@@ -224,7 +226,7 @@ Pedoman:
 - kesimpulan: 3-5 paragraf. Rangkum kondisi tata kelola, kondisi keuangan, kepatuhan operasional, dan penilaian keseluruhan. Sebutkan temuan signifikan secara ringkas.
 - tindak_lanjut: Daftar tindakan pengawasan konkret (3-5 poin) berdasarkan temuan. Tiap poin mulai dengan kata kerja. Format: "1. [tindakan]. 2. [tindakan]. dst."`
 
-  const raw = await callOpenRouter(system, user, 2000)
+  const raw = await callOpenRouter(system, user, 2000, apiKey)
   const match = raw.match(/\{[\s\S]*\}/)
   if (!match) throw new Error('AI tidak mengembalikan JSON untuk KESIMPULAN')
   const { kesimpulan, tindak_lanjut } = JSON.parse(match[0])

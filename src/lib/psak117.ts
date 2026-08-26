@@ -336,7 +336,8 @@ PSAK 117 / IFRS 17 — Komponen Utama:
 export async function ekstrakDataKeuangan(
   teksLapkeu: string,
   namaEntitas: string,
-  jenisUsaha: JenisUsaha
+  jenisUsaha: JenisUsaha,
+  apiKey = ''
 ): Promise<DataKeuangan> {
   const system = `Anda adalah analis keuangan senior OJK yang ahli membaca laporan keuangan asuransi PSAK 117.
 Tugas: ekstrak data keuangan terstruktur dari teks laporan keuangan audited.
@@ -402,7 +403,7 @@ Instruksi:
 
 ${teksLapkeu.slice(0, 160000)}`
 
-  const raw = await callOpenRouter(system, user, 2000)
+  const raw = await callOpenRouter(system, user, 2000, apiKey)
 
   // Ekstrak JSON dari respons
   const match = raw.match(/\{[\s\S]*\}/)
@@ -417,7 +418,8 @@ export async function analisaCompliance(
   scorecard: ScorecardItem[],
   pojkContext: string,
   namaEntitas: string,
-  jenisUsaha: JenisUsaha
+  jenisUsaha: JenisUsaha,
+  apiKey = ''
 ): Promise<string> {
   const gagal = scorecard.filter((s) => s.pass === false).map((s) => s.metric)
   const lolos = scorecard.filter((s) => s.pass === true).map((s) => s.metric)
@@ -467,7 +469,7 @@ RASIO:
 
 Buat analisis kepatuhan 3-5 halaman yang komprehensif dan siap digunakan sebagai dasar tindak lanjut pengawasan.`
 
-  return callOpenRouter(system, user, 3000)
+  return callOpenRouter(system, user, 3000, apiKey)
 }
 
 export async function petakanRisiko(
@@ -475,7 +477,8 @@ export async function petakanRisiko(
   rasio: RasioKeuangan,
   sedkContext: string,
   namaEntitas: string,
-  jenisUsaha: JenisUsaha
+  jenisUsaha: JenisUsaha,
+  apiKey = ''
 ): Promise<string> {
   const system = `Anda adalah analis risiko OJK senior yang menggunakan pendekatan pengawasan berbasis risiko (risk-based supervision).
 
@@ -513,7 +516,7 @@ DATA KEUANGAN KUNCI:
 
 Buat pemetaan risiko komprehensif berbasis SEDK untuk perusahaan ini.`
 
-  return callOpenRouter(system, user, 3000)
+  return callOpenRouter(system, user, 3000, apiKey)
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

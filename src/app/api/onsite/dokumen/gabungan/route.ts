@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
   }
 
   const kombinasiTeks = teksGabungan.join('\n\n').slice(0, 30000)
+  const apiKey = user.api_key ?? ''
 
   after(async () => {
     try {
@@ -126,7 +127,8 @@ Balas HANYA dengan JSON (tanpa teks lain, tanpa markdown):
       const aiResp = await callOpenRouter(
         'Anda adalah pengawas OJK senior. Balas HANYA dengan JSON valid tanpa markdown, tanpa teks tambahan.',
         prompt,
-        8000
+        8000,
+        apiKey
       )
       console.log('[onsite/gabungan] raw (200):', aiResp.slice(0, 200))
 

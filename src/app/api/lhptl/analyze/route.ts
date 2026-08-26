@@ -39,8 +39,9 @@ export async function POST(req: NextRequest) {
   if (sessionErr || !session) return NextResponse.json({ error: 'Gagal membuat session' }, { status: 500 })
   const sessionId = session.id
 
+  const apiKey = user.api_key ?? ''
   after(async () => {
-    await runLhptlAnalysis(sessionId, pathLapkeu, pathGcg, pathLapkeuPrev, namaEntitas, jenisEntitas, periode).catch(err => {
+    await runLhptlAnalysis(sessionId, pathLapkeu, pathGcg, pathLapkeuPrev, namaEntitas, jenisEntitas, periode, apiKey).catch(err => {
       console.error(`[LHPTL ${sessionId}] Background job error:`, err)
     })
   })
@@ -66,7 +67,8 @@ async function runLhptlAnalysis(
   pathLapkeuPrev: string,
   namaEntitas: string,
   jenisEntitas: 'pialang_asuransi' | 'pialang_reasuransi',
-  periode: string
+  periode: string,
+  apiKey = ''
 ) {
   const paths = [pathLapkeu, pathGcg, pathLapkeuPrev]
 
@@ -81,7 +83,7 @@ async function runLhptlAnalysis(
     const extracted = parseLhptlExcel(bufLk, bufTk, bufLkPrev, namaEntitas, jenisEntitas, periode)
 
     // Rules + AI kesimpulan
-    const { hasil, kesimpulan, tindak_lanjut } = await analisisLhptl(extracted)
+    const { hasil, kesimpulan, tindak_lanjut } = await analisisLhptl(extracted, apiKey)
 
     const ringkasan = {
       total: hasil.length,

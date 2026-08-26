@@ -214,7 +214,7 @@ f.      [rekomendasi f]
 PENTING: Jangan gunakan tanda ## atau ** atau tanda markdown lain. Gunakan hanya penomoran 1. / a. / b. persis seperti format di atas. Setiap subseksi harus menyebutkan angka konkret dari data yang diberikan.`
 }
 
-async function doAnalyze(sessionId: string) {
+async function doAnalyze(sessionId: string, apiKey = '') {
   try {
     const { data: sess } = await db()
       .from('psak_session')
@@ -229,7 +229,8 @@ async function doAnalyze(sessionId: string) {
     const text = await callOpenRouter(
       'Kamu adalah pengawas OJK senior ahli PSAK 117 dan PSAK 109. Tulis analisis komprehensif dalam bahasa Indonesia formal.',
       prompt,
-      16000
+      16000,
+      apiKey
     )
 
     await db()
@@ -277,7 +278,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     .update({ status: 'analyzing', updated_at: new Date().toISOString() })
     .eq('id', id)
 
-  after(() => doAnalyze(id))
+  const apiKey = user.api_key ?? ''
+  after(() => doAnalyze(id, apiKey))
 
   return NextResponse.json({ ok: true, analyzing: true })
 }

@@ -23,10 +23,25 @@ async function extractText(buf: Buffer, filename: string): Promise<string> {
     const mammoth = await import('mammoth')
     return (await mammoth.extractRawText({ buffer: buf })).value
   }
+  if (ext === 'xlsx' || ext === 'xls') {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const XLSX = require('xlsx')
+    const wb = XLSX.read(buf, { type: 'buffer' })
+    return wb.SheetNames
+      .map((name: string) => {
+        const ws = wb.Sheets[name]
+        return `=== Sheet: ${name} ===\n` + XLSX.utils.sheet_to_csv(ws)
+      })
+      .join('\n\n')
+      .slice(0, 50000)
+  }
+  if (ext === 'csv') {
+    return buf.toString('utf-8').slice(0, 50000)
+  }
   return buf.toString('utf-8').slice(0, 50000)
 }
 
-async function runAnalysis(dokId: string, kode: string, departemen: string, fokus: string, teks: string, namaFile: string, jenisUsaha = '') {
+async function runAnalysis(dokId: string, kode: string, departemen: string, fokus: string, teks: string, namaFile: string, jenisUsaha = '', apiKey = '') {
   try {
     const pojkRef = await searchRelevantPojk(`${departemen} pemeriksaan asuransi ${fokus}`, 10, jenisUsaha)
     const instruksi = fokus ? `Fokus khusus dari pengawas: ${fokus}` : 'Lakukan analisis menyeluruh atas dokumen ini.'
@@ -86,7 +101,8 @@ Balas HANYA dengan JSON (tanpa teks lain, tanpa markdown):
     const aiResp = await callOpenRouter(
       'Anda adalah pengawas OJK senior. Balas HANYA dengan JSON valid tanpa markdown, tanpa teks tambahan.',
       prompt,
-      6000
+      6000,
+      apiKey
     )
     console.log('[onsite/dokumen] raw (200):', aiResp.slice(0, 200))
 
@@ -166,8 +182,9 @@ export async function POST(req: NextRequest) {
   }
 
   // Proses AI di background — respons langsung kembali
+  const apiKey = user.api_key ?? ''
   after(async () => {
-    await runAnalysis(dokRec.id, kode, departemen, fokus, teks, file.name, jenisUsaha)
+    await runAnalysis(dokRec.id, kode, departemen, fokus, teks, file.name, jenisUsaha, apiKey)
   })
 
   return NextResponse.json({ id: dokRec.id, analyzing: true })
