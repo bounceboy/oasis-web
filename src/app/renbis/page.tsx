@@ -325,7 +325,7 @@ export default function RenbisPage() {
                       <tr key={i}>
                         <td className="col-no">{row.no}</td>
                         <td className="col-ket">{row.keterangan}</td>
-                        <td>{row.isian}</td>
+                        <td>{row.isian || <span style={{ color: '#828d96', fontStyle: 'italic' }}>diisi manual oleh pengawas</span>}</td>
                       </tr>
                     ))}
                   </tbody>

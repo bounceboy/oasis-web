@@ -68,8 +68,16 @@ export const KK_TEMPLATE: Omit<KkRow, 'isian'>[] = [
   // Bagian 3 — Analisis
   { no: '3', hal: 'Tingkat Kesehatan Tahun Sebelumnya', keterangan: 'Catatan pengawas mengenai kondisi kesehatan perusahaan' },
   { no: '4', hal: 'Analisis Rencana Bisnis', keterangan: 'Analisis pengawas mengenai kewajaran Rencana Bisnis (target, asumsi, proyeksi keuangan, strategi)' },
-  { no: '5', hal: 'Kesimpulan', keterangan: 'Kesimpulan pengawas: penyampaian tepat/tidak tepat waktu; cakupan lengkap/tidak lengkap; kewajaran rencana bisnis' },
+  { no: '5', hal: 'Kesimpulan', keterangan: 'Kesimpulan pengawas: penyampaian tepat/tidak tepat waktu (diisi manual); cakupan lengkap/tidak lengkap; kewajaran rencana bisnis' },
 ]
+
+// Bagian administratif penyampaian (nomor/tanggal surat, ketepatan waktu, surat OJK, frekuensi, media) diisi MANUAL
+// oleh pengawas: datanya ada di surat pengantar/sistem, bukan di dokumen Rencana Bisnis. AI hanya menganalisis isi.
+export const BARIS_MANUAL = [0, 1, 2, 3, 4, 5, 6]
+
+// Batas teks yang dikirim ke AI. Terukur 3,16 karakter/token; 400 ribu karakter ≈ 127 ribu token dari konteks 200 ribu.
+// Di atas batas ini dokumen DITOLAK dengan pesan jelas — tidak pernah dipotong diam-diam.
+export const BATAS_TEKS = 400_000
 
 // ─── Step 1: AI ekstrak & isi KK ────────────────────────────────────────────
 
@@ -81,11 +89,18 @@ export async function isiKkRenbis(
   apiKey = ''
 ): Promise<{ kk_rows: KkRow[]; analisis: string; kesimpulan: string }> {
 
-  const templateJson = KK_TEMPLATE.map((r, i) => ({
-    index: i,
-    hal: r.hal,
-    keterangan: r.keterangan,
-  }))
+  if (teksRenbis.length > BATAS_TEKS) {
+    throw new Error(
+      `Dokumen terlalu panjang untuk dibaca utuh: ${teksRenbis.length.toLocaleString('id-ID')} karakter ` +
+      `(batas ${BATAS_TEKS.toLocaleString('id-ID')}). Dokumen tidak dipotong agar tidak ada bagian yang terlewat — ` +
+      `pecah menjadi beberapa berkas atau hubungi administrator.`
+    )
+  }
+
+  // Baris administratif tidak dikirim ke AI; diisi manual oleh pengawas.
+  const templateJson = KK_TEMPLATE
+    .map((r, i) => ({ index: i, hal: r.hal, keterangan: r.keterangan }))
+    .filter((r) => !BARIS_MANUAL.includes(r.index))
 
   const system = `Anda adalah pengawas OJK yang mengisi Kertas Kerja (KK) Evaluasi Rencana Bisnis perusahaan asuransi.
 Tugas: isi kolom "isian" untuk setiap baris KK berdasarkan isi dokumen Rencana Bisnis yang diberikan.
@@ -97,15 +112,15 @@ BATASAN KETAT — WAJIB DIPATUHI:
 - HANYA gunakan informasi yang SECARA EKSPLISIT ADA dalam teks Rencana Bisnis yang diberikan.
 - Jika informasi tidak ditemukan dalam dokumen, isi dengan "Tidak ditemukan dalam dokumen".
 - DILARANG KERAS menyebut pasal, ketentuan, atau angka yang tidak ada dalam REFERENSI POJK di atas.
-- Untuk baris "Tanggal surat Perusahaan": isi HANYA bila tanggal SURAT PENGANTAR tercantum. Bila yang ada hanya tanggal persetujuan Dewan Komisaris atau tanggal penetapan dokumen, tulis "Tanggal surat tidak tercantum; dokumen disetujui Dewan Komisaris tanggal …" — jangan menyebut tanggal persetujuan sebagai tanggal surat.
+- Nomor/tanggal surat, ketepatan waktu penyampaian, surat OJK, frekuensi, dan media penyampaian DIISI MANUAL oleh pengawas dan TIDAK ada di template ini. JANGAN menilai tepat/tidaknya waktu penyampaian, JANGAN menyebut sanksi keterlambatan, dan JANGAN menuliskan nomor atau tanggal surat. Tanggal persetujuan Dewan Komisaris boleh disebut sebagai fakta bila tercantum, tanpa menyimpulkan apa pun tentang ketepatan waktu.
 - Untuk baris checklist (Ada/Tidak Ada): jawab "Ada" jika bagian tersebut ditemukan, "Tidak Ada" jika tidak ditemukan. Sertakan 1-2 kalimat ringkas isinya jika Ada.
 - Untuk baris analisis (no 4): analisis kewajaran target, asumsi, dan proyeksi secara objektif berdasarkan isi dokumen saja.
-- Untuk baris kesimpulan (no 5): simpulkan penyampaian, kelengkapan, dan kewajaran.`
+- Untuk baris kesimpulan (no 5): tulis tiga butir bernomor — (1) PENYAMPAIAN: tulis persis "[diisi manual oleh pengawas]"; (2) KELENGKAPAN: simpulkan cakupan lengkap/tidak lengkap; (3) KEWAJARAN: simpulkan kewajaran rencana bisnis.`
 
   const user = `Perusahaan: ${namaPerusahaan}, Tahun Rencana Bisnis: ${tahun}
 
 TEKS RENCANA BISNIS:
-${teksRenbis.slice(0, 300000)}
+${teksRenbis}
 
 TEMPLATE KK (isi field "isian" untuk setiap baris):
 ${JSON.stringify(templateJson, null, 2)}
@@ -119,7 +134,7 @@ Output HARUS berupa JSON valid:
   ]
 }`
 
-  const raw = await callOpenRouter(system, user, 8000, apiKey)
+  const raw = await callOpenRouter(system, user, 16000, apiKey)
   const greedyMatch = raw.match(/\{[\s\S]*\}/)
   const jsonStr = greedyMatch ? greedyMatch[0] : raw.match(/\{[\s\S]*/)?.at(0)
   if (!jsonStr) throw new Error('AI tidak mengembalikan JSON untuk KK Renbis')
@@ -137,7 +152,7 @@ Output HARUS berupa JSON valid:
 
   const kk_rows: KkRow[] = KK_TEMPLATE.map((tmpl, i) => ({
     ...tmpl,
-    isian: isianMap.get(i) ?? 'Tidak ditemukan dalam dokumen',
+    isian: BARIS_MANUAL.includes(i) ? '' : isianMap.get(i) ?? 'Tidak ditemukan dalam dokumen',
   }))
 
   // Ambil analisis dan kesimpulan dari baris terakhir
