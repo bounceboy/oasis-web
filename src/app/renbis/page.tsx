@@ -418,10 +418,6 @@ export default function RenbisPage() {
                 {saveState === 'saved' && (
                   <span style={{ alignSelf: 'center', fontSize: '0.85rem', color: '#86efac' }}>✓ Tersimpan</span>
                 )}
-                <button className="btn btn-success" onClick={handleDownload} disabled={unduhing}>{unduhing ? 'Menyiapkan…' : '⬇ Unduh KK Renbis (.docx)'}</button>
-                {unduhPesan && (
-                  <span style={{ alignSelf: 'center', fontSize: '0.85rem', color: unduhPesan.startsWith('✓') ? '#86efac' : '#ff6f61' }}>{unduhPesan}</span>
-                )}
               </div>
             </div>
           </div>
