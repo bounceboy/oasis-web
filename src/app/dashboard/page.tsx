@@ -7,6 +7,7 @@ export default async function DashboardPage() {
   if (!user) redirect('/login')
 
   const isAdmin = user.role === 'admin'
+  const tanpaOffsite = ['DPDP', 'PENJAMINAN'].includes(user.direktorat_id ?? '')
   const firstName = (user.nama_lengkap || user.username).split(' ')[0]
 
   const offsiteModules = [
@@ -44,22 +45,24 @@ export default async function DashboardPage() {
           </HoverCard>
         </div>
 
-        {/* Offsite modules */}
-        <div style={{ marginBottom: 44 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#828d96', marginBottom: 14 }}>Pengawasan Offsite</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-            {offsiteModules.map(m => (
-              <HoverCard key={m.href} href={m.href}>
-                <div style={{ fontSize: 15, fontWeight: 500, color: '#eef2ef', marginBottom: 6 }}>
-                  <span style={{ color: '#45e661' }}>{m.label.split(' ')[0]}</span>
-                  {m.label.includes(' ') ? ' ' + m.label.split(' ').slice(1).join(' ') : ''}
-                </div>
-                <div style={{ fontSize: 11.5, color: '#aab4bc', lineHeight: 1.6 }}>{m.sub}</div>
-                <div style={{ marginTop: 16, color: '#45e661', fontSize: 13 }}>↗</div>
-              </HoverCard>
-            ))}
+        {/* Offsite modules — Dapen & Penjaminan belum punya modul offsite; modul yang tidak relevan tidak ditampilkan (KP-10) */}
+        {!tanpaOffsite && (
+          <div style={{ marginBottom: 44 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#828d96', marginBottom: 14 }}>Pengawasan Offsite</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+              {offsiteModules.map(m => (
+                <HoverCard key={m.href} href={m.href}>
+                  <div style={{ fontSize: 15, fontWeight: 500, color: '#eef2ef', marginBottom: 6 }}>
+                    <span style={{ color: '#45e661' }}>{m.label.split(' ')[0]}</span>
+                    {m.label.includes(' ') ? ' ' + m.label.split(' ').slice(1).join(' ') : ''}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#aab4bc', lineHeight: 1.6 }}>{m.sub}</div>
+                  <div style={{ marginTop: 16, color: '#45e661', fontSize: 13 }}>↗</div>
+                </HoverCard>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Tools */}
         <div style={{ marginBottom: 44 }}>
