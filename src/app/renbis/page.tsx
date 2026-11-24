@@ -39,6 +39,8 @@ export default function RenbisPage() {
   const [riwayat, setRiwayat] = useState<RiwayatItem[]>([])
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [pollingId, setPollingId] = useState<string | null>(null)
+  const [unduhing, setUnduhing] = useState(false)
+  const [unduhPesan, setUnduhPesan] = useState<string | null>(null)
 
   const { data: pollingData } = useSessionPolling(pollingId, (data) => {
     const id = pollingId
@@ -137,9 +139,39 @@ export default function RenbisPage() {
     }
   }
 
-  function handleDownload() {
-    if (!result?.sessionId) return
-    window.open(`/api/renbis/download/${result.sessionId}`, '_blank')
+  // Unduh lewat fetch → blob → <a download>. window.open('_blank') untuk berkas lampiran sering diblokir sebagai popup
+  // (atau tidak memberi tanda apa pun) di Edge/Chrome, dan tidak menampilkan galat bila server menolak.
+  async function handleDownload() {
+    if (unduhing) return
+    if (!result?.sessionId) {
+      setUnduhPesan('Sesi belum tersedia. Muat ulang halaman lalu buka hasil dari Riwayat Analisis.')
+      return
+    }
+    setUnduhing(true)
+    setUnduhPesan(null)
+    try {
+      const res = await fetch(`/api/renbis/download/${result.sessionId}`)
+      if (!res.ok) {
+        const j = await res.json().catch(() => null)
+        throw new Error(j?.error ?? `Server menolak permintaan (${res.status})`)
+      }
+      const blob = await res.blob()
+      const cd = res.headers.get('content-disposition') ?? ''
+      const nama = /filename="?([^";]+)"?/.exec(cd)?.[1] ?? `KK_Renbis_${result.tahun}.docx`
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = nama
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
+      setUnduhPesan(`✓ ${nama} diunduh — cek folder Downloads.`)
+    } catch (e) {
+      setUnduhPesan(`Gagal mengunduh: ${e instanceof Error ? e.message : 'kesalahan tidak diketahui'}`)
+    } finally {
+      setUnduhing(false)
+    }
   }
 
   // Kelompok baris KK untuk tampilan
@@ -305,7 +337,10 @@ export default function RenbisPage() {
                   <div className="hasil-meta">Tahun {result.tahun}</div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button className="btn btn-success" onClick={handleDownload}>⬇ Unduh .docx</button>
+                  <button className="btn btn-success" onClick={handleDownload} disabled={unduhing}>{unduhing ? 'Menyiapkan…' : '⬇ Unduh .docx'}</button>
+                  {unduhPesan && (
+                    <span style={{ alignSelf: 'center', fontSize: '0.8rem', color: unduhPesan.startsWith('✓') ? '#86efac' : '#ff6f61' }}>{unduhPesan}</span>
+                  )}
                 </div>
               </div>
 
@@ -383,7 +418,10 @@ export default function RenbisPage() {
                 {saveState === 'saved' && (
                   <span style={{ alignSelf: 'center', fontSize: '0.85rem', color: '#86efac' }}>✓ Tersimpan</span>
                 )}
-                <button className="btn btn-success" onClick={handleDownload}>⬇ Unduh KK Renbis (.docx)</button>
+                <button className="btn btn-success" onClick={handleDownload} disabled={unduhing}>{unduhing ? 'Menyiapkan…' : '⬇ Unduh KK Renbis (.docx)'}</button>
+                {unduhPesan && (
+                  <span style={{ alignSelf: 'center', fontSize: '0.85rem', color: unduhPesan.startsWith('✓') ? '#86efac' : '#ff6f61' }}>{unduhPesan}</span>
+                )}
               </div>
             </div>
           </div>
