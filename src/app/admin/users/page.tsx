@@ -8,6 +8,8 @@ const DIREKTORAT_INFO = [
   { kode: 'DAJI', label: 'Asuransi Jiwa', role: 'User' },
   { kode: 'DASR', label: 'Asuransi Umum', role: 'User' },
   { kode: 'DPJP', label: 'Jasa Penunjang', role: 'User' },
+  { kode: 'DPDP', label: 'Dana Pensiun', role: 'User' },
+  { kode: 'PENJAMINAN', label: 'Pengawasan Penjaminan', role: 'User' },
 ]
 
 export default async function AdminUsersPage() {

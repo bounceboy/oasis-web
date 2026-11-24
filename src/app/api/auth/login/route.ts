@@ -8,6 +8,8 @@ const DIREKTORAT_USERNAME: Record<string, string> = {
   DAJI: 'daji',
   DASR: 'dasr',
   DPJP: 'dpjp',
+  DPDP: 'dpdp',
+  PENJAMINAN: 'penjaminan',
 }
 
 export async function POST(req: NextRequest) {

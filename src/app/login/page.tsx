@@ -7,6 +7,8 @@ const DIREKTORAT = [
   { kode: 'DAJI', label: 'DAJI — Asuransi Jiwa' },
   { kode: 'DASR', label: 'DASR — Asuransi Umum' },
   { kode: 'DPJP', label: 'DPJP — Jasa Penunjang' },
+  { kode: 'DPDP', label: 'DPDP — Dana Pensiun' },
+  { kode: 'PENJAMINAN', label: 'Pengawasan Penjaminan' },
 ]
 
 const LS_KEY = (kode: string) => `oasis_apikeys_${kode}`
