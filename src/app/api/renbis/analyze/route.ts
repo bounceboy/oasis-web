@@ -3,7 +3,7 @@ import { NextRequest, NextResponse, after } from 'next/server'
 export const maxDuration = 300 // 5 menit — AI analysis butuh waktu
 import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { searchRelevantPojk } from '@/lib/pojk-search'
+import { searchReferensiRenbis } from '@/lib/pojk-search'
 import { isiKkRenbis } from '@/lib/renbis'
 import { extractPdfPages } from '@/lib/pdf-chunker'
 
@@ -70,7 +70,7 @@ async function runRenbisAnalysis(
     const teks = pages.map((p) => p.text).join('\n\n')
 
     // 2. Ambil konteks POJK Renbis
-    const pojkContext = await searchRelevantPojk('rencana bisnis perusahaan asuransi penyampaian', 10)
+    const pojkContext = await searchReferensiRenbis(namaEntitas)
 
     // 3. AI isi KK
     const { kk_rows, analisis, kesimpulan } = await isiKkRenbis(teks, namaEntitas, tahun, pojkContext, apiKey)
