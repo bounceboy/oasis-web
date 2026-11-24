@@ -10,6 +10,8 @@ type OnsiteSession = {
 const JENIS_USAHA = [
   'Asuransi Jiwa', 'Asuransi Jiwa Syariah', 'Asuransi Umum',
   'Asuransi Umum Syariah', 'Reasuransi', 'Reasuransi Syariah', 'Pialang Asuransi',
+  'Dana Pensiun Pemberi Kerja', 'Dana Pensiun Lembaga Keuangan',
+  'Perusahaan Penjaminan', 'Perusahaan Penjaminan Syariah',
 ]
 
 export default function AdminSessionsPage() {
