@@ -18,7 +18,7 @@ export default function Navbar({ userName, userRole, showAdmin, simple }: Navbar
 
   const isDashboard = pathname === '/dashboard'
   const isOnsite = pathname.startsWith('/pemeriksaan')
-  const isOffsite = ['/psak117', '/lhptl', '/kyic', '/renbis'].some(p => pathname.startsWith(p))
+  const isOffsite = ['/psak117', '/lhptl', '/kyic', '/renbis', '/lapbul'].some(p => pathname.startsWith(p))
   const isAdmin = pathname.startsWith('/admin')
 
   const navBtn = (active: boolean) => ({
