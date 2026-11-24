@@ -97,6 +97,7 @@ BATASAN KETAT — WAJIB DIPATUHI:
 - HANYA gunakan informasi yang SECARA EKSPLISIT ADA dalam teks Rencana Bisnis yang diberikan.
 - Jika informasi tidak ditemukan dalam dokumen, isi dengan "Tidak ditemukan dalam dokumen".
 - DILARANG KERAS menyebut pasal, ketentuan, atau angka yang tidak ada dalam REFERENSI POJK di atas.
+- Untuk baris "Tanggal surat Perusahaan": isi HANYA bila tanggal SURAT PENGANTAR tercantum. Bila yang ada hanya tanggal persetujuan Dewan Komisaris atau tanggal penetapan dokumen, tulis "Tanggal surat tidak tercantum; dokumen disetujui Dewan Komisaris tanggal …" — jangan menyebut tanggal persetujuan sebagai tanggal surat.
 - Untuk baris checklist (Ada/Tidak Ada): jawab "Ada" jika bagian tersebut ditemukan, "Tidak Ada" jika tidak ditemukan. Sertakan 1-2 kalimat ringkas isinya jika Ada.
 - Untuk baris analisis (no 4): analisis kewajaran target, asumsi, dan proyeksi secara objektif berdasarkan isi dokumen saja.
 - Untuk baris kesimpulan (no 5): simpulkan penyampaian, kelengkapan, dan kewajaran.`
@@ -104,7 +105,7 @@ BATASAN KETAT — WAJIB DIPATUHI:
   const user = `Perusahaan: ${namaPerusahaan}, Tahun Rencana Bisnis: ${tahun}
 
 TEKS RENCANA BISNIS:
-${teksRenbis.slice(0, 120000)}
+${teksRenbis.slice(0, 300000)}
 
 TEMPLATE KK (isi field "isian" untuk setiap baris):
 ${JSON.stringify(templateJson, null, 2)}
@@ -172,9 +173,12 @@ export async function generateRenbisDocx(
 ): Promise<Buffer> {
   const {
     Document, Packer, Table, TableRow, TableCell, Paragraph, TextRun,
-    WidthType, BorderStyle, AlignmentType, HeadingLevel,
+    WidthType, BorderStyle, AlignmentType, HeadingLevel, TableLayoutType,
   } = await import('docx')
 
+  // Lebar kolom TETAP dalam DXA: lebar persentase tanpa columnWidths membuat kolom menyempit di Word/LibreOffice/Google Docs.
+  const KOLOM = [600, 2000, 2300, 4126]
+  const LEBAR_TABEL = KOLOM.reduce((a, b) => a + b, 0)
   const border = { style: BorderStyle.SINGLE, size: 1, color: '000000' }
   const allBorders = { top: border, bottom: border, left: border, right: border }
 
@@ -196,10 +200,10 @@ export async function generateRenbisDocx(
   const headerRow = new TableRow({
     tableHeader: true,
     children: [
-      cell('No.', true, 500, 'D9D9D9'),
-      cell('Hal', true, 3000, 'D9D9D9'),
-      cell('Keterangan', true, 4000, 'D9D9D9'),
-      cell('Isian', true, 4000, 'D9D9D9'),
+      cell('No.', true, KOLOM[0], 'D9D9D9'),
+      cell('Hal', true, KOLOM[1], 'D9D9D9'),
+      cell('Keterangan', true, KOLOM[2], 'D9D9D9'),
+      cell('Isian', true, KOLOM[3], 'D9D9D9'),
     ],
   })
 
@@ -208,16 +212,18 @@ export async function generateRenbisDocx(
     const bg = isSectionHeader ? 'EBF3FB' : undefined
     return new TableRow({
       children: [
-        cell(row.no, isSectionHeader, 500, bg),
-        cell(row.hal, isSectionHeader, 3000, bg),
-        cell(row.keterangan, false, 4000, bg),
-        cell(row.isian, false, 4000),
+        cell(row.no, isSectionHeader, KOLOM[0], bg),
+        cell(row.hal, isSectionHeader, KOLOM[1], bg),
+        cell(row.keterangan, false, KOLOM[2], bg),
+        cell(row.isian, false, KOLOM[3]),
       ],
     })
   })
 
   const table = new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
+    width: { size: LEBAR_TABEL, type: WidthType.DXA },
+    columnWidths: KOLOM,
+    layout: TableLayoutType.FIXED,
     rows: [headerRow, ...dataRows],
   })
 
@@ -244,16 +250,18 @@ export async function generateRenbisDocx(
         new Paragraph({ text: '', spacing: { before: 400 } }),
         // TTD section
         new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
+          width: { size: LEBAR_TABEL, type: WidthType.DXA },
+          columnWidths: [2256, 2256, 2256, 2258],
+          layout: TableLayoutType.FIXED,
           rows: [
             new TableRow({
               children: ['Nama', 'Jabatan', 'Paraf', 'Tanggal'].map((h) =>
-                new TableCell({ borders: allBorders, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 20, font: 'Arial' })] })] })
+                new TableCell({ borders: allBorders, width: { size: 2256, type: WidthType.DXA }, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 20, font: 'Arial' })] })] })
               ),
             }),
             ...Array(3).fill(null).map(() => new TableRow({
               children: Array(4).fill(null).map(() =>
-                new TableCell({ borders: allBorders, children: [new Paragraph({ children: [new TextRun({ text: '', size: 20 })] })] })
+                new TableCell({ borders: allBorders, width: { size: 2256, type: WidthType.DXA }, children: [new Paragraph({ children: [new TextRun({ text: '', size: 20 })] })] })
               ),
             })),
           ],
