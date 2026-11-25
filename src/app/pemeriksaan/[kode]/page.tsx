@@ -539,6 +539,13 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
     await onRefresh()
   }
 
+  async function hapusTemuan(id: string, judul: string) {
+    if (!confirm(`Hapus temuan "${judul}"? Temuan yang dihapus tidak dapat dikembalikan.`)) return
+    const res = await fetch(`/api/onsite/temuan/${id}`, { method: 'DELETE' }).catch(() => null)
+    if (!res?.ok) { alert('Gagal menghapus temuan.'); return }
+    await onRefresh()
+  }
+
   async function saveCatatan(id: string) {
     setSavingCatatan(id)
     await fetch(`/api/onsite/temuan/${id}`, {
@@ -693,12 +700,18 @@ function TabTemuan({ items, onRefresh }: { items: Temuan[]; onRefresh: () => voi
                       </div>
                     )}
                     {t.status === 'dikonfirmasi' && (
-                      <span style={{ fontSize: 11, color: '#45e661' }}>✓ Dikonfirmasi</span>
+                      <>
+                        <span style={{ fontSize: 11, color: '#45e661' }}>✓ Dikonfirmasi</span>
+                        <button onClick={() => updateStatus(t.id, 'draft')} title="Kembalikan temuan ke status draft"
+                          style={{ fontSize: 11, padding: '5px 12px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#eef2ef', border: '1px solid rgba(255,255,255,0.14)', cursor: 'pointer', fontFamily: 'inherit' }}>↩ Batalkan konfirmasi</button>
+                      </>
                     )}
                     {t.status === 'di_drop' && (
                       <button onClick={() => updateStatus(t.id, 'draft')}
                         style={{ fontSize: 11, color: '#828d96', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Batalkan drop</button>
                     )}
+                    <button onClick={() => hapusTemuan(t.id, t.judul)}
+                      style={{ fontSize: 11, padding: '5px 12px', borderRadius: 999, background: 'rgba(255,111,97,0.08)', color: '#ff8b80', border: '1px solid rgba(255,111,97,0.35)', cursor: 'pointer', fontFamily: 'inherit' }}>🗑 Hapus</button>
                   </div>
                 </div>
               </div>
