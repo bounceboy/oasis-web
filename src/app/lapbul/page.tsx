@@ -237,7 +237,7 @@ export default function LapbulPage() {
         <Navbar simple />
         <div style={{ marginBottom: 26, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <div className="title"><span>Lapbul Penjaminan</span> — analisis kesesuaian ketentuan</div>
+            <div className="title"><span>Cadangan Klaim</span> — analisis lapbul penjaminan</div>
             <div className="subtitle">Unggah laporan bulanan APOLO (LBPPNJK). Angka dibaca langsung dari kode komponen, diuji terhadap POJK 11/2025, dicek konsistensinya antar lembar, dan setiap angka dapat ditelusuri ke sel asalnya.</div>
           </div>
           {main && <button className="btn btn-outline" onClick={reset}>+ Analisis baru</button>}

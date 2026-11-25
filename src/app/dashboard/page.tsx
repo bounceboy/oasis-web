@@ -8,14 +8,18 @@ export default async function DashboardPage() {
 
   const isAdmin = user.role === 'admin'
   const tanpaOffsite = ['DPDP', 'PENJAMINAN'].includes(user.direktorat_id ?? '')
-  const lihatPenjaminan = isAdmin || user.direktorat_id === 'PENJAMINAN'
   const firstName = (user.nama_lengkap || user.username).split(' ')[0]
 
+  // Dapen & Penjaminan hanya melihat modul sektornya; modul yang tidak relevan tidak ditampilkan (KP-10)
+  const cadanganKlaim = { href: '/lapbul', label: 'Cadangan Klaim', sub: 'Analisis Cadangan Klaim Penjaminan' }
   const offsiteModules = [
-    { href: '/psak',    label: 'PSAK',         sub: 'Analisis LK PSAK 117 & 109' },
-    { href: '/lhptl',   label: 'LHPTL',       sub: 'Pengawasan Tidak Langsung Pialang' },
-    { href: '/kyic',    label: 'KYIC/KYNBFI', sub: 'Know Your Insurance Company' },
-    { href: '/renbis',  label: 'Renbis',       sub: 'Evaluasi Rencana Bisnis Tahunan' },
+    ...(tanpaOffsite ? [] : [
+      { href: '/psak',    label: 'PSAK',         sub: 'Analisis LK PSAK 117 & 109' },
+      { href: '/lhptl',   label: 'LHPTL',       sub: 'Pengawasan Tidak Langsung Pialang' },
+      { href: '/kyic',    label: 'KYIC/KYNBFI', sub: 'Know Your Insurance Company' },
+      { href: '/renbis',  label: 'Renbis',       sub: 'Evaluasi Rencana Bisnis Tahunan' },
+    ]),
+    ...(isAdmin || user.direktorat_id === 'PENJAMINAN' ? [cadanganKlaim] : []),
   ]
 
   return (
@@ -46,37 +50,20 @@ export default async function DashboardPage() {
           </HoverCard>
         </div>
 
-        {/* Offsite modules — Dapen & Penjaminan belum punya modul offsite; modul yang tidak relevan tidak ditampilkan (KP-10) */}
-        {!tanpaOffsite && (
+        {/* Offsite modules */}
+        {offsiteModules.length > 0 && (
           <div style={{ marginBottom: 44 }}>
             <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#828d96', marginBottom: 14 }}>Pengawasan Offsite</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(4, offsiteModules.length)}, 1fr)`, gap: 16 }}>
               {offsiteModules.map(m => (
                 <HoverCard key={m.href} href={m.href}>
                   <div style={{ fontSize: 15, fontWeight: 500, color: '#eef2ef', marginBottom: 6 }}>
-                    <span style={{ color: '#45e661' }}>{m.label.split(' ')[0]}</span>
-                    {m.label.includes(' ') ? ' ' + m.label.split(' ').slice(1).join(' ') : ''}
+                    <span style={{ color: '#45e661' }}>{m.label}</span>
                   </div>
                   <div style={{ fontSize: 11.5, color: '#aab4bc', lineHeight: 1.6 }}>{m.sub}</div>
                   <div style={{ marginTop: 16, color: '#45e661', fontSize: 13 }}>↗</div>
                 </HoverCard>
               ))}
-            </div>
-          </div>
-        )}
-
-        {/* Offsite penjaminan */}
-        {lihatPenjaminan && (
-          <div style={{ marginBottom: 44 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#828d96', marginBottom: 14 }}>Pengawasan Offsite · Penjaminan</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-              <HoverCard href="/lapbul">
-                <div style={{ fontSize: 15, fontWeight: 500, color: '#eef2ef', marginBottom: 6 }}>
-                  <span style={{ color: '#45e661' }}>Lapbul</span> Penjaminan
-                </div>
-                <div style={{ fontSize: 11.5, color: '#aab4bc', lineHeight: 1.6 }}>Uji kesesuaian POJK 11/2025, anomali antar lembar, dan hitung ulang cadangan klaim</div>
-                <div style={{ marginTop: 16, color: '#45e661', fontSize: 13 }}>↗</div>
-              </HoverCard>
             </div>
           </div>
         )}
