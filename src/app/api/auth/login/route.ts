@@ -10,6 +10,7 @@ const DIREKTORAT_USERNAME: Record<string, string> = {
   DPJP: 'dpjp',
   DPDP: 'dpdp',
   PENJAMINAN: 'penjaminan',
+  DEMO: 'demo',
 }
 
 export async function POST(req: NextRequest) {

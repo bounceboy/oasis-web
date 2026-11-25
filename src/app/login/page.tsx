@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 
 const DIREKTORAT = [
+  { kode: 'DEMO', label: 'DEMO — Akun Demonstrasi' },
   { kode: 'DPSS', label: 'DPSS — Asuransi & Reasuransi Syariah' },
   { kode: 'DAJI', label: 'DAJI — Asuransi Jiwa' },
   { kode: 'DASR', label: 'DASR — Asuransi Umum' },

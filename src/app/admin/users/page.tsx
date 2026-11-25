@@ -10,6 +10,7 @@ const DIREKTORAT_INFO = [
   { kode: 'DPJP', label: 'Jasa Penunjang', role: 'User' },
   { kode: 'DPDP', label: 'Dana Pensiun', role: 'User' },
   { kode: 'PENJAMINAN', label: 'Pengawasan Penjaminan', role: 'User' },
+  { kode: 'DEMO', label: 'Akun Demonstrasi', role: 'User' },
 ]
 
 export default async function AdminUsersPage() {

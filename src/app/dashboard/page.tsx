@@ -19,7 +19,7 @@ export default async function DashboardPage() {
       { href: '/kyic',    label: 'KYIC/KYNBFI', sub: 'Know Your Insurance Company' },
       { href: '/renbis',  label: 'Renbis',       sub: 'Evaluasi Rencana Bisnis Tahunan' },
     ]),
-    ...(isAdmin || user.direktorat_id === 'PENJAMINAN' ? [cadanganKlaim] : []),
+    ...(isAdmin || ['PENJAMINAN', 'DEMO'].includes(user.direktorat_id ?? '') ? [cadanganKlaim] : []),
   ]
 
   return (
