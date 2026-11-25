@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   const nama = String(body?.namaEntitas ?? '').trim()
   if (!nama || !body?.main?.sheets || !body?.params) return NextResponse.json({ error: 'Data analisis tidak lengkap' }, { status: 400 })
 
-  const hasil = { main: body.main, prior: Array.isArray(body.prior) ? body.prior : [], params: body.params, ringkasan: body.ringkasan ?? null }
+  const hasil = { main: body.main, prior: Array.isArray(body.prior) ? body.prior : [], params: body.params, ringkasan: body.ringkasan ?? null, ai: body.ai ?? null }
   const id = typeof body.id === 'string' ? body.id : null
   if (id) {
     let q = db().from('offsite_sessions').update({ nama_entitas: nama, hasil, updated_at: new Date().toISOString() }).eq('id', id).eq('modul', 'lapbul')

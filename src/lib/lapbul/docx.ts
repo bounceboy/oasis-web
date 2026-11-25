@@ -7,6 +7,7 @@ import {
   ShadingType, Table, TableCell, TableLayoutType, TableRow, TextRun, WidthType,
 } from 'docx'
 import type { LapbulData } from './parse'
+import type { AiRecord } from './ai-shared'
 import { type Analysis, type Der, type Params, type Ref, LINGKUP, STAT, fmtVal, idn, refLabel, rpF, sheetTitle } from './engine'
 
 const FONT = 'Bookman Old Style'
@@ -60,9 +61,9 @@ function table(headers: string[], rows: Cellish[][], widths: number[], size = 8.
 }
 const stCell = (st: keyof typeof FILL, txt: string): Cellish => ({ t: txt, b: true, a: 'c', fill: FILL[st] })
 
-export interface ReportInput { L: LapbulData; A: Analysis; P: Params; namaEntitas: string; logo?: ArrayBuffer | Uint8Array | null; dibaca: string }
+export interface ReportInput { L: LapbulData; A: Analysis; P: Params; namaEntitas: string; logo?: ArrayBuffer | Uint8Array | null; dibaca: string; ai?: AiRecord | null }
 
-export function buildReportDoc({ L, A, P, namaEntitas, logo, dibaca }: ReportInput): Document {
+export function buildReportDoc({ L, A, P, namaEntitas, logo, dibaca, ai }: ReportInput): Document {
   const D = A.D
   const short = (r: Ref) => refLabel(r, D)
   // jejak sumber: kumpulkan seluruh referensi (rekursif untuk angka turunan)
@@ -97,7 +98,7 @@ export function buildReportDoc({ L, A, P, namaEntitas, logo, dibaca }: ReportInp
   body.push(para(namaEntitas, { size: 13, bold: true, align: 'c', after: 6 }))
   body.push(para(`Posisi laporan ${posisi}`, { size: 11, align: 'c', after: 2 }))
   body.push(para(`Lapbul dibaca ${dibaca}`, { size: 11, align: 'c', after: 26 }))
-  body.push(para('Draf analisis OASIS untuk diverifikasi pengawas. Seluruh angka dibaca langsung dari berkas lapbul dengan aturan tetap.', { size: 9.5, italic: true, align: 'c', after: 60 }))
+  body.push(para(ai ? 'Draf analisis OASIS untuk diverifikasi pengawas. Angka dan status dihitung dengan aturan tetap; bagian analisis AI adalah draf bantuan.' : 'Draf analisis OASIS untuk diverifikasi pengawas. Seluruh angka dibaca langsung dari berkas lapbul dengan aturan tetap.', { size: 9.5, italic: true, align: 'c', after: 60 }))
   body.push(para('[Nama Departemen Pengawasan]', { size: 11, align: 'c', hl: true, after: 2 }))
   body.push(para(String(new Date().getFullYear()), { size: 11, align: 'c' }))
   body.push(new Paragraph({ children: [new PageBreak()] }))
@@ -153,8 +154,25 @@ export function buildReportDoc({ L, A, P, namaEntitas, logo, dibaca }: ReportInp
     A.ratios.map(r => [r.nama, r.dilaporkan ? fmtVal(r.dilaporkan.v, r.unit) : '—', r.hitung, r.same === null ? '—' : r.same ? 'sama' : 'berbeda', r.dilaporkan ? `${r.dilaporkan.sheet} › ${r.dilaporkan.addr}` : '—']),
     [5.2, 2.6, 2.6, 2.0, 4.6], 8.5, [1, 2]))
 
-  // ---- VII ----
-  body.push(heading('VII. Keterbatasan data dan hal yang perlu dikonfirmasi'))
+  // ---- Analisis AI ----
+  if (ai) {
+    const h = ai.hasil
+    body.push(heading('VII. Analisis AI (draf, perlu diverifikasi)'))
+    body.push(para(`Disusun oleh model ${ai.model} dari hasil mesin aturan dan isi lembar lapbul. Angka dan status pada bagian I–VI tidak diubah AI. Dugaan penyebab adalah hipotesis.`, { size: 9, italic: true, align: 'j', after: 4 }))
+    if (ai.angkaPerluCek.length) body.push(para(`Angka pada teks AI yang tidak ditemukan persis di data dan perlu dicek: ${ai.angkaPerluCek.join('; ')}.`, { size: 9, hl: true, after: 4 }))
+    body.push(para(h.ringkasan, { size: 10, align: 'j', after: 6 }))
+    body.push(para('A. Temuan prioritas', { size: 10.5, bold: true, after: 3, keep: true }))
+    body.push(...table(['No', 'Temuan', 'Prioritas', 'Uraian'], h.temuan.map((t, i) => [String(i + 1), t.judul, { t: t.prioritas, a: 'c' as const }, t.uraian]), [0.9, 4.0, 1.9, 10.2], 8.5))
+    body.push(para('B. Anomali yang perlu didalami', { size: 10.5, bold: true, before: 4, after: 3, keep: true }))
+    body.push(...table(['No', 'Anomali', 'Pengamatan', 'Dugaan penyebab'], h.anomali.map((a, i) => [String(i + 1), a.judul, a.pengamatan, a.dugaan_penyebab.map(d => '• ' + d).join('\n')]), [0.9, 3.6, 6.5, 6.0], 8.5))
+    body.push(para('C. Pertanyaan konfirmasi kepada perusahaan', { size: 10.5, bold: true, before: 4, after: 3, keep: true }))
+    body.push(...table(['No', 'Pertanyaan', 'Data yang diminta'], h.pertanyaan.map((q, i) => [String(i + 1), q.pertanyaan, q.data_diminta]), [0.9, 9.6, 6.5], 8.5))
+    body.push(para('D. Saran tindak lanjut pengawasan', { size: 10.5, bold: true, before: 4, after: 3, keep: true }))
+    h.tindak_lanjut.forEach((x, i) => body.push(para(`${i + 1}. ${x.replace(/^\d+[.)]\s*/, '')}`, { size: 9.5, after: 2 })))
+  }
+
+  // ---- Keterbatasan ----
+  body.push(heading(`${ai ? 'VIII' : 'VII'}. Keterbatasan data dan hal yang perlu dikonfirmasi`))
   A.tests.filter(t => t.status === 'na').forEach(t => body.push(para(`• ${t.judul} (${t.pasal}): ${t.note}`, { size: 9.5, after: 2 })))
   body.push(para('• Cadangan klaim: lapbul tidak memisahkan nilai penjaminan yang ditanggung sendiri dari bruto; hasil bersifat indikatif.', { size: 9.5, after: 2 }))
   body.push(para('• Perhitungan ECL menurut PSAK 109 tidak dicakup (membutuhkan data umur dan kolektibilitas di luar lapbul).', { size: 9.5, after: 2 }))

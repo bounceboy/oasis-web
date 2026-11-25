@@ -8,9 +8,10 @@ import {
   analyze, DEFAULT_PARAMS, LINGKUP, STAT, fmtVal, idn, refLabel, rpF, rpS, sheetTitle,
   type Analysis, type Lingkup, type Params, type Ref, type Status,
 } from '@/lib/lapbul/engine'
+import { susunDataAi, type AiRecord } from '@/lib/lapbul/ai-shared'
 
-type Tab = 'ringkasan' | 'angka' | 'uji' | 'anomali' | 'hitung'
-const TABS: [Tab, string][] = [['ringkasan', 'Ringkasan'], ['angka', 'Angka dan rasio'], ['uji', 'Pengujian ketentuan'], ['anomali', 'Anomali'], ['hitung', 'Hitung ulang']]
+type Tab = 'ai' | 'ringkasan' | 'angka' | 'uji' | 'anomali' | 'hitung'
+const TABS: [Tab, string][] = [['ringkasan', 'Ringkasan'], ['angka', 'Angka dan rasio'], ['uji', 'Pengujian ketentuan'], ['anomali', 'Anomali'], ['hitung', 'Hitung ulang'], ['ai', 'Analisis AI']]
 
 interface RiwayatItem { id: string; nama_entitas: string; created_at: string; ringkasan: { posisi?: string; sum?: Record<Status, number> } | null }
 interface Loaded { file: File; data?: LapbulData; error?: string }
@@ -33,6 +34,36 @@ export default function LapbulPage() {
   const [stack, setStack] = useState<Ref[]>([])
   const [filterUji, setFilterUji] = useState<'all' | Status>('all')
   const fileRef = useRef<HTMLInputElement>(null)
+  const [ai, setAi] = useState<AiRecord | null>(null)
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [detik, setDetik] = useState(0)
+  const aiRun = useRef(0) // jawaban dari analisis yang sudah ditinggalkan diabaikan
+
+  useEffect(() => {
+    if (!aiBusy) return
+    const t = setInterval(() => setDetik(d => d + 1), 1000)
+    return () => clearInterval(t)
+  }, [aiBusy])
+
+  async function jalankanAi(L: LapbulData, pembanding: LapbulData[], P: Params) {
+    const run = ++aiRun.current
+    setAiBusy(true); setAiError(null); setDetik(0)
+    try {
+      const data = susunDataAi(L, analyze(L, pembanding, P), P)
+      const res = await fetch('/api/lapbul/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data }) })
+      const d = await res.json().catch(() => ({ error: `Server tidak merespons (${res.status})` }))
+      if (aiRun.current !== run) return
+      if (!res.ok) throw new Error(d.error || 'Analisis AI gagal')
+      setAi({ hasil: d.hasil, model: d.model, angkaPerluCek: d.angkaPerluCek || [], params: P, dibuat: new Date().toISOString() })
+      setSaveState('idle')
+    } catch (e) {
+      if (aiRun.current !== run) return
+      setAiError(e instanceof Error ? e.message : 'Analisis AI gagal')
+    }
+    setAiBusy(false)
+  }
+  const batalkanAi = () => { aiRun.current++; setAiBusy(false); setAiError(null) }
 
   const A: Analysis | null = useMemo(() => (main ? analyze(main, prior, params) : null), [main, prior, params])
 
@@ -60,7 +91,8 @@ export default function LapbulPage() {
     const ok = files.filter(x => x.data).map(x => x.data!).sort((a, b) => b.posisiISO.localeCompare(a.posisiISO))
     if (!ok.length) { setError('Belum ada lapbul yang terbaca.'); return }
     setBusy(true)
-    setMain(ok[0]); setPrior(ok.slice(1)); setSavedId(null); setSaveState('idle'); setTab('ringkasan'); setStack([])
+    setMain(ok[0]); setPrior(ok.slice(1)); setSavedId(null); setSaveState('idle'); setTab('ai'); setStack([]); setAi(null)
+    void jalankanAi(ok[0], ok.slice(1), params)
     if (!nama) setNama(ok[0].entitas)
     setBusy(false)
   }
@@ -72,6 +104,7 @@ export default function LapbulPage() {
     if (!h?.main) { setError('Riwayat tidak dapat dibuka.'); return }
     const item = riwayat.find(x => x.id === id)
     setMain(h.main); setPrior(h.prior || []); setParams({ ...DEFAULT_PARAMS, ...h.params }); setNama(item?.nama_entitas || h.main.entitas)
+    batalkanAi(); setAi(h.ai || null)
     setSavedId(id); setSaveState('saved'); setTab('ringkasan'); setStack([])
   }
 
@@ -88,7 +121,7 @@ export default function LapbulPage() {
     try {
       const res = await fetch('/api/lapbul', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: savedId, namaEntitas: nama || main.entitas, main, prior, params, ringkasan: { posisi: main.posisi, posisiISO: main.posisiISO, sum: A.sum, file: main.file } }),
+        body: JSON.stringify({ id: savedId, namaEntitas: nama || main.entitas, main, prior, params, ai, ringkasan: { posisi: main.posisi, posisiISO: main.posisiISO, sum: A.sum, file: main.file } }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error)
@@ -103,7 +136,7 @@ export default function LapbulPage() {
       const [{ Packer }, { buildReportDoc, reportFileName }] = await Promise.all([import('docx'), import('@/lib/lapbul/docx')])
       const logo = await fetch('/lapbul/ojk-logo.png').then(r => (r.ok ? r.arrayBuffer() : null)).catch(() => null)
       const dibaca = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-      const doc = buildReportDoc({ L: main, A, P: params, namaEntitas: nama || main.entitas, logo: logo ? new Uint8Array(logo) : null, dibaca })
+      const doc = buildReportDoc({ L: main, A, P: params, namaEntitas: nama || main.entitas, logo: logo ? new Uint8Array(logo) : null, dibaca, ai })
       const blob = await Packer.toBlob(doc)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a'); a.href = url; a.download = reportFileName(nama || main.entitas, main); a.click()
@@ -113,7 +146,7 @@ export default function LapbulPage() {
   }
 
   const setP = (p: Partial<Params>) => { setParams(x => ({ ...x, ...p })); if (saveState === 'saved') setSaveState('idle') }
-  const reset = () => { setMain(null); setPrior([]); setFiles([]); setNama(''); setParams(DEFAULT_PARAMS); setSavedId(null); setSaveState('idle'); setStack([]) }
+  const reset = () => { batalkanAi(); setAi(null); setMain(null); setPrior([]); setFiles([]); setNama(''); setParams(DEFAULT_PARAMS); setSavedId(null); setSaveState('idle'); setStack([]) }
 
   // ───────── komponen kecil ─────────
   const Chip = ({ r, push }: { r: Ref; push?: boolean }) => (
@@ -230,6 +263,12 @@ export default function LapbulPage() {
         .excerpt tr.hit td { background: rgba(69,230,97,0.1); color: #eef2ef; }
         .excerpt td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .icon-btn { background: none; border: 1px solid rgba(255,255,255,0.12); color: #aab4bc; border-radius: 999px; padding: 5px 12px; cursor: pointer; font-size: 11.5px; font-family: inherit; }
+        .ai-load { text-align: center; padding: 44px 16px; }
+        .spin { width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgba(69,230,97,0.2); border-top-color: #45e661; margin: 0 auto 16px; animation: putar .9s linear infinite; }
+        @keyframes putar { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+        .ai-warn { border: 1px solid rgba(245,197,66,0.3); background: rgba(245,197,66,0.07); color: #f5d98a; border-radius: 12px; padding: 10px 14px; font-size: 12px; line-height: 1.6; margin-bottom: 12px; }
+        .ai-list { margin: 6px 0 0; padding-left: 18px; }
         @media (max-width: 960px) { .side { display: none; } .tiles { grid-template-columns: repeat(2, 1fr); } }
       `}</style>
 
@@ -286,7 +325,7 @@ export default function LapbulPage() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                  <span className="note">Tanpa AI: pembacaan memakai kode komponen APOLO dan rumus tetap.</span>
+                  <span className="note">Angka dan status dihitung dengan aturan tetap; AI menelaah anomali dan menyusun draf analisis.</span>
                   <button className="btn btn-primary" disabled={busy || !files.some(f => f.data)} onClick={runAnalysis}>Analisis →</button>
                 </div>
               </div>
@@ -301,10 +340,10 @@ export default function LapbulPage() {
                     <div className="hasil-meta">Posisi {main.posisi || '—'} · {main.file}{prior.length ? ` · pembanding: ${prior.map(p => p.posisi).join(', ')}` : ''}</div>
                   </div>
                   <div className="actions">
-                    <button className="btn btn-outline" onClick={simpan} disabled={saveState === 'saving' || saveState === 'saved'}>
+                    <button className="btn btn-outline" onClick={simpan} disabled={aiBusy || saveState === 'saving' || saveState === 'saved'}>
                       {saveState === 'saving' ? 'Menyimpan…' : saveState === 'saved' ? '✓ Tersimpan' : 'Simpan'}
                     </button>
-                    <button className="btn btn-primary" onClick={unduh} disabled={dlState === 'busy'}>{dlState === 'busy' ? 'Menyiapkan…' : '⬇ Unduh Word'}</button>
+                    <button className="btn btn-primary" onClick={unduh} disabled={aiBusy || dlState === 'busy'}>{aiBusy ? 'Menunggu AI…' : dlState === 'busy' ? 'Menyiapkan…' : '⬇ Unduh Word'}</button>
                   </div>
                 </div>
 
@@ -342,6 +381,11 @@ export default function LapbulPage() {
                     </button>
                   ))}
                 </div>
+
+                {tab === 'ai' && (
+                  <AiPanel ai={ai} busy={aiBusy} error={aiError} detik={detik} stale={!!ai && (ai.params.lingkup !== params.lingkup || ai.params.porsi !== params.porsi || ai.params.tglTerima !== params.tglTerima)}
+                    onRun={() => jalankanAi(main, prior, params)} A={A} L={main} Chip={Chip} />
+                )}
 
                 {tab === 'ringkasan' && <Ringkasan A={A} nama={nama || main.entitas} L={main} onTab={setTab} Pill={Pill} />}
 
@@ -544,6 +588,90 @@ function Ringkasan({ A, nama, L, onTab, Pill }: { A: Analysis; nama: string; L: 
           <tr key={t.id}><td>{t.judul}<div className="note">{t.pasal}</div></td><td className="num">{t.nilai}</td><td className="note" style={{ whiteSpace: 'nowrap' }}>{t.batas}</td><td><Pill s={t.status} /></td></tr>
         ))}
       </tbody></table></div>
+    </div>
+  )
+}
+
+function AiPanel({ ai, busy, error, detik, stale, onRun, A, L, Chip }: {
+  ai: AiRecord | null; busy: boolean; error: string | null; detik: number; stale: boolean; onRun: () => void
+  A: Analysis; L: LapbulData; Chip: (p: { r: Ref; push?: boolean }) => React.ReactElement
+}) {
+  if (busy) {
+    const tahap = detik < 8 ? 'Mengirim hasil aturan dan isi lembar ke AI' : detik < 25 ? 'AI menelaah pengujian dan selisih antar lembar' : detik < 50 ? 'AI mencari anomali pada neraca, laba rugi, dan klaim' : 'AI menyusun temuan, pertanyaan, dan tindak lanjut'
+    return (
+      <div className="ai-load" role="status">
+        <div className="spin" />
+        <div className="test-title">{tahap}…</div>
+        <div className="note" style={{ marginTop: 8 }}>{detik} detik · biasanya 1–2 menit. Hasil aturan sudah bisa dibuka di tab lain.</div>
+      </div>
+    )
+  }
+  if (!ai) {
+    return (
+      <div className="ai-load">
+        {error && <div className="error-box" style={{ textAlign: 'left' }}>{error}</div>}
+        <div className="note" style={{ marginBottom: 14 }}>Analisis AI belum tersedia untuk lapbul ini.</div>
+        <button className="btn btn-primary" onClick={onRun}>Jalankan analisis AI</button>
+      </div>
+    )
+  }
+  const h = ai.hasil
+  /** Ubah pengenal rujukan AI menjadi chip jejak sumber; pengenal yang tidak ada diabaikan. */
+  const rujuk = (ids: string[]) => {
+    const refs: Ref[] = []
+    for (const id of ids) {
+      const [a, b] = id.replace(/[[\]]/g, '').split(':')
+      if (a === 'uji') refs.push(...(A.tests.find(t => t.id === b)?.refs || []))
+      else if (a === 'cek') refs.push(...(A.checks.find(c => c.id === b)?.refs || []))
+      else {
+        const row = L.sheets[a]?.rows.find(r => r.k === b)
+        const nums = row?.cells.filter(c => typeof c.v === 'number') || []
+        const c = nums.find(c => /^total ›|jumlah$/i.test(c.h)) || nums[0]
+        if (row && c) refs.push({ t: 's', sheet: a, k: b, h: c.h, addr: c.addr, r: row.r, u: row.u, v: c.v, file: L.file })
+      }
+    }
+    const unik = [...new Map(refs.map(r => [r.t === 'd' ? r.id : r.sheet + r.addr, r])).values()].slice(0, 8)
+    return unik.length ? <div style={{ marginTop: 8 }}>{unik.map((r, i) => <Chip key={i} r={r} />)}</div> : null
+  }
+  const warna = { tinggi: 'bad', sedang: 'warn', rendah: 'na' } as const
+  return (
+    <div>
+      {error && <div className="error-box">{error}</div>}
+      {stale && <div className="ai-warn">Pengaturan analisis berubah setelah AI dijalankan. Jalankan ulang agar teks AI sesuai dengan angka terbaru.</div>}
+      {ai.angkaPerluCek.length > 0 && <div className="ai-warn">Angka pada teks AI yang tidak ditemukan persis di data, mohon dicek: {ai.angkaPerluCek.join('; ')}</div>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span className="note">Draf AI ({ai.model}) · perlu diverifikasi pengawas. Angka dan status tetap dari aturan.</span>
+        <button className="icon-btn" onClick={onRun}>Jalankan ulang</button>
+      </div>
+      <p className="test-calc" style={{ fontSize: 13, lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{h.ringkasan}</p>
+      <div className="grp">Temuan prioritas</div>
+      {h.temuan.map((t, i) => (
+        <div className="test" key={i}>
+          <div className="test-head"><div className="test-title">{t.judul}</div><span className={`pill pill-${warna[t.prioritas] || 'na'}`}>Prioritas {t.prioritas}</span></div>
+          <div className="test-calc" style={{ marginTop: 8 }}>{t.uraian}</div>
+          {rujuk(t.rujukan)}
+        </div>
+      ))}
+      <div className="grp">Anomali yang perlu didalami</div>
+      {h.anomali.map((a, i) => (
+        <div className="test" key={i}>
+          <div className="test-title">{a.judul}</div>
+          <div className="test-calc" style={{ marginTop: 8 }}>{a.pengamatan}</div>
+          <div className="note" style={{ marginTop: 8 }}>Dugaan penyebab (perlu konfirmasi)</div>
+          <ul className="ai-list test-calc">{a.dugaan_penyebab.map((d, j) => <li key={j}>{d}</li>)}</ul>
+          {rujuk(a.rujukan)}
+        </div>
+      ))}
+      <div className="grp">Pertanyaan konfirmasi ke perusahaan</div>
+      {h.pertanyaan.map((q, i) => (
+        <div className="test" key={i}>
+          <div className="test-calc" style={{ color: '#eef2ef' }}>{i + 1}. {q.pertanyaan}</div>
+          <div className="note" style={{ marginTop: 6 }}>Data diminta: {q.data_diminta}</div>
+          {rujuk(q.rujukan)}
+        </div>
+      ))}
+      <div className="grp">Saran tindak lanjut</div>
+      <ol className="ai-list test-calc">{h.tindak_lanjut.map((x, i) => <li key={i}>{x.replace(/^\d+[.)]\s*/, '')}</li>)}</ol>
     </div>
   )
 }
