@@ -3,7 +3,7 @@ export const maxDuration = 300
 import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { callOpenRouter } from '@/lib/claude'
-import { searchRelevantPojk } from '@/lib/pojk-search'
+import { searchReferensiOnsite } from '@/lib/pojk-search'
 
 const KLUSTER: Record<string, string> = {
   A: 'Risiko Asuransi', B: 'SDM & Kelembagaan', C: 'Pemasaran & Keagenan',
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
 
   after(async () => {
     try {
-      const pojkRef = await searchRelevantPojk(`${departemen} pemeriksaan asuransi ${fokus}`, 10, jenisUsaha)
+      const pojkRef = await searchReferensiOnsite(departemen, fokus, kombinasiTeks, jenisUsaha)
       const instruksi = fokus ? `Fokus khusus dari pengawas: ${fokus}` : 'Lakukan analisis menyeluruh atas semua dokumen ini secara terpadu.'
 
       const prompt = `Anda adalah pengawas OJK senior yang melakukan pemeriksaan onsite perusahaan asuransi.

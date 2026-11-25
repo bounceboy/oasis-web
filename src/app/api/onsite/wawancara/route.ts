@@ -3,7 +3,7 @@ export const maxDuration = 300
 import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { callOpenRouter } from '@/lib/claude'
-import { searchRelevantPojk } from '@/lib/pojk-search'
+import { searchReferensiOnsite } from '@/lib/pojk-search'
 import { createClient } from '@supabase/supabase-js'
 
 const BUCKET = 'waw-uploads'
@@ -58,7 +58,7 @@ async function extractText(buf: Buffer, filename: string): Promise<string> {
 
 async function runAnalysis(wawId: string, kode: string, departemen: string, fokus: string, teks: string, namaFile: string, jenisUsaha = '', apiKey = '') {
   try {
-    const pojkRef = await searchRelevantPojk(`${departemen} wawancara pemeriksaan asuransi ${fokus}`, 10, jenisUsaha)
+    const pojkRef = await searchReferensiOnsite(departemen, fokus, teks, jenisUsaha)
     const instruksi = fokus ? `Fokus khusus dari pengawas: ${fokus}` : 'Analisis catatan wawancara ini secara menyeluruh untuk mengidentifikasi potensi temuan.'
 
     const prompt = `Anda adalah pengawas OJK senior yang menganalisis catatan/bahan tayang wawancara pemeriksaan onsite.
@@ -115,7 +115,7 @@ Balas HANYA dengan JSON (tanpa teks lain, tanpa markdown):
     const aiResp = await callOpenRouter(
       'Anda adalah pengawas OJK senior. Balas HANYA dengan JSON valid tanpa markdown, tanpa teks tambahan.',
       prompt,
-      6000,
+      10000,
       apiKey
     )
 

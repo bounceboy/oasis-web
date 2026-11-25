@@ -70,7 +70,8 @@ async function runRenbisAnalysis(
     const teks = pages.map((p) => p.text).join('\n\n')
 
     // 2. Ambil konteks POJK Renbis
-    const pojkContext = await searchReferensiRenbis(namaEntitas)
+    // prinsip syariah dikenali dari isi dokumen, tidak hanya dari nama yang diketik
+    const pojkContext = await searchReferensiRenbis(namaEntitas, /tabarru|ujrah/i.test(teks) ? 'syariah' : '')
 
     // 3. AI isi KK
     const { kk_rows, analisis, kesimpulan } = await isiKkRenbis(teks, namaEntitas, tahun, pojkContext, apiKey)

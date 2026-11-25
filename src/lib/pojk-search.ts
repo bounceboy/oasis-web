@@ -100,6 +100,19 @@ const RENBIS_PERTANYAAN = [
   'perubahan atau penyesuaian rencana bisnis frekuensi penyampaian',
 ]
 
+async function referensiKesehatan(syariah: boolean): Promise<Baris[]> {
+  const sumber = syariah ? 'POJK No. 72 Tahun 2016' : 'POJK No. 71 Tahun 2016'
+  const tanya = syariah
+    ? ['perusahaan setiap saat wajib memenuhi tingkat solvabilitas dana tabarru dan menetapkan target internal paling rendah', 'target tingkat solvabilitas internal ditetapkan paling rendah 120% dari DTMBR',
+       'perusahaan dilarang melakukan pendistribusian surplus underwriting dalam hal masih terdapat qardh', 'kemampuan memberikan qardh dan persetujuan direksi']
+    : ['perusahaan setiap saat wajib memenuhi tingkat solvabilitas dan menetapkan target internal paling rendah', 'target tingkat solvabilitas internal ditetapkan paling rendah 120% dari MMBR']
+  const res = await new OpenAI({ apiKey: process.env.OPENAI_API_KEY }).embeddings.create({ model: 'text-embedding-3-small', input: tanya })
+  const hasil = await Promise.all(res.data.map((d) => db().rpc('match_pojk_chunks', { query_embedding: d.embedding, match_count: 3, filter_source: sumber })))
+  const unik = new Map<string, Baris>()
+  for (const h of hasil) for (const c of (h.data ?? []) as Array<Baris & { id?: string }>) unik.set(c.id ?? `${c.pasal}|${c.content.slice(0, 40)}`, c)
+  return [...unik.values()]
+}
+
 export async function searchReferensiRenbis(namaEntitas: string, jenisUsaha = ''): Promise<string> {
   const syariah = /syariah/i.test(`${namaEntitas} ${jenisUsaha}`)
   const sumber = ['POJK No. 24 Tahun 2019', syariah ? 'SEOJK No. 10 Tahun 2021' : 'SEOJK No. 23 Tahun 2024']
@@ -127,10 +140,59 @@ export async function searchReferensiRenbis(namaEntitas: string, jenisUsaha = ''
     if (!unik.size) throw new Error('tidak ada hasil')
     // peraturan inti dulu, baru SEOJK
     const urut = [...unik.values()].sort((a, b) => sumber.indexOf(a.source ?? '') - sumber.indexOf(b.source ?? '') || (b.similarity ?? 0) - (a.similarity ?? 0))
-    return formatChunks(urut)
+    const kesehatan = await referensiKesehatan(syariah).catch(() => [] as Baris[])
+    return formatChunks(urut) + (kesehatan.length ? '\n\n---\n\nKETENTUAN KESEHATAN KEUANGAN (pembanding proyeksi dan rencana):\n\n' + formatChunks(kesehatan) : '')
   } catch (err) {
     console.error('[pojk-search] referensi Renbis gagal, kembali ke pencarian lama:', err)
     return searchRelevantPojk('rencana bisnis perusahaan asuransi penyampaian', 10, jenisUsaha)
+  }
+}
+
+// ─── Referensi Onsite: pencarian makna berdasarkan departemen, fokus, DAN isi dokumen ─────────────
+// Pencarian lama hanya memakai beberapa kata pertama (departemen), sehingga fokus pengawas dan isi dokumen
+// tidak ikut menentukan pasal yang diambil.
+const PANJANG_POTONGAN = 400
+const MAKS_POTONGAN = 45
+
+export function pertanyaanOnsite(departemen: string, fokus: string, teks: string): string[] {
+  const q: string[] = [`${departemen} kewajiban dan larangan perusahaan ${fokus}`.trim()]
+  for (const f of fokus.split(/[,;\n]+/).map((x) => x.trim()).filter((x) => x.length > 3).slice(0, 6)) q.push(`${departemen}: ${f}`)
+  const bersih = teks.slice(0, 18000).replace(/\s+/g, ' ').trim()
+  const langkah = Math.max(PANJANG_POTONGAN, Math.ceil(bersih.length / MAKS_POTONGAN))
+  for (let i = 0; i < bersih.length; i += langkah) q.push(bersih.slice(i, i + langkah))
+  return q
+}
+
+export async function searchReferensiOnsite(departemen: string, fokus: string, teks: string, jenisUsaha = '', limit = 34): Promise<string> {
+  const sektor = sektorDariJenisUsaha(jenisUsaha)
+  try {
+    const q = pertanyaanOnsite(departemen, fokus, teks)
+    const res = await new OpenAI({ apiKey: process.env.OPENAI_API_KEY }).embeddings.create({ model: 'text-embedding-3-small', input: q })
+    const emb = [...res.data].sort((a, b) => a.index - b.index).map((d) => d.embedding)
+    const hasil = await Promise.all(
+      emb.map((e) => db().rpc('match_pojk_chunks_kategori', {
+        query_embedding: e, match_count: 5, filter_kategori: kategoriFilter(jenisUsaha, sektor), filter_sektor: sektorBoleh(sektor), hanya_berlaku: true,
+      }))
+    )
+    // ambil bergiliran: hasil teratas tiap pertanyaan dulu, agar semua topik dokumen terwakili
+    const pilih = new Map<string, Baris>()
+    for (let peringkat = 0; peringkat < 5 && pilih.size < limit; peringkat++) {
+      for (const h of hasil) {
+        const c = ((h.data ?? []) as Array<Baris & { id?: string }>)[peringkat]
+        if (!c || pilih.size >= limit) continue
+        pilih.set(c.id ?? `${c.source}|${c.pasal}|${c.content.slice(0, 40)}`, c)
+      }
+    }
+    if (!pilih.size) throw new Error('tidak ada hasil')
+    // dokumen yang menyentuh kesehatan keuangan selalu dibandingkan dengan batas solvabilitas, qardh, dan surplus
+    if (sektor === 'asuransi' && /solvabilitas|qardh|surplus underwriting/i.test(teks)) {
+      for (const c of await referensiKesehatan(/tabarru|syariah/i.test(`${jenisUsaha} ${teks}`)).catch(() => [] as Baris[]))
+        pilih.set((c as Baris & { id?: string }).id ?? `${c.source}|${c.pasal}|${c.content.slice(0, 40)}`, c)
+    }
+    return formatChunks([...pilih.values()].map((c) => ({ ...c, content: c.content.slice(0, 1800) })))
+  } catch (err) {
+    console.error('[pojk-search] referensi Onsite gagal, kembali ke pencarian lama:', err)
+    return searchRelevantPojk(`${departemen} pemeriksaan asuransi ${fokus}`, 10, jenisUsaha)
   }
 }
 

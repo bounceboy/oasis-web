@@ -115,6 +115,8 @@ BATASAN KETAT — WAJIB DIPATUHI:
 - Nomor/tanggal surat, ketepatan waktu penyampaian, surat OJK, frekuensi, dan media penyampaian DIISI MANUAL oleh pengawas dan TIDAK ada di template ini. JANGAN menilai tepat/tidaknya waktu penyampaian, JANGAN menyebut sanksi keterlambatan, dan JANGAN menuliskan nomor atau tanggal surat. Tanggal persetujuan Dewan Komisaris boleh disebut sebagai fakta bila tercantum, tanpa menyimpulkan apa pun tentang ketepatan waktu.
 - Untuk baris checklist (Ada/Tidak Ada): jawab "Ada" jika bagian tersebut ditemukan, "Tidak Ada" jika tidak ditemukan. Sertakan 1-2 kalimat ringkas isinya jika Ada.
 - Untuk baris analisis (no 4): analisis kewajaran target, asumsi, dan proyeksi secara objektif berdasarkan isi dokumen saja.
+- Bila REFERENSI memuat ketentuan kesehatan keuangan, bandingkan setiap proyeksi rasio, target internal, qardh, dan rencana distribusi surplus dengan batas atau larangan di referensi tersebut. Batas minimum regulator berbeda dengan target internal minimum: periksa keduanya, dan nyatakan secara tegas bila tidak terpenuhi (sebutkan pasalnya).
+- Periksa konsistensi angka antarbagian dokumen dan sebutkan setiap selisih.
 - Untuk baris kesimpulan (no 5): tulis tiga butir bernomor — (1) PENYAMPAIAN: tulis persis "[diisi manual oleh pengawas]"; (2) KELENGKAPAN: simpulkan cakupan lengkap/tidak lengkap; (3) KEWAJARAN: simpulkan kewajaran rencana bisnis.`
 
   const user = `Perusahaan: ${namaPerusahaan}, Tahun Rencana Bisnis: ${tahun}

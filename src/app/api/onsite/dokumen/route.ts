@@ -3,7 +3,7 @@ export const maxDuration = 300
 import { getUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { callOpenRouter } from '@/lib/claude'
-import { searchRelevantPojk } from '@/lib/pojk-search'
+import { searchReferensiOnsite } from '@/lib/pojk-search'
 
 const KLUSTER: Record<string, string> = {
   A: 'Risiko Asuransi', B: 'SDM & Kelembagaan', C: 'Pemasaran & Keagenan',
@@ -43,7 +43,7 @@ async function extractText(buf: Buffer, filename: string): Promise<string> {
 
 async function runAnalysis(dokId: string, kode: string, departemen: string, fokus: string, teks: string, namaFile: string, jenisUsaha = '', apiKey = '') {
   try {
-    const pojkRef = await searchRelevantPojk(`${departemen} pemeriksaan asuransi ${fokus}`, 10, jenisUsaha)
+    const pojkRef = await searchReferensiOnsite(departemen, fokus, teks, jenisUsaha)
     const instruksi = fokus ? `Fokus khusus dari pengawas: ${fokus}` : 'Lakukan analisis menyeluruh atas dokumen ini.'
 
     const prompt = `Anda adalah pengawas OJK senior yang melakukan pemeriksaan onsite perusahaan asuransi.
@@ -63,6 +63,8 @@ Analisis dokumen di atas dan hasilkan JSON dengan struktur PERSIS seperti contoh
 PENTING:
 - risk_based: temuan kelemahan tata kelola, kontrol internal, risiko operasional (pasal_terkait boleh kosong array)
 - compliance: pelanggaran POJK yang ada di referensi (pasal_terkait WAJIB diisi)
+- Periksa dokumen butir demi butir terhadap REFERENSI: angka batas minimum atau maksimum, jangka waktu, frekuensi, kewenangan persetujuan, dan larangan. Setiap ketidaksesuaian menjadi satu temuan compliance tersendiri; jangan menggabungkan beberapa pelanggaran
+- Sebut pasal hanya bila isinya ada di REFERENSI dan memang mengatur hal tersebut
 - Setiap kategori minimal 1 temuan jika ada indikasi masalah
 - kluster pilih dari: A(Risiko Asuransi) B(SDM) C(Pemasaran) D(Keuangan) E(GCG) F(APU-PPT) G(Investasi) H(TI)
 - urgensi: "kritis" atau "signifikan" atau "perlu_perhatian"
@@ -101,7 +103,7 @@ Balas HANYA dengan JSON (tanpa teks lain, tanpa markdown):
     const aiResp = await callOpenRouter(
       'Anda adalah pengawas OJK senior. Balas HANYA dengan JSON valid tanpa markdown, tanpa teks tambahan.',
       prompt,
-      6000,
+      10000,
       apiKey
     )
     console.log('[onsite/dokumen] raw (200):', aiResp.slice(0, 200))
