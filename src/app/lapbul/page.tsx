@@ -110,8 +110,9 @@ export default function LapbulPage() {
 
   async function hapusRiwayat(id: string) {
     if (!confirm('Hapus riwayat analisis ini?')) return
-    await fetch(`/api/sessions/${id}`, { method: 'DELETE' })
-    if (savedId === id) setSavedId(null)
+    const res = await fetch(`/api/sessions/${id}`, { method: 'DELETE' }).catch(() => null)
+    if (!res?.ok) { setError('Gagal menghapus riwayat analisis.'); return }
+    if (savedId === id) reset() // analisis yang sedang dibuka ikut ditutup
     loadRiwayat()
   }
 
@@ -247,7 +248,9 @@ export default function LapbulPage() {
         .rw:hover { border-color: rgba(69,230,97,0.4); }
         .rw .a { font-size: 12.5px; color: #eef2ef; }
         .rw .b { font-size: 11px; color: #828d96; margin-top: 3px; display: flex; justify-content: space-between; }
-        .rw .x { background: none; border: none; color: #828d96; cursor: pointer; font-size: 11px; }
+        .rw .x { display: block; width: 100%; margin-top: 10px; padding: 7px; border-radius: 999px; background: rgba(255,111,97,0.08); border: 1px solid rgba(255,111,97,0.35); color: #ff8b80; cursor: pointer; font-size: 11.5px; font-family: inherit; }
+        .rw .x:hover { background: rgba(255,111,97,0.18); }
+        .btn-hapus { background: transparent; color: #ff8b80; border: 1px solid rgba(255,111,97,0.4); }
 
         .drawer-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 40; }
         .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(520px, 100vw); background: #0b1016; border-left: 1px solid rgba(255,255,255,0.1); z-index: 41; display: flex; flex-direction: column; }
@@ -340,6 +343,7 @@ export default function LapbulPage() {
                     <div className="hasil-meta">Posisi {main.posisi || '—'} · {main.file}{prior.length ? ` · pembanding: ${prior.map(p => p.posisi).join(', ')}` : ''}</div>
                   </div>
                   <div className="actions">
+                    {savedId && <button className="btn btn-hapus" onClick={() => hapusRiwayat(savedId)} disabled={aiBusy}>🗑 Hapus analisis</button>}
                     <button className="btn btn-outline" onClick={simpan} disabled={aiBusy || saveState === 'saving' || saveState === 'saved'}>
                       {saveState === 'saving' ? 'Menyimpan…' : saveState === 'saved' ? '✓ Tersimpan' : 'Simpan'}
                     </button>
@@ -525,9 +529,9 @@ export default function LapbulPage() {
                 <div className="a">{r.nama_entitas}</div>
                 <div className="b">
                   <span>{r.ringkasan?.posisi || new Date(r.created_at).toLocaleDateString('id-ID')}</span>
-                  <button className="x" onClick={e => { e.stopPropagation(); hapusRiwayat(r.id) }}>hapus</button>
                 </div>
                 {r.ringkasan?.sum && <div className="b"><span style={{ color: '#45e661' }}>{r.ringkasan.sum.ok} memenuhi</span><span style={{ color: '#ff6f61' }}>{r.ringkasan.sum.bad} tidak</span><span style={{ color: '#f5c542' }}>{r.ringkasan.sum.warn} klarifikasi</span></div>}
+                <button className="x" onClick={e => { e.stopPropagation(); hapusRiwayat(r.id) }}>🗑 Hapus analisis</button>
               </div>
             ))}
           </div>

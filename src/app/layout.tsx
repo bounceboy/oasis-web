@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
+import DropUpload from "@/components/oasis/DropUpload";
 
 const poppins = Poppins({
   weight: ['300', '400', '500', '600'],
@@ -21,6 +22,7 @@ export default function RootLayout({
   return (
     <html lang="id" className={poppins.variable}>
       <body>
+        <DropUpload />
         {/* Aurora backdrop */}
         <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0 }}>
           <div style={{ position: 'absolute', top: -220, left: '35%', width: 820, height: 680, background: 'radial-gradient(closest-side, rgba(28,90,190,0.55), transparent 70%)', filter: 'blur(70px)' }} />
